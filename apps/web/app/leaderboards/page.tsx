@@ -2,7 +2,6 @@ import React from "react";
 import { createClient } from "@/utils/supabase/server";
 import Image from "next/image";
 
-// Definimos o tipo para evitar o erro de 'any'
 type LeaderboardTitle = {
   id: string;
   name: string;

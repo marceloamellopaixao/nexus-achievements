@@ -27,7 +27,7 @@ export async function updateProfile(username: string, bio: string) {
   }
 
   // Revalida a página do perfil e o layout global (Topbar)
-  revalidatePath('/profile')
+  revalidatePath(`/profile/${username.trim()}`)
   revalidatePath('/')
   
   return { success: true, message: 'Perfil salvo com sucesso!' }

@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import { updateProfile } from '../actions'
+import { updateProfile } from '../../actions'
 import { toast } from 'react-toastify'
 import { useRouter } from 'next/navigation'
 
