@@ -31,7 +31,7 @@ export default async function RootLayout({
       .single(); // Busca os dados do usuário logado usando o ID da sessão
 
     userData = data; // Armazena os dados do usuário para uso posterior (ex: exibir nome, avatar, etc.)
-    console.log("Dados do usuário logado:", userData); // Loga os dados do usuário para verificação
+    // console.log("Dados do usuário logado:", userData); // Loga os dados do usuário para verificação
   }
 
   return (
@@ -89,6 +89,16 @@ export default async function RootLayout({
                   {userData?.username ? userData.username.charAt(0) : "U"}
                 </div>
               )}
+
+              {/* BOTÃO DE LOGOUT */}
+              <form action="/auth/signout" method="post">
+                <button
+                  type="submit"
+                  className="ml-2 px-3 py-1.5 text-sm font-medium text-red-400 hover:text-red-300 hover:bg-red-400/10 rounded-md transition-colors"
+                >
+                  Sair
+                </button>
+              </form>
             </div>
           </header>
 
