@@ -42,7 +42,7 @@ export default function IntegrationsPage() {
     setLoadingSync(true);
     const result = await syncSteamAchievements();
     if (result.error) toast.error(result.error);
-    else toast.success(result.success, { icon: "🔄" });
+    else toast.success(`🔄 ${result.success}`);
     setLoadingSync(false);
   };
 

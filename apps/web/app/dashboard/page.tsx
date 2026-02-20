@@ -1,220 +1,140 @@
 import React from "react";
+import { createClient } from "@/utils/supabase/server";
+import Image from "next/image";
+import Link from "next/link";
 
-export default function DashboardPage() {
-    // Mock de dados: futuramente virá de uma consulta 'count' no Supabase
-    const stats = [
-        { label: "Jogos Platinados", value: "1.204", icon: "🏆", color: "text-blue-400" },
-        { label: "Nexus Coins Geradas", value: "84.5K", icon: "🪙", color: "text-yellow-400" },
-        { label: "Caçadores Ativos", value: "342", icon: "🎮", color: "text-primary" },
-        { label: "Conquistas Hoje", value: "5.892", icon: "🔥", color: "text-orange-400" },
-    ];
+// 1. Tipagem rigorosa para o Feed
+type GlobalActivity = {
+  id: string;
+  game_name: string;
+  achievement_name: string;
+  points_earned: number;
+  platform: string;
+  created_at: string;
+  users: {
+    username: string;
+    avatar_url: string | null;
+  } | null;
+};
 
-    // Mock do Feed de Atividades (Prepara o formato para o futuro Supabase)
-    const activities = [
-        {
-            id: 1,
-            user: { name: "ShadowNinja", initial: "S", color: "bg-purple-500" },
-            action: "desbloqueou a conquista épica",
-            achievement: { title: "No Hit Run", points: 50, rarity: "Ouro" },
-            game: "Elden Ring",
-            time: "Há 5 minutos",
-        },
-        {
-            id: 2,
-            user: { name: "CyberGamer", initial: "C", color: "bg-blue-500" },
-            action: "platinou o jogo",
-            achievement: { title: "100% Completion", points: 200, rarity: "Platina" },
-            game: "Cyberpunk 2077",
-            time: "Há 12 minutos",
-        },
-        {
-            id: 3,
-            user: { name: "KratosFan", initial: "K", color: "bg-red-500" },
-            action: "desbloqueou a conquista",
-            achievement: { title: "Primeiro Sangue", points: 10, rarity: "Bronze" },
-            game: "God of War Ragnarök",
-            time: "Há 45 minutos",
-        },
-        {
-            id: 4,
-            user: { name: "PixelHunter", initial: "P", color: "bg-green-500" },
-            action: "desbloqueou a conquista rara",
-            achievement: { title: "Speedrunner", points: 30, rarity: "Prata" },
-            game: "Hollow Knight",
-            time: "Há 1 hora",
-        },
-    ];
+export default async function DashboardPage() {
+  const supabase = await createClient();
 
-    // Mock dos Jogos em Alta
-    const trendingGames = [
-        {
-            id: 1,
-            title: "Elden Ring",
-            hunters: "1.2k",
-            platforms: ["PC", "PS5", "XBSX"],
-            coverGradient: "from-yellow-900 to-black",
-        },
-        {
-            id: 2,
-            title: "Helldivers 2",
-            hunters: "850",
-            platforms: ["PC", "PS5"],
-            coverGradient: "from-blue-900 to-black",
-        },
-        {
-            id: 3,
-            title: "Final Fantasy VII Rebirth",
-            hunters: "620",
-            platforms: ["PS5"],
-            coverGradient: "from-teal-900 to-black",
-        },
-        {
-            id: 4,
-            title: "Hades II",
-            hunters: "430",
-            platforms: ["PC"],
-            coverGradient: "from-orange-900 to-black",
-        },
-    ];
+  const { data } = await supabase
+    .from("global_activity")
+    .select(`
+      id,
+      game_name,
+      achievement_name,
+      points_earned,
+      platform,
+      created_at,
+      users (
+        username,
+        avatar_url
+      )
+    `)
+    .order("created_at", { ascending: false })
+    .limit(50);
 
-    return (
-        <div className="space-y-8 animate-in fade-in duration-500">
-            {/* Cabeçalho da Página */}
-            <div>
-                <h2 className="text-3xl font-bold text-white tracking-tight">Hub Global</h2>
-                <p className="text-gray-400 mt-1">
-                    Visão geral da comunidade Nexus e atividades em tempo real.
-                </p>
-            </div>
+  // Forçamos o TypeScript a entender o formato exato que vem do Supabase
+  const activities = data as unknown as GlobalActivity[] | null;
 
-            {/* Grid de Cards de Estatísticas */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {stats.map((stat, index) => (
-                    <div
-                        key={index}
-                        className="bg-surface/50 border border-border rounded-2xl p-6 flex items-center justify-between hover:border-primary/50 hover:bg-surface transition-all cursor-default group"
-                    >
-                        <div>
-                            <p className="text-sm font-medium text-gray-400 group-hover:text-gray-300 transition-colors">
-                                {stat.label}
-                            </p>
-                            <p className="text-3xl font-bold text-white mt-1">
-                                {stat.value}
-                            </p>
-                        </div>
-                        <div className={`text-4xl ${stat.color} bg-background p-3 rounded-xl border border-border shadow-inner`}>
-                            {stat.icon}
-                        </div>
-                    </div>
-                ))}
-            </div>
+  const timeAgo = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
-            {/* Feed de Atividades e Sidebar Direita (Grid) */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    if (diffInSeconds < 60) return "Agora mesmo";
+    if (diffInSeconds < 3600) return `Há ${Math.floor(diffInSeconds / 60)} min`;
+    if (diffInSeconds < 86400) return `Há ${Math.floor(diffInSeconds / 3600)}h`;
+    return `Há ${Math.floor(diffInSeconds / 86400)} dias`;
+  };
 
-                {/* Coluna Principal: Feed */}
-                <div className="lg:col-span-2 space-y-4">
-                    <h3 className="text-xl font-bold text-white border-b border-border pb-2 mb-4">
-                        Atividades Recentes
-                    </h3>
-
-                    <div className="space-y-4">
-                        {activities.map((item) => (
-                            <div
-                                key={item.id}
-                                className="bg-surface/30 border border-border rounded-xl p-4 flex gap-4 hover:bg-surface/60 transition-colors"
-                            >
-                                {/* Avatar do Usuário (Usando Iniciais para não quebrar domínios de imagem) */}
-                                <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg shrink-0 ${item.user.color} shadow-sm border border-border`}>
-                                    {item.user.initial}
-                                </div>
-
-                                {/* Conteúdo da Atividade */}
-                                <div className="flex-1">
-                                    <div className="flex justify-between items-start">
-                                        <p className="text-gray-300">
-                                            <span className="font-bold text-white cursor-pointer hover:text-primary transition-colors">
-                                                {item.user.name}
-                                            </span>{" "}
-                                            {item.action}{" "}
-                                            <span className="font-semibold text-gray-200">
-                                                &quot;{item.achievement.title}&quot;
-                                            </span>{" "}
-                                            em <span className="text-primary/90 font-medium">{item.game}</span>.
-                                        </p>
-                                        <span className="text-xs text-gray-500 whitespace-nowrap ml-4">
-                                            {item.time}
-                                        </span>
-                                    </div>
-
-                                    {/* Badge de Pontuação e Raridade */}
-                                    <div className="mt-3 flex gap-2">
-                                        <div className="flex items-center gap-1 bg-background border border-border px-2 py-1 rounded-md text-xs font-medium">
-                                            <span className="text-yellow-500">🪙</span> +{item.achievement.points}
-                                        </div>
-                                        <div className="flex items-center bg-background border border-border px-2 py-1 rounded-md text-xs font-medium text-gray-400">
-                                            Raridade: <span className="text-white ml-1">{item.achievement.rarity}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-
-                    <button className="w-full py-3 mt-4 bg-surface border border-border rounded-xl text-gray-400 hover:text-white hover:border-primary/50 transition-all font-medium">
-                        Carregar mais atividades
-                    </button>
-                </div>
-
-                {/* Coluna Secundária: Jogos em Alta */}
-                <div className="space-y-4">
-                    <h3 className="text-xl font-bold text-white border-b border-border pb-2 mb-4">
-                        Em Alta na Comunidade
-                    </h3>
-
-                    <div className="grid grid-cols-1 gap-4">
-                        {trendingGames.map((game) => (
-                            <div
-                                key={game.id}
-                                className="group relative overflow-hidden rounded-xl border border-border bg-surface flex items-center gap-4 p-3 hover:border-primary/50 cursor-pointer transition-all"
-                            >
-                                {/* Capa do Jogo (Simulada com Gradiente por enquanto) */}
-                                <div className={`w-16 h-20 rounded-md shrink-0 bg-linear-to-b ${game.coverGradient} border border-white/10 shadow-inner flex items-center justify-center`}>
-                                    <span className="text-2xl opacity-50">🎮</span>
-                                </div>
-
-                                {/* Informações do Jogo */}
-                                <div className="flex-1 min-w-0">
-                                    <h4 className="text-white font-bold truncate group-hover:text-primary transition-colors">
-                                        {game.title}
-                                    </h4>
-
-                                    <div className="flex items-center gap-2 mt-1">
-                                        <span className="text-xs text-green-400 font-medium bg-green-400/10 px-2 py-0.5 rounded-sm">
-                                            🔥 {game.hunters} platinas
-                                        </span>
-                                    </div>
-
-                                    {/* Plataformas */}
-                                    <div className="flex gap-1 mt-2">
-                                        {game.platforms.map((platform, idx) => (
-                                            <span key={idx} className="text-[10px] text-gray-400 border border-border bg-background px-1.5 py-0.5 rounded">
-                                                {platform}
-                                            </span>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-
-                    <button className="w-full py-3 mt-2 text-primary text-sm font-medium hover:text-primary/80 transition-colors">
-                        Ver todos os jogos →
-                    </button>
-                </div>
-
-            </div>
-
+  return (
+    <div className="space-y-8 animate-in fade-in duration-500 max-w-4xl mx-auto pb-10">
+      
+      {/* Cabeçalho do Dashboard */}
+      <div className="py-6 border-b border-border flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div>
+          <h2 className="text-3xl font-black text-white tracking-tight">🌐 Feed Global</h2>
+          <p className="text-gray-400 mt-1">Acompanhe as conquistas e platinas de todos os caçadores.</p>
         </div>
-    )
+        <Link href="/integrations" className="px-4 py-2 bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 rounded-lg text-sm font-bold transition-colors">
+          + Sincronizar Conquistas
+        </Link>
+      </div>
+
+      {/* Linha do Tempo (Feed) */}
+      <div className="space-y-6">
+        {!activities || activities.length === 0 ? (
+          <div className="bg-surface/30 border border-border border-dashed rounded-2xl p-10 text-center">
+            <span className="text-4xl opacity-50">📭</span>
+            <p className="text-gray-400 font-medium mt-4">O feed está muito silencioso...</p>
+            <p className="text-sm text-gray-500 mt-1">Seja o primeiro a sincronizar suas conquistas!</p>
+          </div>
+        ) : (
+          <div className="relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-linear-to-b before:from-transparent before:via-border before:to-transparent">
+            
+            {/* O map agora não usa 'any', usa o tipo que o TypeScript infere automaticamente do array */}
+            {activities.map((activity) => {
+              const user = activity.users;
+              if (!user) return null;
+
+              return (
+                <div key={activity.id} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active mb-8">
+                  
+                  {/* Ponto central da Timeline */}
+                  <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-background bg-surface text-xs shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 shadow-lg z-10">
+                    <span className="text-primary font-black drop-shadow-md">
+                      {activity.platform === 'Steam' ? '🎮' : '🏆'}
+                    </span>
+                  </div>
+                  
+                  {/* Card da Atividade */}
+                  <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-surface border border-border p-4 rounded-2xl hover:border-primary/50 transition-colors shadow-lg">
+                    
+                    <div className="flex items-center justify-between mb-3 border-b border-border/50 pb-3">
+                      <Link href={`/profile/${user.username}`} className="flex items-center gap-3 group/link">
+                        <div className="w-8 h-8 rounded-full bg-background overflow-hidden relative border border-border">
+                          {user.avatar_url ? (
+                            <Image src={user.avatar_url} alt={user.username} fill className="object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-xs font-bold uppercase text-gray-500">
+                              {user.username.charAt(0)}
+                            </div>
+                          )}
+                        </div>
+                        <p className="font-bold text-white text-sm group-hover/link:text-primary transition-colors">
+                          {user.username}
+                        </p>
+                      </Link>
+                      <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider bg-background px-2 py-1 rounded-md">
+                        {timeAgo(activity.created_at)}
+                      </span>
+                    </div>
+
+                    <div className="space-y-1">
+                      <p className="text-xs text-gray-400 font-bold uppercase">{activity.game_name}</p>
+                      <h4 className="text-lg font-black text-white leading-tight">
+                        {activity.achievement_name}
+                      </h4>
+                    </div>
+
+                    <div className="mt-4 flex items-center gap-2 bg-green-500/10 w-fit px-3 py-1.5 rounded-lg border border-green-500/20">
+                      <span className="text-yellow-500 text-sm">🪙</span>
+                      <span className="text-green-400 font-bold text-xs uppercase tracking-wide">
+                        +{activity.points_earned} Nexus Coins
+                      </span>
+                    </div>
+
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }

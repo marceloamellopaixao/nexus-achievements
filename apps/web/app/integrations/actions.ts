@@ -3,7 +3,6 @@
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 
-// Função 1: Salvar a Steam ID no perfil do usuário
 export async function saveSteamId(steamId: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -21,14 +20,13 @@ export async function saveSteamId(steamId: string) {
   return { success: 'Steam ID vinculada com sucesso!' }
 }
 
-// Função 2: O Oráculo (Motor de Sincronização Básico)
 export async function syncSteamAchievements() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) return { error: 'Não autorizado.' }
 
-  // 1. Busca a Steam ID do usuário
+  // 1. Busca a Steam ID e os status atuais do usuário
   const { data: userData } = await supabase
     .from('users')
     .select('steam_id, nexus_coins, global_level, total_games, total_platinums')
@@ -48,45 +46,60 @@ export async function syncSteamAchievements() {
       return { error: 'Perfil da Steam privado ou sem jogos.' }
     }
 
-    const games = gamesData.response.games
-    let newCoins = userData.nexus_coins || 0
-    let platinums = userData.total_platinums || 0
-    let syncedGamesCount = games.length
+    const games = gamesData.response.games;
+    const currentGamesCount = userData.total_games || 0;
+    const newGamesCount = games.length;
 
-    // Lógica simplificada de MVP: Como a API de conquistas individuais da Steam
-    // exige 1 requisição POR JOGO (o que causaria timeout), no MVP vamos 
-    // recompensar o usuário pelos jogos que ele possui.
-    // (Numa infraestrutura real, usaríamos um Worker em background para processar jogo a jogo).
-    
-    // Bônus simbólico de primeira sincronização:
-    newCoins += 500; 
+    // 3. Trava de segurança: Se não há jogos novos, não faz nada
+    if (newGamesCount === currentGamesCount) {
+      return { success: 'Tudo atualizado! Nenhuma nova conquista encontrada.' };
+    }
 
-    // Atualiza os status principais do usuário
+    // 4. Lógica de Recompensas
+    let coinsToAdd = 0;
+    let activityTitle = '';
+
+    if (currentGamesCount === 0) {
+      // Primeira vez sincronizando
+      coinsToAdd = 500;
+      activityTitle = 'Sincronização Inicial Concluída';
+    } else if (newGamesCount > currentGamesCount) {
+      // Comprou/ganhou jogos novos desde a última sync
+      const diff = newGamesCount - currentGamesCount;
+      coinsToAdd = diff * 10; // 10 coins de bônus por cada jogo novo adicionado
+      activityTitle = `Sincronizou ${diff} novo(s) jogo(s)`;
+    }
+
+    const newCoins = (userData.nexus_coins || 0) + coinsToAdd;
+
+    // 5. Atualiza o banco com os novos valores
     await supabase
       .from('users')
       .update({
         nexus_coins: newCoins,
-        total_games: syncedGamesCount,
-        global_level: Math.floor(newCoins / 1000) + 1 // Regra simples de nível
+        total_games: newGamesCount,
+        global_level: Math.floor(newCoins / 1000) + 1 // Regra de nível: 1 nível a cada 1000 moedas
       })
       .eq('id', user.id)
 
-    // Insere um log genérico de atividade para testarmos o Feed
-    await supabase
-      .from('global_activity')
-      .insert({
-        user_id: user.id,
-        game_name: 'Conta Steam',
-        achievement_name: 'Sincronização Inicial Concluída',
-        points_earned: 500,
-        platform: 'Steam'
-      })
+    // 6. Só insere no Feed Global se o usuário realmente ganhou pontos
+    if (coinsToAdd > 0) {
+      await supabase
+        .from('global_activity')
+        .insert({
+          user_id: user.id,
+          game_name: 'Conta Steam',
+          achievement_name: activityTitle,
+          points_earned: coinsToAdd,
+          platform: 'Steam'
+        })
+    }
 
     revalidatePath('/integrations')
     revalidatePath('/dashboard')
     revalidatePath('/profile')
 
-    return { success: `Sincronização concluída! ${syncedGamesCount} jogos encontrados. Você ganhou 500 Nexus Coins.` }
+    return { success: `Sincronização concluída! +${coinsToAdd} Nexus Coins.` }
 
   } catch (err) {
     console.error(err)
