@@ -1,147 +1,106 @@
-import React from "react";
-import { createClient } from "@/utils/supabase/server";
-import { linkPlatform, unlinkPlatform } from "./actions";
+'use client'
 
-export default async function IntegrationsPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+import React, { useState, useEffect } from "react";
+import { saveSteamId, syncSteamAchievements } from "./actions";
+import { toast } from "react-toastify";
+import { createClient } from "@/utils/supabase/client";
 
-  // Dicionário para guardar as contas que o utilizador já tem vinculadas
-  const userAccounts: Record<string, string> = {};
+export default function IntegrationsPage() {
+  const [steamId, setSteamId] = useState("");
+  const [savedSteamId, setSavedSteamId] = useState<string | null>(null);
+  const [loadingSave, setLoadingSave] = useState(false);
+  const [loadingSync, setLoadingSync] = useState(false);
+  const supabase = createClient();
 
-  if (user) {
-    const { data } = await supabase
-      .from("linked_accounts")
-      .select("platform, platform_user_id")
-      .eq("user_id", user.id);
-      
-    if (data) {
-      data.forEach((acc) => {
-        userAccounts[acc.platform] = acc.platform_user_id;
-      });
+  useEffect(() => {
+    async function loadUser() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data } = await supabase.from('users').select('steam_id').eq('id', user.id).single();
+        if (data?.steam_id) {
+          setSavedSteamId(data.steam_id);
+          setSteamId(data.steam_id);
+        }
+      }
     }
-  }
+    loadUser();
+  }, [supabase]);
 
-  // Base das Plataformas
-  const platformsBase = [
-    {
-      id: "steam",
-      name: "Steam",
-      description: "Insira a sua SteamID de 17 dígitos. O seu perfil Steam deve estar definido como público.",
-      color: "bg-[#171a21]",
-      borderHighlight: "hover:border-[#66c0f4]",
-      textColor: "text-[#66c0f4]",
-      icon: "💨",
-    },
-    {
-      id: "psn",
-      name: "PlayStation Network",
-      description: "Insira a sua PSN ID. Apenas troféus sincronizados publicamente serão capturados.",
-      color: "bg-[#003087]",
-      borderHighlight: "hover:border-[#0070d1]",
-      textColor: "text-[#0070d1]",
-      icon: "🎮",
-    },
-    {
-      id: "xbox",
-      name: "Xbox Live",
-      description: "Insira a sua Gamertag exata. Inclua os números finais se existirem.",
-      color: "bg-[#107C10]",
-      borderHighlight: "hover:border-[#9bf00b]",
-      textColor: "text-[#9bf00b]",
-      icon: "❎",
-    },
-    {
-      id: "epic",
-      name: "Epic Games",
-      description: "Conecte a sua conta Epic para sincronizar jogos que suportem o novo sistema de conquistas.",
-      color: "bg-[#313131]",
-      borderHighlight: "hover:border-white",
-      textColor: "text-white",
-      icon: "⬛",
-    },
-  ];
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoadingSave(true);
+    const result = await saveSteamId(steamId);
+    if (result.error) toast.error(result.error);
+    else {
+      toast.success(result.success);
+      setSavedSteamId(steamId);
+    }
+    setLoadingSave(false);
+  };
 
-  // Mescla a base visual com os dados reais do banco de dados
-  const platforms = platformsBase.map(plat => ({
-    ...plat,
-    isConnected: !!userAccounts[plat.id],
-    currentValue: userAccounts[plat.id] || "",
-  }));
+  const handleSync = async () => {
+    setLoadingSync(true);
+    const result = await syncSteamAchievements();
+    if (result.error) toast.error(result.error);
+    else toast.success(result.success, { icon: "🔄" });
+    setLoadingSync(false);
+  };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 pb-10 max-w-4xl">
-      
-      <div>
-        <h2 className="text-3xl font-bold text-white tracking-tight">🔗 Integrações</h2>
-        <p className="text-gray-400 mt-1">
-          Vincule as suas contas de jogos para o Nexus começar a sincronizar as suas conquistas automaticamente.
-        </p>
+    <div className="space-y-8 animate-in fade-in duration-500 max-w-4xl mx-auto pb-10">
+      <div className="py-6 border-b border-border">
+        <h2 className="text-3xl font-black text-white tracking-tight">🔗 Integrações</h2>
+        <p className="text-gray-400 mt-1">Conecte as suas contas para alimentar o seu Nexus.</p>
       </div>
 
-      <div className="space-y-6">
-        {platforms.map((platform) => (
-          <div 
-            key={platform.id} 
-            className={`bg-surface border border-border rounded-2xl overflow-hidden transition-all duration-300 ${platform.borderHighlight} group`}
-          >
-            <div className="p-6 md:p-8 flex flex-col md:flex-row gap-6 items-start md:items-center">
-              
-              <div className="flex items-center gap-4 md:w-1/3 shrink-0">
-                <div className={`w-14 h-14 rounded-xl flex items-center justify-center text-2xl shadow-inner ${platform.color}`}>
-                  {platform.icon}
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-white">{platform.name}</h3>
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full mt-1 inline-block ${platform.isConnected ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-gray-500/10 text-gray-400 border border-gray-500/20'}`}>
-                    {platform.isConnected ? "Conectado" : "Não Conectado"}
-                  </span>
-                </div>
-              </div>
+      {/* Steam Integration Card */}
+      <div className="bg-surface border border-border rounded-2xl p-6 md:p-8 flex flex-col md:flex-row gap-8 items-start">
+        <div className="w-16 h-16 bg-blue-900/20 text-blue-500 rounded-2xl flex items-center justify-center text-3xl shrink-0 border border-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.1)]">
+          <i className="Steam-Icon">🎮</i>
+        </div>
 
-              <div className="flex-1 w-full">
-                <p className="text-sm text-gray-400 mb-3">
-                  {platform.description}
-                </p>
-                
-                {platform.isConnected ? (
-                  /* FORMULÁRIO DE DESCONECTAR */
-                  <form action={unlinkPlatform} className="flex items-center gap-3">
-                    {/* Alterado de value para defaultValue */}
-                    <input type="hidden" name="platform" defaultValue={platform.id} />
-                    <input 
-                      type="text" 
-                      disabled 
-                      // Alterado de value para defaultValue
-                      defaultValue={platform.currentValue}
-                      className="flex-1 bg-background border border-border rounded-lg px-4 py-2.5 text-gray-500 text-sm opacity-70 cursor-not-allowed"
-                    />
-                    <button type="submit" className="px-4 py-2.5 bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 rounded-lg text-sm font-medium transition-colors">
-                      Desconectar
-                    </button>
-                  </form>
-                ) : (
-                  /* FORMULÁRIO DE CONECTAR */
-                  <form action={linkPlatform} className="flex flex-col sm:flex-row items-center gap-3">
-                    {/* Alterado de value para defaultValue */}
-                    <input type="hidden" name="platform" defaultValue={platform.id} />
-                    <input 
-                      type="text" 
-                      name="platformId"
-                      required
-                      placeholder={`Inserir ID da ${platform.name}`}
-                      className="flex-1 w-full bg-background border border-border rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all placeholder:text-gray-600"
-                    />
-                    <button type="submit" className="w-full sm:w-auto px-6 py-2.5 bg-white text-black hover:bg-gray-200 rounded-lg text-sm font-bold transition-colors">
-                      Vincular
-                    </button>
-                  </form>
-                )}
-              </div>
-              
-            </div>
+        <div className="flex-1 space-y-4">
+          <div>
+            <h3 className="text-xl font-bold text-white">Steam</h3>
+            <p className="text-sm text-gray-400 mt-1">
+              Vincule sua Steam ID64 para sincronizar seus jogos e converter conquistas em Nexus Coins. 
+              <br/>Seu perfil na Steam precisa ser <strong>Público</strong>.
+            </p>
           </div>
-        ))}
+
+          <form onSubmit={handleSave} className="flex gap-2">
+            <input 
+              type="text" 
+              placeholder="Sua Steam ID (Ex: 76561198...)" 
+              value={steamId}
+              onChange={(e) => setSteamId(e.target.value)}
+              className="flex-1 bg-background border border-border rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-blue-500 transition-colors"
+              required
+            />
+            <button 
+              type="submit"
+              disabled={loadingSave}
+              className="px-6 py-2.5 bg-white text-black font-bold rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+            >
+              {loadingSave ? 'Salvando...' : savedSteamId ? 'Atualizar ID' : 'Vincular'}
+            </button>
+          </form>
+
+          {savedSteamId && (
+            <div className="pt-4 border-t border-border mt-4 flex items-center justify-between">
+              <span className="text-sm text-green-400 font-bold flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> Conta Vinculada
+              </span>
+              <button 
+                onClick={handleSync}
+                disabled={loadingSync}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold text-sm transition-all shadow-lg shadow-blue-500/20 disabled:opacity-50 flex items-center gap-2"
+              >
+                {loadingSync ? 'Sincronizando...' : '🔄 Forçar Sincronização'}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
     </div>
