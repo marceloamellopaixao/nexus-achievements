@@ -8,15 +8,16 @@ import Image from 'next/image'
 type Game = {
   id: string;
   title: string;
-  cover_url: string;
+  cover_url: string | null; 
 }
 
 type Props = {
   availableGames: Game[];
   initialShowcase: string[];
+  limit: number;
 }
 
-export default function ShowcaseEditor({ availableGames, initialShowcase }: Props) {
+export default function ShowcaseEditor({ availableGames, initialShowcase, limit }: Props) {
   const [selected, setSelected] = useState<string[]>(initialShowcase || [])
   const [saving, setSaving] = useState(false)
 
@@ -24,8 +25,8 @@ export default function ShowcaseEditor({ availableGames, initialShowcase }: Prop
     if (selected.includes(gameId)) {
       setSelected(selected.filter(id => id !== gameId))
     } else {
-      if (selected.length >= 5) {
-        toast.warning("Você só pode fixar até 5 jogos!", { theme: 'dark' })
+      if (selected.length >= limit) {
+        toast.warning(`Você só pode fixar até ${limit} jogos!`, { theme: 'dark' })
         return;
       }
       setSelected([...selected, gameId])
@@ -38,7 +39,7 @@ export default function ShowcaseEditor({ availableGames, initialShowcase }: Prop
     if (result.error) {
       toast.error(result.error, { theme: 'dark' })
     } else {
-      toast.success("Estante atualizada com sucesso!", { theme: 'dark', icon: () => <span>🏆</span> })
+      toast.success("Estante atualizada com sucesso!", { theme: 'dark', icon: <span className="text-xl">🏆</span> })
     }
     setSaving(false)
   }
@@ -48,10 +49,10 @@ export default function ShowcaseEditor({ availableGames, initialShowcase }: Prop
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-xl font-bold text-white">🏆 Estante de Troféus</h3>
-          <p className="text-sm text-gray-400 mt-1">Selecione até 5 jogos para exibir no seu perfil público.</p>
+          <p className="text-sm text-gray-400 mt-1">Selecione até {limit} jogos para exibir no seu perfil público.</p>
         </div>
         <span className="bg-background border border-border px-3 py-1 rounded-md text-xs font-bold text-primary">
-          {selected.length} / 5 Slots
+          {selected.length} / {limit} Slots
         </span>
       </div>
 
@@ -59,6 +60,8 @@ export default function ShowcaseEditor({ availableGames, initialShowcase }: Prop
         {availableGames.map((game) => {
           const isSelected = selected.includes(game.id)
           const slotNumber = selected.indexOf(game.id) + 1
+          
+          const hasCover = typeof game.cover_url === 'string' && game.cover_url.trim() !== '';
 
           return (
             <div 
@@ -68,7 +71,15 @@ export default function ShowcaseEditor({ availableGames, initialShowcase }: Prop
                 isSelected ? 'border-primary shadow-[0_0_15px_rgba(59,130,246,0.3)] scale-105 z-10' : 'border-transparent hover:border-border'
               }`}
             >
-              <Image src={game.cover_url} alt={game.title} fill className="object-cover" />
+              {hasCover ? (
+                <Image src={game.cover_url as string} alt={`${game.title} Cover`} fill className="object-cover" />
+              ) : (
+                <div className="absolute inset-0 w-full h-full bg-surface flex flex-col items-center justify-center p-3 text-center border border-border/50">
+                  <span className="text-2xl mb-2 opacity-50">🎮</span>
+                  <span className="text-[10px] font-bold text-gray-400 leading-tight">{game.title}</span>
+                </div>
+              )}
+              
               <div className="absolute inset-0 bg-black/40 hover:bg-transparent transition-colors"></div>
               
               {isSelected && (

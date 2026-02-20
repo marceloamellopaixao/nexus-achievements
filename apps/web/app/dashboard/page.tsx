@@ -2,6 +2,7 @@ import React from "react";
 import { createClient } from "@/utils/supabase/server";
 import Image from "next/image";
 import Link from "next/link";
+import AutoSync from "../components/AutoSync";
 
 // 1. Tipagem rigorosa para o Feed
 type GlobalActivity = {
@@ -53,6 +54,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 max-w-4xl mx-auto pb-10">
+      <AutoSync />
       
       {/* Cabeçalho do Dashboard */}
       <div className="py-6 border-b border-border flex flex-col md:flex-row md:items-end justify-between gap-4">

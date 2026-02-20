@@ -34,7 +34,7 @@ export default async function StudioPage({ params }: StudioPageProps) {
   // 1. Busca os dados do utilizador logado
   const { data: userData } = await supabase
     .from("users")
-    .select("username, bio, equipped_background, equipped_border, equipped_title, showcase_games")
+    .select("username, bio, equipped_background, equipped_border, equipped_title, showcase_games, showcase_limit")
     .eq("id", user.id)
     .single();
 
@@ -54,7 +54,7 @@ export default async function StudioPage({ params }: StudioPageProps) {
     .eq("user_id", user.id);
 
   const inventoryRecords = inventoryData as unknown as InventoryResult[] | null;
-  
+
   const myItems = (inventoryRecords
     ?.map(inv => inv.shop_items)
     .filter(Boolean) as ShopItem[]) || [];
@@ -67,7 +67,7 @@ export default async function StudioPage({ params }: StudioPageProps) {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-10 max-w-5xl mx-auto">
-      
+
       {/* HEADER DO ESTÚDIO */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-6">
         <div>
@@ -79,14 +79,15 @@ export default async function StudioPage({ params }: StudioPageProps) {
         </Link>
       </div>
 
-      <ProfileForm 
-        initialUsername={userData?.username || ''} 
-        initialBio={userData?.bio || ''} 
+      <ProfileForm
+        initialUsername={userData?.username || ''}
+        initialBio={userData?.bio || ''}
       />
 
-      <ShowcaseEditor 
-        availableGames={allGames || []} 
-        initialShowcase={userData?.showcase_games || []} 
+      <ShowcaseEditor
+        availableGames={allGames || []}
+        initialShowcase={userData?.showcase_games || []}
+        limit={userData?.showcase_limit || 5}
       />
 
       {/* SEÇÃO 3: INVENTÁRIO VISUAL */}
@@ -103,14 +104,14 @@ export default async function StudioPage({ params }: StudioPageProps) {
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {myItems.map((item) => {
               const isEquipped = item.id === equipped.background || item.id === equipped.border || item.id === equipped.title;
-              
+
               return (
                 <div key={item.id} className={`bg-surface border rounded-xl p-4 flex flex-col gap-4 transition-all ${isEquipped ? 'border-primary shadow-[0_0_15px_rgba(147,197,253,0.1)]' : 'border-border'}`}>
                   <div className="h-24 bg-background rounded-lg flex items-center justify-center relative overflow-hidden">
-                    
+
                     {/* Visual do Fundo via style inline */}
                     {item.gradient && (
-                      <div 
+                      <div
                         className="absolute inset-0 w-full h-full opacity-80"
                         style={{ background: item.gradient }}
                       ></div>
@@ -118,7 +119,7 @@ export default async function StudioPage({ params }: StudioPageProps) {
 
                     {/* Visual da Moldura */}
                     {item.border_style && (
-                      <div 
+                      <div
                         className="relative z-10 w-12 h-12 rounded-full border-4 bg-surface"
                         style={{ borderImage: item.border_style, borderImageSlice: 1 }}
                       ></div>
@@ -126,7 +127,7 @@ export default async function StudioPage({ params }: StudioPageProps) {
 
                     {/* Visual da Tag */}
                     {item.tag_style && (
-                      <div 
+                      <div
                         className="relative z-10 px-3 py-1 rounded-md border text-xs font-bold"
                         style={{ background: item.tag_style }}
                       >

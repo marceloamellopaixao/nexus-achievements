@@ -2,6 +2,8 @@ import { createClient } from "@/utils/supabase/server";
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
+import SocialButtons from "./SocialButtons";
+import { CommentInput, DeleteCommentButton } from "./CommentForm";
 
 interface ProfilePageProps {
   params: Promise<{ username: string }>;
@@ -13,8 +15,19 @@ type ShowcaseGame = {
   cover_url: string;
 };
 
+// Função para calcular "Tempo Atrás" dos recados
+const timeAgo = (dateString: string) => {
+  const date = new Date(dateString);
+  const diff = Math.floor((new Date().getTime() - date.getTime()) / 1000);
+  if (diff < 60) return "Agora mesmo";
+  if (diff < 3600) return `Há ${Math.floor(diff / 60)} min`;
+  if (diff < 86400) return `Há ${Math.floor(diff / 3600)}h`;
+  return `Há ${Math.floor(diff / 86400)} dias`;
+};
+
 export default async function PublicProfilePage({ params }: ProfilePageProps) {
   const { username } = await params;
+  const currentPath = `/profile/${username}`;
   const supabase = await createClient();
 
   const { data: { user: authUser } } = await supabase.auth.getUser();
@@ -24,31 +37,45 @@ export default async function PublicProfilePage({ params }: ProfilePageProps) {
     .eq("username", username)
     .single();
 
-  if (error || !profile) {
-    notFound();
-  }
+  if (error || !profile) notFound();
 
   const isOwner = authUser?.id === profile.id;
+  const showcaseLimit = profile.showcase_limit || 5;
 
-  const equippedIds = [
-    profile.equipped_background, 
-    profile.equipped_border, 
-    profile.equipped_title
-  ].filter(Boolean);
+  // 1. DADOS SOCIAIS (Seguidores e Seguindo)
+  const [{ count: followersCount }, { count: followingCount }] = await Promise.all([
+    supabase.from('user_follows').select('*', { count: 'exact', head: true }).eq('following_id', profile.id),
+    supabase.from('user_follows').select('*', { count: 'exact', head: true }).eq('follower_id', profile.id)
+  ]);
 
-  const styles = { 
-    background: null as string | null, 
-    border: null as string | null, 
-    titleStyle: null as string | null, 
-    titleName: null as string | null 
-  };
+  let isFollowing = false;
+  if (authUser && !isOwner) {
+    const { data } = await supabase.from('user_follows').select('follower_id').eq('follower_id', authUser.id).eq('following_id', profile.id).maybeSingle();
+    if (data) isFollowing = true;
+  }
+
+  // 2. BUSCA O MURAL DE RECADOS (Com os autores)
+  const { data: commentsRaw } = await supabase
+    .from('profile_comments')
+    .select('*')
+    .eq('profile_id', profile.id)
+    .order('created_at', { ascending: false });
+
+  // Puxa os detalhes dos autores de forma segura
+  const authorIds = [...new Set(commentsRaw?.map(c => c.author_id) || [])];
+  const { data: authors } = await supabase.from('users').select('id, username, avatar_url').in('id', authorIds);
+
+  const comments = commentsRaw?.map(c => ({
+    ...c,
+    author: authors?.find(a => a.id === c.author_id)
+  })) || [];
+
+  // 3. COSMÉTICOS E ESTANTE (Mantido do anterior)
+  const equippedIds = [profile.equipped_background, profile.equipped_border, profile.equipped_title].filter(Boolean);
+  const styles = { background: null as string | null, border: null as string | null, titleStyle: null as string | null, titleName: null as string | null };
 
   if (equippedIds.length > 0) {
-    const { data: shopItems } = await supabase
-      .from("shop_items")
-      .select("*")
-      .in("id", equippedIds);
-
+    const { data: shopItems } = await supabase.from("shop_items").select("*").in("id", equippedIds);
     if (shopItems) {
       styles.background = shopItems.find(i => i.id === profile.equipped_background)?.gradient || null;
       styles.border = shopItems.find(i => i.id === profile.equipped_border)?.border_style || null;
@@ -60,15 +87,9 @@ export default async function PublicProfilePage({ params }: ProfilePageProps) {
 
   let showcaseGames: ShowcaseGame[] = [];
   if (profile.showcase_games && profile.showcase_games.length > 0) {
-    const { data: gamesData } = await supabase
-      .from("games")
-      .select("id, title, cover_url")
-      .in("id", profile.showcase_games);
-      
+    const { data: gamesData } = await supabase.from("games").select("id, title, cover_url").in("id", profile.showcase_games);
     if (gamesData) {
-      showcaseGames = profile.showcase_games
-        .map((id: string) => gamesData.find(g => g.id === id))
-        .filter(Boolean) as ShowcaseGame[];
+      showcaseGames = profile.showcase_games.map((id: string) => gamesData.find(g => g.id === id)).filter(Boolean) as ShowcaseGame[];
     }
   }
 
@@ -76,11 +97,10 @@ export default async function PublicProfilePage({ params }: ProfilePageProps) {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-10 max-w-5xl mx-auto">
-      
+
+      {/* CARD PRINCIPAL DO PERFIL */}
       <div className="relative bg-surface border border-border rounded-2xl overflow-hidden mt-4 shadow-xl">
-        
-        {/* Banner Dinâmico com style inline */}
-        <div 
+        <div
           className="h-48 md:h-64 relative border-b border-border shadow-inner transition-all duration-700"
           style={styles.background ? { background: styles.background } : { backgroundColor: '#18181b' }}
         >
@@ -88,9 +108,7 @@ export default async function PublicProfilePage({ params }: ProfilePageProps) {
         </div>
 
         <div className="px-6 pb-6 relative flex flex-col md:flex-row md:items-end gap-6 -mt-12 md:-mt-16">
-          
-          {/* Avatar Dinâmico */}
-          <div 
+          <div
             className="relative w-24 h-24 md:w-32 md:h-32 rounded-2xl bg-surface flex items-center justify-center shrink-0 z-10 transition-all duration-700 shadow-2xl border-4"
             style={styles.border ? { borderImage: styles.border, borderImageSlice: 1 } : { borderColor: '#09090b' }}
           >
@@ -110,10 +128,7 @@ export default async function PublicProfilePage({ params }: ProfilePageProps) {
             </h1>
             <div>
               {styles.titleStyle && styles.titleName ? (
-                <span 
-                  className="inline-block px-3 py-1 rounded-md border text-xs font-bold mt-1 shadow-sm"
-                  style={{ background: styles.titleStyle }}
-                >
+                <span className="inline-block px-3 py-1 rounded-md border text-xs font-bold mt-1 shadow-sm" style={{ background: styles.titleStyle }}>
                   {styles.titleName}
                 </span>
               ) : (
@@ -122,20 +137,33 @@ export default async function PublicProfilePage({ params }: ProfilePageProps) {
             </div>
           </div>
 
-          {isOwner && (
-            <div className="mb-2">
-              <Link href={`/profile/${profile.username}/studio`} className="inline-block w-full md:w-auto text-center px-6 py-2.5 bg-white text-black hover:bg-gray-200 rounded-lg font-bold text-sm transition-colors shadow-sm">
+          <div className="mb-2 flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+            {isOwner ? (
+              <Link href={`/profile/${profile.username}/studio`} className="text-center px-6 py-2.5 bg-white text-black hover:bg-gray-200 rounded-lg font-bold text-sm transition-colors shadow-sm">
                 ⚙️ Configurar Perfil
               </Link>
-            </div>
-          )}
+            ) : (
+              <SocialButtons targetId={profile.id} initialIsFollowing={isFollowing} currentPath={currentPath} />
+            )}
+          </div>
         </div>
 
-        {/* Stats Fixas */}
         <div className="px-6 pb-6 grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t border-white/5">
           <div className="md:col-span-2">
             <p className="text-gray-300 leading-relaxed text-sm md:text-base italic">&quot;{profile.bio}&quot;</p>
-            <p className="text-xs text-gray-500 mt-3 font-medium uppercase tracking-wider">📅 Membro desde {joinDate}</p>
+            <div className="flex items-center gap-4 mt-3">
+              <p className="text-xs text-gray-500 font-medium uppercase tracking-wider flex gap-1">
+                <span>📅 {joinDate}</span>
+              </p>
+              <p className="text-xs text-gray-500 font-bold uppercase tracking-wider flex gap-4">
+                <Link href={`/profile/${profile.username}/network?tab=followers`} className="hover:text-primary transition-colors group">
+                  <strong className="text-white group-hover:text-primary transition-colors">{followersCount || 0}</strong> Seguidores
+                </Link>
+                <Link href={`/profile/${profile.username}/network?tab=following`} className="hover:text-primary transition-colors group">
+                  <strong className="text-white group-hover:text-primary transition-colors">{followingCount || 0}</strong> Seguindo
+                </Link>
+              </p>
+            </div>
           </div>
           <div className="flex gap-4 md:justify-end items-center">
             <div className="text-center bg-background/50 border border-border px-4 py-2 rounded-xl min-w-20">
@@ -151,32 +179,99 @@ export default async function PublicProfilePage({ params }: ProfilePageProps) {
         </div>
       </div>
 
-      {/* ESTANTE DE TROFÉUS DINÂMICA */}
-      <div className="space-y-4 pt-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-white flex items-center gap-2">🏆 Estante de Troféus</h2>
-          <span className="text-xs font-medium text-gray-500 bg-surface px-2 py-1 rounded border border-border">
-            {showcaseGames.length} / 5 Slots
-          </span>
+      {/* ÁREA INFERIOR */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        {/* COLUNA ESQUERDA: ESTANTE */}
+        <div className="lg:col-span-2 space-y-4 pt-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-bold text-white flex items-center gap-2">🏆 Estante de Troféus</h2>
+            <span className="text-xs font-medium text-gray-500 bg-surface px-2 py-1 rounded border border-border">
+              {showcaseGames.length} / {showcaseLimit} Slots
+            </span>
+          </div>
+
+          {showcaseGames.length === 0 ? (
+            <div className="h-48 bg-surface/30 rounded-3xl border border-dashed border-border flex flex-col items-center justify-center text-gray-500 text-sm font-medium">
+              <span className="text-3xl mb-2 opacity-50">🎮</span>
+              Este caçador ainda não exibiu nenhum troféu.
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+              {showcaseGames.map((game, idx) => {
+                const hasCover = typeof game.cover_url === 'string' && game.cover_url.trim() !== '';
+                return (
+                  <Link href={`/games/${game.id}`} key={`${game.id}-${idx}`} className="relative aspect-3/4 rounded-xl border border-border/50 bg-surface overflow-hidden hover:border-primary/50 transition-all cursor-pointer shadow-lg group flex flex-col items-center justify-center">
+                    {hasCover ? (
+                      <img src={game.cover_url} alt={game.title} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
+                    ) : (
+                      <div className="w-full h-full flex flex-col items-center justify-center p-3 text-center bg-surface">
+                        <span className="text-3xl mb-2 opacity-50">🎮</span>
+                        <span className="text-[10px] font-bold text-gray-400 leading-tight">{game.title}</span>
+                      </div>
+                    )}
+                    <div className="absolute inset-x-0 bottom-0 bg-linear-to-t from-black/90 via-black/40 to-transparent p-3 pt-12 translate-y-2 group-hover:translate-y-0 transition-transform">
+                      <p className="font-bold text-white text-xs truncate drop-shadow-md z-10 relative">{game.title}</p>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
         </div>
-        
-        {showcaseGames.length === 0 ? (
-          <div className="h-48 bg-surface/30 rounded-3xl border border-dashed border-border flex flex-col items-center justify-center text-gray-500 text-sm font-medium">
-            <span className="text-3xl mb-2 opacity-50">🎮</span>
-            Este caçador ainda não exibiu nenhum troféu.
+
+        {/* COLUNA DIREITA: MURAL DE RECADOS */}
+        <div className="space-y-4 pt-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold text-white flex items-center gap-2">💬 Mural</h2>
           </div>
-        ) : (
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            {showcaseGames.map((game, idx) => (
-              <Link href={`/games/${game.id}`} key={`${game.id}-${idx}`} className="relative aspect-3/4 rounded-xl border border-border/50 bg-surface overflow-hidden hover:border-primary/50 transition-all cursor-pointer shadow-lg group">
-                <Image src={game.cover_url} alt={game.title} fill className="object-cover group-hover:scale-105 transition-transform duration-500" />
-                <div className="absolute inset-x-0 bottom-0 bg-linear-to-t from-black/90 via-black/40 to-transparent p-3 pt-12 translate-y-2 group-hover:translate-y-0 transition-transform">
-                  <p className="font-bold text-white text-xs truncate drop-shadow-md">{game.title}</p>
+
+          <div className="bg-surface border border-border rounded-2xl p-4 flex flex-col h-[500px]">
+            {authUser && (
+              <CommentInput profileId={profile.id} currentPath={currentPath} />
+            )}
+
+            <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
+              {comments.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-center opacity-50">
+                  <span className="text-3xl mb-2">📭</span>
+                  <p className="text-xs text-gray-400">O mural está silencioso.</p>
                 </div>
-              </Link>
-            ))}
+              ) : (
+                comments.map((comment) => {
+                  const canDelete = authUser?.id === comment.author_id || isOwner;
+                  return (
+                    <div key={comment.id} className="bg-background border border-border p-3 rounded-xl flex gap-3 group relative">
+                      <Link href={`/profile/${comment.author?.username}`} className="w-8 h-8 rounded-full bg-surface shrink-0 overflow-hidden relative border border-border">
+                        {comment.author?.avatar_url ? (
+                          // Tag <img> para avatares de comentários para evitar crashes UGC
+                          <img src={comment.author.avatar_url} alt="Avatar" className="w-full h-full object-cover" loading="lazy" />
+                        ) : (
+                          <span className="flex items-center justify-center w-full h-full text-xs font-bold">{comment.author?.username?.charAt(0)}</span>
+                        )}
+                      </Link>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between">
+                          <Link href={`/profile/${comment.author?.username}`} className="font-bold text-white text-xs hover:text-primary transition-colors">
+                            {comment.author?.username}
+                          </Link>
+                          <span className="text-[10px] text-gray-500">{timeAgo(comment.created_at)}</span>
+                        </div>
+                        <p className="text-sm text-gray-300 mt-1 break-words">{comment.content}</p>
+                      </div>
+                      {canDelete && (
+                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-background rounded-md shadow-lg border border-border">
+                          <DeleteCommentButton commentId={comment.id} currentPath={currentPath} />
+                        </div>
+                      )}
+                    </div>
+                  )
+                })
+              )}
+            </div>
           </div>
-        )}
+        </div>
+
       </div>
 
     </div>
