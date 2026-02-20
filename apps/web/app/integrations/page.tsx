@@ -1,8 +1,29 @@
 import React from "react";
+import { createClient } from "@/utils/supabase/server";
+import { linkPlatform, unlinkPlatform } from "./actions";
 
-export default function IntegrationsPage() {
-  // Mock dos estados de conexão (Futuramente virá da tabela 'linked_accounts')
-  const platforms = [
+export default async function IntegrationsPage() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  // Dicionário para guardar as contas que o utilizador já tem vinculadas
+  const userAccounts: Record<string, string> = {};
+
+  if (user) {
+    const { data } = await supabase
+      .from("linked_accounts")
+      .select("platform, platform_user_id")
+      .eq("user_id", user.id);
+      
+    if (data) {
+      data.forEach((acc) => {
+        userAccounts[acc.platform] = acc.platform_user_id;
+      });
+    }
+  }
+
+  // Base das Plataformas
+  const platformsBase = [
     {
       id: "steam",
       name: "Steam",
@@ -10,9 +31,7 @@ export default function IntegrationsPage() {
       color: "bg-[#171a21]",
       borderHighlight: "hover:border-[#66c0f4]",
       textColor: "text-[#66c0f4]",
-      isConnected: true,
-      currentValue: "76561198000000000",
-      icon: "💨", // Trocamos por ícones SVG reais depois
+      icon: "💨",
     },
     {
       id: "psn",
@@ -21,8 +40,6 @@ export default function IntegrationsPage() {
       color: "bg-[#003087]",
       borderHighlight: "hover:border-[#0070d1]",
       textColor: "text-[#0070d1]",
-      isConnected: false,
-      currentValue: "",
       icon: "🎮",
     },
     {
@@ -32,8 +49,6 @@ export default function IntegrationsPage() {
       color: "bg-[#107C10]",
       borderHighlight: "hover:border-[#9bf00b]",
       textColor: "text-[#9bf00b]",
-      isConnected: false,
-      currentValue: "",
       icon: "❎",
     },
     {
@@ -43,16 +58,20 @@ export default function IntegrationsPage() {
       color: "bg-[#313131]",
       borderHighlight: "hover:border-white",
       textColor: "text-white",
-      isConnected: false,
-      currentValue: "",
       icon: "⬛",
     },
   ];
 
+  // Mescla a base visual com os dados reais do banco de dados
+  const platforms = platformsBase.map(plat => ({
+    ...plat,
+    isConnected: !!userAccounts[plat.id],
+    currentValue: userAccounts[plat.id] || "",
+  }));
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-10 max-w-4xl">
       
-      {/* Cabeçalho */}
       <div>
         <h2 className="text-3xl font-bold text-white tracking-tight">🔗 Integrações</h2>
         <p className="text-gray-400 mt-1">
@@ -60,7 +79,6 @@ export default function IntegrationsPage() {
         </p>
       </div>
 
-      {/* Lista de Plataformas */}
       <div className="space-y-6">
         {platforms.map((platform) => (
           <div 
@@ -69,7 +87,6 @@ export default function IntegrationsPage() {
           >
             <div className="p-6 md:p-8 flex flex-col md:flex-row gap-6 items-start md:items-center">
               
-              {/* Ícone e Nome */}
               <div className="flex items-center gap-4 md:w-1/3 shrink-0">
                 <div className={`w-14 h-14 rounded-xl flex items-center justify-center text-2xl shadow-inner ${platform.color}`}>
                   {platform.icon}
@@ -82,35 +99,43 @@ export default function IntegrationsPage() {
                 </div>
               </div>
 
-              {/* Formulário / Ação */}
               <div className="flex-1 w-full">
                 <p className="text-sm text-gray-400 mb-3">
                   {platform.description}
                 </p>
                 
                 {platform.isConnected ? (
-                  <div className="flex items-center gap-3">
+                  /* FORMULÁRIO DE DESCONECTAR */
+                  <form action={unlinkPlatform} className="flex items-center gap-3">
+                    {/* Alterado de value para defaultValue */}
+                    <input type="hidden" name="platform" defaultValue={platform.id} />
                     <input 
                       type="text" 
                       disabled 
-                      value={platform.currentValue}
+                      // Alterado de value para defaultValue
+                      defaultValue={platform.currentValue}
                       className="flex-1 bg-background border border-border rounded-lg px-4 py-2.5 text-gray-500 text-sm opacity-70 cursor-not-allowed"
                     />
-                    <button className="px-4 py-2.5 bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 rounded-lg text-sm font-medium transition-colors">
+                    <button type="submit" className="px-4 py-2.5 bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 rounded-lg text-sm font-medium transition-colors">
                       Desconectar
                     </button>
-                  </div>
+                  </form>
                 ) : (
-                  <div className="flex flex-col sm:flex-row items-center gap-3">
+                  /* FORMULÁRIO DE CONECTAR */
+                  <form action={linkPlatform} className="flex flex-col sm:flex-row items-center gap-3">
+                    {/* Alterado de value para defaultValue */}
+                    <input type="hidden" name="platform" defaultValue={platform.id} />
                     <input 
                       type="text" 
+                      name="platformId"
+                      required
                       placeholder={`Inserir ID da ${platform.name}`}
                       className="flex-1 w-full bg-background border border-border rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all placeholder:text-gray-600"
                     />
-                    <button className="w-full sm:w-auto px-6 py-2.5 bg-white text-black hover:bg-gray-200 rounded-lg text-sm font-bold transition-colors">
+                    <button type="submit" className="w-full sm:w-auto px-6 py-2.5 bg-white text-black hover:bg-gray-200 rounded-lg text-sm font-bold transition-colors">
                       Vincular
                     </button>
-                  </div>
+                  </form>
                 )}
               </div>
               
