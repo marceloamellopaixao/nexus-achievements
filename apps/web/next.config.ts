@@ -19,7 +19,13 @@ const nextConfig: NextConfig = {
         pathname: "/**",
       },
       {
-       protocol: "https",
+        protocol: 'https',
+        hostname: 'images.igdb.com',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: "https",
         hostname: "", // Permite qualquer domínio (útil para desenvolvimento, mas deve ser restrito em produção)
         port: "",
         pathname: "/**",
