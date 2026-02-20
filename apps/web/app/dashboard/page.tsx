@@ -45,6 +45,38 @@ export default function DashboardPage() {
         },
     ];
 
+    // Mock dos Jogos em Alta
+    const trendingGames = [
+        {
+            id: 1,
+            title: "Elden Ring",
+            hunters: "1.2k",
+            platforms: ["PC", "PS5", "XBSX"],
+            coverGradient: "from-yellow-900 to-black",
+        },
+        {
+            id: 2,
+            title: "Helldivers 2",
+            hunters: "850",
+            platforms: ["PC", "PS5"],
+            coverGradient: "from-blue-900 to-black",
+        },
+        {
+            id: 3,
+            title: "Final Fantasy VII Rebirth",
+            hunters: "620",
+            platforms: ["PS5"],
+            coverGradient: "from-teal-900 to-black",
+        },
+        {
+            id: 4,
+            title: "Hades II",
+            hunters: "430",
+            platforms: ["PC"],
+            coverGradient: "from-orange-900 to-black",
+        },
+    ];
+
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
             {/* Cabeçalho da Página */}
@@ -106,7 +138,7 @@ export default function DashboardPage() {
                                             </span>{" "}
                                             {item.action}{" "}
                                             <span className="font-semibold text-gray-200">
-                                                "{item.achievement.title}"
+                                                &quot;{item.achievement.title}&quot;
                                             </span>{" "}
                                             em <span className="text-primary/90 font-medium">{item.game}</span>.
                                         </p>
@@ -134,17 +166,51 @@ export default function DashboardPage() {
                     </button>
                 </div>
 
-                {/* Coluna Secundária: Jogos em Alta (Placeholder por enquanto) */}
+                {/* Coluna Secundária: Jogos em Alta */}
                 <div className="space-y-4">
                     <h3 className="text-xl font-bold text-white border-b border-border pb-2 mb-4">
-                        Jogos em Alta
+                        Em Alta na Comunidade
                     </h3>
-                    <div className="bg-surface/30 border border-border border-dashed rounded-xl h-64 flex items-center justify-center flex-col text-center p-4">
-                        <span className="text-3xl mb-2">🔥</span>
-                        <p className="text-gray-500 font-medium text-sm">
-                            Os jogos mais platinados da semana aparecerão aqui.
-                        </p>
+
+                    <div className="grid grid-cols-1 gap-4">
+                        {trendingGames.map((game) => (
+                            <div
+                                key={game.id}
+                                className="group relative overflow-hidden rounded-xl border border-border bg-surface flex items-center gap-4 p-3 hover:border-primary/50 cursor-pointer transition-all"
+                            >
+                                {/* Capa do Jogo (Simulada com Gradiente por enquanto) */}
+                                <div className={`w-16 h-20 rounded-md shrink-0 bg-linear-to-b ${game.coverGradient} border border-white/10 shadow-inner flex items-center justify-center`}>
+                                    <span className="text-2xl opacity-50">🎮</span>
+                                </div>
+
+                                {/* Informações do Jogo */}
+                                <div className="flex-1 min-w-0">
+                                    <h4 className="text-white font-bold truncate group-hover:text-primary transition-colors">
+                                        {game.title}
+                                    </h4>
+
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <span className="text-xs text-green-400 font-medium bg-green-400/10 px-2 py-0.5 rounded-sm">
+                                            🔥 {game.hunters} platinas
+                                        </span>
+                                    </div>
+
+                                    {/* Plataformas */}
+                                    <div className="flex gap-1 mt-2">
+                                        {game.platforms.map((platform, idx) => (
+                                            <span key={idx} className="text-[10px] text-gray-400 border border-border bg-background px-1.5 py-0.5 rounded">
+                                                {platform}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
                     </div>
+
+                    <button className="w-full py-3 mt-2 text-primary text-sm font-medium hover:text-primary/80 transition-colors">
+                        Ver todos os jogos →
+                    </button>
                 </div>
 
             </div>
