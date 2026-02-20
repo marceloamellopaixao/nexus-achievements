@@ -103,19 +103,28 @@ export default async function ShopPage() {
 
                                                 {/* FUNDO (STYLE INLINE) */}
                                                 {item.gradient && (
-                                                    <div className={`absolute inset-0 w-full h-full opacity-80 ${bannerClass}`}></div>
+                                                    <div 
+                                                        className="absolute inset-0 w-full h-full opacity-80"
+                                                        style={{ background: item.gradient }}
+                                                    ></div>
                                                 )}
 
                                                 {/* MOLDURA */}
                                                 {item.border_style && (
-                                                    <div className={`w-16 h-16 rounded-full border-4 bg-surface flex items-center justify-center z-10 ${item.border_style}`}>
+                                                    <div 
+                                                        className="w-16 h-16 rounded-full border-4 bg-surface flex items-center justify-center z-10"
+                                                        style={{ borderImage: item.border_style, borderImageSlice: 1 }}
+                                                    >
                                                         <span className="text-2xl">👤</span>
                                                     </div>
                                                 )}
 
                                                 {/* TAG */}
                                                 {item.tag_style && (
-                                                    <div className={`px-4 py-1.5 rounded-md border text-sm font-bold z-10 ${item.tag_style}`}>
+                                                    <div 
+                                                        className="px-4 py-1.5 rounded-md border text-sm font-bold z-10"
+                                                        style={{ background: item.tag_style }}
+                                                    >
                                                         {item.name}
                                                     </div>
                                                 )}

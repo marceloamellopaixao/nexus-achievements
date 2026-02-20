@@ -7,6 +7,12 @@ interface ProfilePageProps {
   params: Promise<{ username: string }>;
 }
 
+type ShowcaseGame = {
+  id: string;
+  title: string;
+  cover_url: string;
+};
+
 export default async function PublicProfilePage({ params }: ProfilePageProps) {
   const { username } = await params;
   const supabase = await createClient();
@@ -25,16 +31,16 @@ export default async function PublicProfilePage({ params }: ProfilePageProps) {
   const isOwner = authUser?.id === profile.id;
 
   const equippedIds = [
-    profile.equipped_background,
-    profile.equipped_border,
+    profile.equipped_background, 
+    profile.equipped_border, 
     profile.equipped_title
   ].filter(Boolean);
 
-  const styles = {
-    background: null as string | null,
-    border: null as string | null,
-    titleStyle: null as string | null,
-    titleName: null as string | null
+  const styles = { 
+    background: null as string | null, 
+    border: null as string | null, 
+    titleStyle: null as string | null, 
+    titleName: null as string | null 
   };
 
   if (equippedIds.length > 0) {
@@ -52,30 +58,44 @@ export default async function PublicProfilePage({ params }: ProfilePageProps) {
     }
   }
 
-  const joinDate = new Date(profile.created_at).toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' });
+  let showcaseGames: ShowcaseGame[] = [];
+  if (profile.showcase_games && profile.showcase_games.length > 0) {
+    const { data: gamesData } = await supabase
+      .from("games")
+      .select("id, title, cover_url")
+      .in("id", profile.showcase_games);
+      
+    if (gamesData) {
+      showcaseGames = profile.showcase_games
+        .map((id: string) => gamesData.find(g => g.id === id))
+        .filter(Boolean) as ShowcaseGame[];
+    }
+  }
 
-  const bannerClass = styles.background ? `bg-linear-to-r ${styles.background}` : "bg-linear-to-r from-primary/40 via-purple-900/40 to-background";
-  const avatarBorderClass = styles.border ? `border-4 ${styles.border}` : "border-4 border-background";
+  const joinDate = new Date(profile.created_at).toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' });
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-10 max-w-5xl mx-auto">
+      
       <div className="relative bg-surface border border-border rounded-2xl overflow-hidden mt-4 shadow-xl">
         
-        {/* BANNER */}
-        <div className={`h-48 md:h-64 relative border-b border-border shadow-inner transition-all duration-700 ${bannerClass}`}>
+        {/* Banner Dinâmico com style inline */}
+        <div 
+          className="h-48 md:h-64 relative border-b border-border shadow-inner transition-all duration-700"
+          style={styles.background ? { background: styles.background } : { backgroundColor: '#18181b' }}
+        >
           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-20 mix-blend-overlay"></div>
         </div>
 
         <div className="px-6 pb-6 relative flex flex-col md:flex-row md:items-end gap-6 -mt-12 md:-mt-16">
-          <div className={`relative w-24 h-24 md:w-32 md:h-32 rounded-2xl bg-surface flex items-center justify-center shrink-0 z-10 transition-all duration-700 ${avatarBorderClass}`}>
+          
+          {/* Avatar Dinâmico */}
+          <div 
+            className="relative w-24 h-24 md:w-32 md:h-32 rounded-2xl bg-surface flex items-center justify-center shrink-0 z-10 transition-all duration-700 shadow-2xl border-4"
+            style={styles.border ? { borderImage: styles.border, borderImageSlice: 1 } : { borderColor: '#09090b' }}
+          >
             {profile.avatar_url ? (
-              <Image
-                src={profile.avatar_url}
-                alt={profile.username}
-                fill
-                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                className="rounded-xl object-cover"
-              />
+              <Image src={profile.avatar_url} alt={profile.username} fill className="rounded-xl object-cover" />
             ) : (
               <span className="text-4xl font-bold text-white">{profile.username.charAt(0).toUpperCase()}</span>
             )}
@@ -89,8 +109,11 @@ export default async function PublicProfilePage({ params }: ProfilePageProps) {
               </span>
             </h1>
             <div>
-              {styles.titleStyle ? (
-                <span className={`inline-block px-3 py-1 rounded-md border text-xs font-bold mt-1 ${styles.titleStyle}`}>
+              {styles.titleStyle && styles.titleName ? (
+                <span 
+                  className="inline-block px-3 py-1 rounded-md border text-xs font-bold mt-1 shadow-sm"
+                  style={{ background: styles.titleStyle }}
+                >
                   {styles.titleName}
                 </span>
               ) : (
@@ -108,6 +131,7 @@ export default async function PublicProfilePage({ params }: ProfilePageProps) {
           )}
         </div>
 
+        {/* Stats Fixas */}
         <div className="px-6 pb-6 grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t border-white/5">
           <div className="md:col-span-2">
             <p className="text-gray-300 leading-relaxed text-sm md:text-base italic">&quot;{profile.bio}&quot;</p>
@@ -115,21 +139,46 @@ export default async function PublicProfilePage({ params }: ProfilePageProps) {
           </div>
           <div className="flex gap-4 md:justify-end items-center">
             <div className="text-center bg-background/50 border border-border px-4 py-2 rounded-xl min-w-20">
-              <p className="text-2xl font-black text-white">{profile.total_games}</p>
+              <p className="text-2xl font-black text-white">{profile.total_games || 0}</p>
               <p className="text-[10px] text-gray-500 font-bold uppercase">Jogos</p>
             </div>
             <div className="text-center bg-background/50 border border-border px-4 py-2 rounded-xl min-w-20 relative overflow-hidden">
               <div className="absolute inset-0 bg-blue-500/10"></div>
-              <p className="text-2xl font-black text-blue-400 relative z-10">{profile.total_platinums}</p>
+              <p className="text-2xl font-black text-blue-400 relative z-10">{profile.total_platinums || 0}</p>
               <p className="text-[10px] text-gray-500 font-bold uppercase relative z-10">Platinas</p>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="h-64 bg-surface/30 rounded-3xl border border-dashed border-border flex items-center justify-center text-gray-500 text-sm font-medium">
-        O sistema de conquistas está sendo sincronizado.
+      {/* ESTANTE DE TROFÉUS DINÂMICA */}
+      <div className="space-y-4 pt-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold text-white flex items-center gap-2">🏆 Estante de Troféus</h2>
+          <span className="text-xs font-medium text-gray-500 bg-surface px-2 py-1 rounded border border-border">
+            {showcaseGames.length} / 5 Slots
+          </span>
+        </div>
+        
+        {showcaseGames.length === 0 ? (
+          <div className="h-48 bg-surface/30 rounded-3xl border border-dashed border-border flex flex-col items-center justify-center text-gray-500 text-sm font-medium">
+            <span className="text-3xl mb-2 opacity-50">🎮</span>
+            Este caçador ainda não exibiu nenhum troféu.
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            {showcaseGames.map((game, idx) => (
+              <Link href={`/games/${game.id}`} key={`${game.id}-${idx}`} className="relative aspect-3/4 rounded-xl border border-border/50 bg-surface overflow-hidden hover:border-primary/50 transition-all cursor-pointer shadow-lg group">
+                <Image src={game.cover_url} alt={game.title} fill className="object-cover group-hover:scale-105 transition-transform duration-500" />
+                <div className="absolute inset-x-0 bottom-0 bg-linear-to-t from-black/90 via-black/40 to-transparent p-3 pt-12 translate-y-2 group-hover:translate-y-0 transition-transform">
+                  <p className="font-bold text-white text-xs truncate drop-shadow-md">{game.title}</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
+
     </div>
   );
 }

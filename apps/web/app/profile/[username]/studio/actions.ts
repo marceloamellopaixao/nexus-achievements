@@ -34,7 +34,27 @@ export async function equipCosmetic(itemId: string, category: string) {
 
   if (error) return { error: 'Erro ao equipar o item.' }
 
-  revalidatePath('/profile/studio')
-  revalidatePath('/profile')
+  revalidatePath('/profile/[username]', 'page')
+  revalidatePath('/profile/[username]/studio', 'page')
+  return { success: true }
+}
+
+export async function updateShowcase(gameIds: string[]) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) return { error: 'Não autorizado' }
+  if (gameIds.length > 5) return { error: 'Limite máximo de 5 jogos excedido.' }
+
+  const { error } = await supabase
+    .from('users')
+    .update({ showcase_games: gameIds })
+    .eq('id', user.id)
+
+  if (error) return { error: 'Erro ao guardar a estante de troféus.' }
+
+  revalidatePath('/profile/[username]', 'page')
+  revalidatePath('/profile/[username]/studio', 'page')
+  
   return { success: true }
 }
