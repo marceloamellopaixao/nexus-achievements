@@ -104,8 +104,7 @@ export default async function ShopPage() {
                                                 {/* FUNDO (STYLE INLINE) */}
                                                 {item.gradient && (
                                                     <div 
-                                                        className="absolute inset-0 w-full h-full opacity-80"
-                                                        style={{ background: item.gradient }}
+                                                        className={`absolute inset-0 w-full h-full opacity-80 ${bannerClass}`}
                                                     ></div>
                                                 )}
 
