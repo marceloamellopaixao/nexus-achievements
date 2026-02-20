@@ -55,6 +55,9 @@ export default async function RootLayout({
             <Link href="/shop" className="block px-4 py-2 rounded-md hover:bg-white/5 transition-colors text-primary font-medium">
               🛒 Loja de Pontos
             </Link>
+            <Link href="/integrations" className="block px-4 py-2 rounded-md hover:bg-white/5 transition-colors mt-4 border-t border-border pt-4">
+              🔗 Integrações
+            </Link>
           </nav>
         </aside>
 
