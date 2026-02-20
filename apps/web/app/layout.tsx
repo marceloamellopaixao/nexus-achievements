@@ -3,6 +3,7 @@ import "./globals.css";
 import Link from "next/link";
 import { createClient } from "@/utils/supabase/server";
 import Image from "next/image";
+import { ToastContainer } from "react-toastify";
 
 export const metadata: Metadata = {
   title: "Nexus Achievements",
@@ -107,6 +108,12 @@ export default async function RootLayout({
 
           {/* CONTEÚDO DA PÁGINA */}
           <main className="flex-1 overflow-y-auto p-6">
+            <ToastContainer 
+              closeOnClick
+              pauseOnHover
+              draggable
+              theme="dark"
+            />
             {children}
           </main>
         </div>
