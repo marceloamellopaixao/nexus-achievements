@@ -1,26 +1,19 @@
 @import "tailwindcss";
-@import "@repo/tailwind-config";
 
-:root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
+@theme {
+  /* No V4, as cores customizadas são definidas usando o prefixo --color-* */
+  --color-background: hsl(224 71% 4%);
+  --color-foreground: hsl(210 40% 98%);
+  --color-surface: hsl(222 47% 11%);
+  --color-border: hsl(215 28% 17%);
+  --color-primary: hsl(262 83% 58%);
+  --color-primary-foreground: hsl(210 40% 98%);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 0, 0, 0;
-    --background-end-rgb: 0, 0, 0;
+@layer base {
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: system-ui, -apple-system, sans-serif;
   }
-}
-
-body {
-  color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
 }
