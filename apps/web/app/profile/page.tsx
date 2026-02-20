@@ -9,7 +9,7 @@ export default async function ProfilePage() {
 
   let profile = null;
   // Criamos um objeto para guardar tanto o estilo (CSS) quanto o nome (Texto) do título
-  let equippedStyles = { 
+  const equippedStyles = { 
     background: null as string | null, 
     border: null as string | null, 
     titleStyle: null as string | null,
@@ -107,18 +107,18 @@ export default async function ProfilePage() {
         <div className="px-6 pb-6 grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t border-white/5">
           <div className="md:col-span-2">
             <p className="text-gray-300 leading-relaxed text-sm md:text-base italic">
-              "{profile.bio}"
+              &quot;{profile.bio}&quot;
             </p>
             <p className="text-xs text-gray-500 mt-3 font-medium uppercase tracking-wider">
                 📅 MEMBRO DESDE {joinDate.toUpperCase()}
             </p>
           </div>
           <div className="flex gap-4 md:justify-end items-center">
-            <div className="text-center bg-background/50 border border-border px-4 py-2 rounded-xl min-w-[80px]">
+            <div className="text-center bg-background/50 border border-border px-4 py-2 rounded-xl min-w-20">
               <p className="text-2xl font-black text-white">{profile.total_games}</p>
               <p className="text-[10px] text-gray-500 font-bold uppercase">Jogos</p>
             </div>
-            <div className="text-center bg-background/50 border border-border px-4 py-2 rounded-xl min-w-[80px] relative overflow-hidden group">
+            <div className="text-center bg-background/50 border border-border px-4 py-2 rounded-xl min-w-20 relative overflow-hidden group">
               <div className="absolute inset-0 bg-blue-500/5 group-hover:bg-blue-500/10 transition-colors"></div>
               <p className="text-2xl font-black text-blue-400 relative z-10">{profile.total_platinums}</p>
               <p className="text-[10px] text-gray-500 font-bold uppercase relative z-10">Platinas</p>
@@ -132,7 +132,7 @@ export default async function ProfilePage() {
         <h2 className="text-2xl font-bold text-white flex items-center gap-2">🏆 Estante de Troféus</h2>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           {showcase.map((game) => (
-            <div key={game.id} className={`relative aspect-[3/4] rounded-xl border border-border/50 bg-linear-to-b ${game.gradient} p-4 flex flex-col justify-between group hover:border-primary/50 transition-all cursor-pointer overflow-hidden shadow-lg`}>
+            <div key={game.id} className={`relative aspect-3/4 rounded-xl border border-border/50 bg-linear-to-b ${game.gradient} p-4 flex flex-col justify-between group hover:border-primary/50 transition-all cursor-pointer overflow-hidden shadow-lg`}>
               <div className="absolute top-2 right-2 text-[10px] font-bold text-white/70 bg-black/40 px-1.5 py-0.5 rounded backdrop-blur-md border border-white/10">{game.platform}</div>
               <div className="flex-1 flex items-center justify-center"><span className="text-5xl group-hover:scale-110 transition-transform duration-300 drop-shadow-2xl">{game.icon}</span></div>
               <div className="text-center mt-2 relative z-10">
