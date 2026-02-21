@@ -12,10 +12,10 @@ export function CommentInput({ profileId, currentPath }: { profileId: string, cu
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!content.trim() || content.length > MAX_CHARS) return
-    
+
     setLoading(true)
     const res = await postComment(profileId, content.trim(), currentPath)
-    
+
     if (res?.error) {
       toast.error(res.error, { theme: 'dark' })
     } else {
@@ -28,10 +28,10 @@ export function CommentInput({ profileId, currentPath }: { profileId: string, cu
   return (
     <form onSubmit={handleSubmit} className="mb-2">
       <div className="relative">
-        <textarea 
+        <textarea
           value={content}
           onChange={(e) => setContent(e.target.value)}
-          placeholder="Deixe um recado para este caçador..." 
+          placeholder="Deixe um recado para este caçador..."
           className="w-full bg-background/50 border border-border rounded-2xl p-4 pr-4 pb-8 text-sm text-white font-medium focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary resize-none transition-all shadow-inner custom-scrollbar"
           rows={3}
           maxLength={MAX_CHARS}
@@ -42,9 +42,9 @@ export function CommentInput({ profileId, currentPath }: { profileId: string, cu
           {content.length}/{MAX_CHARS}
         </div>
       </div>
-      
+
       <div className="flex justify-end mt-3">
-        <button 
+        <button
           type="submit"
           disabled={loading || !content.trim() || content.length > MAX_CHARS}
           className="flex items-center gap-2 px-6 py-2.5 bg-primary/10 text-primary border border-primary/20 font-black text-xs md:text-sm rounded-xl hover:bg-primary hover:text-white transition-all disabled:opacity-50 hover:shadow-[0_0_15px_rgba(59,130,246,0.3)] active:scale-95"
@@ -58,29 +58,30 @@ export function CommentInput({ profileId, currentPath }: { profileId: string, cu
 }
 
 export function DeleteCommentButton({ commentId, currentPath }: { commentId: string, currentPath: string }) {
-  const [loading, setLoading] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  const handleDelete = async () => {
-    if(!confirm("Tem certeza que deseja apagar este recado?")) return;
-    setLoading(true)
-    
-    const res = await deleteComment(commentId, currentPath)
-    if (res?.error) {
-      toast.error(res.error, { theme: 'dark' })
-    } else {
-      toast.success("Recado apagado.", { theme: 'dark', icon: <span>🗑️</span> })
-    }
-    setLoading(false)
+  async function handleDelete() {
+    if (!confirm("Deseja apagar este recado?")) return;
+    setIsDeleting(true);
+    // Aqui chama a sua server action de delete
+    await deleteComment(commentId, currentPath);
+    setIsDeleting(false);
   }
 
   return (
-    <button 
-      onClick={handleDelete} 
-      disabled={loading} 
-      className="flex items-center justify-center w-8 h-8 rounded-full bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white border border-transparent hover:border-red-600 transition-all shadow-sm disabled:opacity-50" 
-      title="Apagar Recado"
+    <button
+      onClick={handleDelete}
+      disabled={isDeleting}
+      className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all active:scale-90 disabled:opacity-50"
+      title="Apagar recado"
     >
-      {loading ? <span className="animate-spin text-xs">🔄</span> : <span className="text-sm">🗑️</span>}
+      {isDeleting ? (
+        <span className="animate-spin block text-xs">🌀</span>
+      ) : (
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+        </svg>
+      )}
     </button>
-  )
+  );
 }
