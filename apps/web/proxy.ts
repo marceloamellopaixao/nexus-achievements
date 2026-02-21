@@ -17,7 +17,7 @@ export async function proxy(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           response = NextResponse.next({
             request,
           })
@@ -33,7 +33,7 @@ export async function proxy(request: NextRequest) {
   const url = request.nextUrl.clone()
 
   // 1. Proteger rotas (LOGIN)
-  const protectedRoutes = ['/dashboard', '/studio', '/shop', '/chat']
+  const protectedRoutes = ['/dashboard', '/studio', '/shop', '/chat', '/integrations']
   const isProtectedRoute = protectedRoutes.some(route => url.pathname.startsWith(route))
 
   if (isProtectedRoute && !user) {
