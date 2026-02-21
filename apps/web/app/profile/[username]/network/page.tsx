@@ -78,7 +78,7 @@ export default async function NetworkPage({ params, searchParams }: NetworkPageP
           </div>
         </div>
         <Link href={`/profile/${profile.username}`} className="px-6 py-3 bg-surface/80 backdrop-blur-md border border-border text-white hover:bg-white/5 rounded-xl font-black text-sm transition-all shadow-sm flex items-center justify-center gap-2">
-          <span>⬅️</span> Voltar ao Perfil
+          Voltar ao Perfil
         </Link>
       </div>
 
