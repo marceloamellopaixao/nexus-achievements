@@ -1,33 +1,20 @@
-import { NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
+import { createClient } from '@/utils/supabase/server'
+import { NextResponse } from 'next/server'
 
 export async function GET(request: Request) {
-    const requestUrl = new URL(request.url);
-    const code = requestUrl.searchParams.get("code");
-    let next = requestUrl.searchParams.get("next") ?? "/dashboard";
+  const { searchParams, origin } = new URL(request.url)
+  const code = searchParams.get('code')
+  const next = searchParams.get('next') ?? '/dashboard'
 
-    if (code) {
-        const supabase = await createClient();
-        const { data, error } = await supabase.auth.exchangeCodeForSession(code);
-        
-        if (!error && data.user) {
-            // Busca o username que foi gerado automaticamente pelo banco de dados
-            const { data: userData } = await supabase
-                .from('users')
-                .select('username')
-                .eq('id', data.user.id)
-                .single();
-
-            // A MÁGICA: Se o username tiver espaços ou caracteres especiais, forçamos o Onboarding!
-            const isValidUsername = /^[a-zA-Z0-9_]{3,20}$/.test(userData?.username || '');
-            
-            if (!isValidUsername) {
-                next = "/onboarding";
-            }
-
-            return NextResponse.redirect(new URL(next, request.url));
-        }
+  if (code) {
+    const supabase = await createClient()
+    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    
+    if (!error) {
+      return NextResponse.redirect(`${origin}${next}`)
     }
+  }
 
-    return NextResponse.redirect(new URL("/login?error=true", request.url));
+  // Se der erro, manda para uma página de erro ou login
+  return NextResponse.redirect(`${origin}/login?error=auth_callback_failed`)
 }
