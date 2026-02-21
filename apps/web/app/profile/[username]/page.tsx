@@ -159,7 +159,15 @@ export default async function PublicProfilePage({ params }: ProfilePageProps) {
                   )}
                 </div>
               </div>
-              <div className="shrink-0">
+              <div className="flex gap-2 shrink-0">
+                {!isOwner && (
+                  <Link
+                    href={`/compare/${profile.username}`}
+                    className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-black text-sm transition-all duration-300 shadow-md active:scale-95 disabled:opacity-50 bg-surface/50 border border-border text-gray-300 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/30"
+                  >
+                    ⚔️ Comparar
+                  </Link>
+                )}
                 {isOwner ? (
                   <Link href={`/profile/${profile.username}/studio`} className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-white text-black hover:bg-gray-200 rounded-xl font-black text-sm transition-all shadow-md hover:scale-105 w-full md:w-auto">
                     <span>⚙️</span> Configurar Perfil
