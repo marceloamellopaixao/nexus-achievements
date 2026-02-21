@@ -1,0 +1,24 @@
+'use client'
+
+import { usePathname } from 'next/navigation';
+
+interface NavLink {
+  href: string;
+  label: string;
+}
+
+export default function HeaderTitle({ links }: { links: NavLink[] }) {
+  const pathname = usePathname();
+
+  // Encontra o link que corresponde ao início da rota atual
+  // Ex: se estiver em /games/123, ele reconhece como "Jogos" (/games)
+  const currentPath = links.find(link => 
+    pathname === link.href || (link.href !== '/dashboard' && pathname.startsWith(link.href))
+  );
+
+  return (
+    <h1 className="text-xl md:text-2xl font-black text-transparent bg-clip-text bg-linear-to-r from-primary to-purple-500 tracking-tighter uppercase">
+      {currentPath?.label || 'NEXUS'}
+    </h1>
+  );
+}
