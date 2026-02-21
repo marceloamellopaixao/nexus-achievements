@@ -2,7 +2,8 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function proxy(request: NextRequest) {
-  const response = NextResponse.next({
+  // Criamos a resposta inicial
+  let response = NextResponse.next({
     request: {
       headers: request.headers,
     },
@@ -17,46 +18,35 @@ export async function proxy(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          // Isso é crucial para que o middleware consiga "escrever" o cookie 
-          // e passar para a página seguinte no servidor
+          // 1. Atualiza os cookies na REQUISIÇÃO (para o Next.js ler na página)
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+          // 2. Cria uma nova resposta para garantir que os cookies sejam enviados ao navegador
+          response = NextResponse.next({ request })
+          // 3. Define os cookies na RESPOSTA final
+          cookiesToSet.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options)
+          )
         },
       },
     }
   )
 
   const { data: { user } } = await supabase.auth.getUser()
-  const url = request.nextUrl.clone()
 
-  // 1. Proteger rotas (LOGIN)
-  const protectedRoutes = ['/dashboard', '/studio', '/shop', '/chat', '/integrations']
-  const isProtectedRoute = protectedRoutes.some(route => url.pathname.startsWith(route))
-
-  if (isProtectedRoute && !user) {
-    url.pathname = '/login'
-    return NextResponse.redirect(url)
+  // Se o usuário está logado e tenta ir para /login, manda para /dashboard
+  if (user && request.nextUrl.pathname === '/login') {
+    return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
-  // 2. Lógica de Onboarding
-  if (user && !url.pathname.startsWith('/onboarding') && !url.pathname.startsWith('/auth')) {
-    const { data: profile } = await supabase
-      .from('users')
-      .select('username')
-      .eq('id', user.id)
-      .single()
-
-    if (!profile?.username || profile.username.includes(' ')) {
-      url.pathname = '/onboarding'
-      return NextResponse.redirect(url)
-    }
+  // Se NÃO está logado e tenta ir para rota protegida, manda para /login
+  const protectedRoutes = ['/dashboard', '/studio', '/shop', '/chat']
+  if (!user && protectedRoutes.some(path => request.nextUrl.pathname.startsWith(path))) {
+    return NextResponse.redirect(new URL('/login', request.url))
   }
 
   return response
 }
 
-// O matcher continua igual
 export const config = {
-  matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
-  ],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
 }
