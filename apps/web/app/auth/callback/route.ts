@@ -24,6 +24,8 @@ export async function GET(request: Request) {
             
             if (!isValidUsername) {
                 next = "/onboarding";
+            } else {
+                next = next.startsWith("/") ? next : `/${next}`;
             }
 
             // IMPORTANTE: Use a origem da requisição para evitar problemas de domínio na Vercel

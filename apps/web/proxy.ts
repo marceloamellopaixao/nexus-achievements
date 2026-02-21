@@ -32,16 +32,41 @@ export async function proxy(request: NextRequest) {
   )
 
   const { data: { user } } = await supabase.auth.getUser()
+  const url = request.nextUrl.clone()
 
-  // Se o usuário está logado e tenta ir para /login, manda para /dashboard
-  if (user && request.nextUrl.pathname === '/login') {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+  // 1. Se NÃO está logado e tenta ir para rota protegida, manda para /login
+  const protectedRoutes = ['/dashboard', '/studio', '/shop', '/chat', '/profile', '/integrations']
+  const isProtectedRoute = protectedRoutes.some(path => url.pathname.startsWith(path))
+
+  if (!user && isProtectedRoute) {
+    url.pathname = '/login'
+    return NextResponse.redirect(url)
   }
 
-  // Se NÃO está logado e tenta ir para rota protegida, manda para /login
-  const protectedRoutes = ['/dashboard', '/studio', '/shop', '/chat']
-  if (!user && protectedRoutes.some(path => request.nextUrl.pathname.startsWith(path))) {
-    return NextResponse.redirect(new URL('/login', request.url))
+  // 2. Se ESTÁ logado, precisamos verificar se o perfil "físico" dele existe no banco
+  if (user && !url.pathname.startsWith('/auth')) {
+    
+    // A MÁGICA: Usamos maybeSingle() em vez de single() para não gerar Erro 500 se o banco foi resetado
+    const { data: profile } = await supabase
+      .from('users')
+      .select('username')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    // Valida se o perfil não existe (reset), não tem username, ou tem username inválido (com espaço)
+    const needsOnboarding = !profile || !profile.username || profile.username.includes(' ')
+
+    // Se precisa de onboarding e não está na página de onboarding, redireciona para lá
+    if (needsOnboarding && !url.pathname.startsWith('/onboarding')) {
+      url.pathname = '/onboarding'
+      return NextResponse.redirect(url)
+    }
+
+    // Se NÃO precisa de onboarding (perfil 100% OK) e tenta acessar telas iniciais, manda pro dashboard
+    if (!needsOnboarding && (url.pathname === '/login' || url.pathname === '/onboarding' || url.pathname === '/')) {
+      url.pathname = '/dashboard'
+      return NextResponse.redirect(url)
+    }
   }
 
   return response

@@ -19,7 +19,6 @@ export default function LoginPage() {
   }
 
   return (
-    // Removido o min-h-screen e bg-background. Adicionado cálculo de altura perfeito.
     <div className="flex w-full min-h-[calc(100vh-10rem)] md:min-h-[calc(100vh-12rem)] items-center justify-center relative overflow-hidden rounded-3xl">
 
       <div className="absolute top-1/4 right-1/4 w-64 h-64 bg-primary/20 rounded-full blur-[100px] pointer-events-none"></div>

@@ -96,8 +96,9 @@ export default async function PublicProfilePage({ params }: ProfilePageProps) {
     }
   }
 
-  // 4. ESTANTE DE JOGOS
+  // 4. ESTANTE DE JOGOS DINÂMICA
   let showcaseGames: ShowcaseGame[] = [];
+
   if (profile.showcase_games && profile.showcase_games.length > 0) {
     const { data: gamesData } = await supabase.from("games").select("id, title, cover_url").in("id", profile.showcase_games);
     if (gamesData) {
@@ -109,9 +110,9 @@ export default async function PublicProfilePage({ params }: ProfilePageProps) {
 
   return (
     <div className="min-h-screen pb-20 animate-in fade-in duration-500">
-      
+
       {/* BANNER DO PERFIL (Full-Bleed Corrigido) */}
-      <div 
+      <div
         className="-mx-4 md:-mx-8 -mt-4 md:-mt-8 h-64 md:h-80 relative overflow-hidden border-b border-border/50 shadow-2xl rounded-b-4xl transition-all duration-700 z-0"
         style={{ background: styles.background || '#18181b' }}
       >
@@ -122,10 +123,10 @@ export default async function PublicProfilePage({ params }: ProfilePageProps) {
       {/* CARTÃO DE INFORMAÇÕES DO CAÇADOR */}
       <div className="max-w-5xl mx-auto -mt-24 md:-mt-32 relative z-10 px-2 md:px-0">
         <div className="bg-surface/60 backdrop-blur-xl border border-border/60 rounded-3xl p-6 md:p-8 shadow-2xl flex flex-col md:flex-row gap-6 md:gap-8 items-center md:items-start">
-          
+
           {/* Avatar com Aro de Gradiente (Correção das Pontas) */}
           <div className="relative w-32 h-32 md:w-40 md:h-40 shrink-0 z-10 -mt-16 md:-mt-20">
-            <div 
+            <div
               className="absolute inset-0 rounded-3xl md:rounded-4xl p-1 shadow-2xl transition-all duration-700"
               style={{ background: styles.border || 'transparent' }}
             >
@@ -224,25 +225,21 @@ export default async function PublicProfilePage({ params }: ProfilePageProps) {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 md:gap-5">
-              {showcaseGames.map((game, idx) => {
-                const hasCover = typeof game.cover_url === 'string' && game.cover_url.trim() !== '';
-                return (
-                  <Link href={`/games/${game.id}`} key={`${game.id}-${idx}`} className="relative aspect-3/4 rounded-2xl border border-border/50 bg-surface overflow-hidden hover:border-primary/50 transition-all duration-300 cursor-pointer shadow-lg group flex flex-col items-center justify-center hover:shadow-[0_0_20px_rgba(59,130,246,0.2)] hover:-translate-y-1">
-                    {hasCover ? (
-                      <Image src={game.cover_url} alt={game.title} fill sizes="(max-width: 768px) 50vw, 33vw" className="object-cover z-0 group-hover:scale-105 transition-transform duration-500" unoptimized />
-                    ) : (
-                      <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center bg-surface border border-dashed border-border/50 z-0">
-                        <span className="text-4xl mb-2 opacity-50">🎮</span>
-                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{game.title}</span>
-                      </div>
-                    )}
-                    <div className="absolute inset-x-0 bottom-0 bg-linear-to-t from-black via-black/60 to-transparent p-4 pt-16 translate-y-2 group-hover:translate-y-0 transition-transform z-10">
-                      <p className="font-bold text-white text-xs md:text-sm line-clamp-2 drop-shadow-md leading-tight group-hover:text-primary transition-colors">{game.title}</p>
-                    </div>
-                  </Link>
-                );
-              })}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+              {/* Renderiza os jogos selecionados */}
+              {showcaseGames.map((game) => (
+                <Link href={`/games/${game.id}`} key={game.id} className="group relative aspect-3/4 rounded-2xl border border-border/50 bg-surface overflow-hidden hover:border-primary/50 transition-all shadow-lg">
+                  <Image src={game.cover_url} alt={game.title} fill className="object-cover group-hover:scale-105 transition-transform" unoptimized />
+                </Link>
+              ))}
+
+              {/* Renderiza slots vazios disponíveis (comprados) */}
+              {Array.from({ length: Math.max(0, showcaseLimit - showcaseGames.length) }).map((_, i) => (
+                <div key={`empty-${i}`} className="aspect-3/4 rounded-2xl border-2 border-dashed border-border/30 bg-surface/20 flex flex-col items-center justify-center gap-2 opacity-50">
+                  <span className="text-2xl">🔒</span>
+                  <span className="text-[9px] font-black uppercase tracking-widest text-gray-500">Slot Disponível</span>
+                </div>
+              ))}
             </div>
           )}
         </div>

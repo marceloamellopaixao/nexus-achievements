@@ -39,8 +39,8 @@ export default function EquipButton({ itemId, category, isEquipped }: Props) {
       onClick={handleEquip}
       disabled={loading}
       className={`w-full py-2.5 px-4 rounded-xl font-black text-xs md:text-sm transition-all duration-300 flex items-center justify-center gap-2 shadow-sm active:scale-95 disabled:opacity-50 disabled:pointer-events-none ${isEquipped
-          ? 'bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 hover:border-red-500/40'
-          : 'bg-primary/10 text-primary border border-primary/30 hover:bg-primary hover:text-white hover:shadow-[0_0_15px_rgba(59,130,246,0.4)]'
+        ? 'bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-600 hover:text-white'
+        : 'bg-primary/10 text-primary border border-primary/30 hover:bg-primary hover:text-white hover:shadow-[0_0_20px_rgba(59,130,246,0.6)]'
         }`}
     >
       {loading ? (

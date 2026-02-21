@@ -29,13 +29,15 @@ export default async function RootLayout({
   let userData: UserData | null = null;
 
   if (user) {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("users")
       .select("username, avatar_url, nexus_coins")
       .eq("id", user.id)
-      .single();
+      .maybeSingle();
 
-    userData = data as UserData;
+    if (!error && data) {
+      userData = data as UserData;
+    }
   }
 
   const navLinks = [
@@ -43,9 +45,9 @@ export default async function RootLayout({
     { href: "/games", icon: "🎮", label: "Jogos", mobile: true },
     { href: "/leaderboards", icon: "🏆", label: "Hall da Fama", mobile: true },
     { href: "/chat", icon: "💬", label: "Taverna", mobile: true },
-    { href: userData?.username ? `/profile/${userData.username}` : "/dashboard", icon: "👤", label: "Meu Perfil", mobile: true },
+    { href: userData?.username ? `/profile/${userData.username}` : "/login", icon: "👤", label: "Meu Perfil", mobile: true },
     { href: "/shop", icon: "🛒", label: "Loja", mobile: true },
-    { href: "/integrations", icon: "⚙️", label: "Integrações", mobile: false },
+    { href: "/integrations", icon: "⚙️", label: "Integrações", mobile: true },
   ];
 
   return (
