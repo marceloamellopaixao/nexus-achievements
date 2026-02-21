@@ -5,13 +5,15 @@ import { createClient } from "@/utils/supabase/server";
 import Image from "next/image";
 import { ToastContainer } from "react-toastify";
 import { DesktopNavLinks, MobileNavLinks } from "./components/NavLinks";
+import NotificationBell from "./components/NotificationBell";
+// Importe o novo componente
+import HeaderTitle from "./components/HeaderTitle";
 
 export const metadata: Metadata = {
   title: 'Nexus Achievements | Sua Jornada Gamer',
   description: 'A plataforma definitiva para caçadores de conquistas da Steam.',
 };
 
-// Interface para evitar o uso de 'any' e resolver erros de tipagem
 interface UserData {
   username: string;
   avatar_url: string | null;
@@ -54,9 +56,6 @@ export default async function RootLayout({
     <html lang="pt-BR" className="dark">
       <body className="antialiased flex h-screen overflow-hidden bg-background text-foreground selection:bg-primary/30">
 
-        {/* =========================================
-            DESKTOP SIDEBAR
-            ========================================= */}
         <aside className="w-64 xl:w-72 border-r border-border/50 bg-surface/30 backdrop-blur-xl hidden md:flex flex-col shadow-[4px_0_24px_rgba(0,0,0,0.2)] z-50">
           <div className="h-20 flex items-center px-8 border-b border-border/50">
             <Link href="/dashboard" className="flex items-center gap-2 group">
@@ -74,7 +73,7 @@ export default async function RootLayout({
           {userData && (
             <div className="p-4 border-t border-border/50 bg-background/20 m-4 rounded-2xl">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-full bg-surface border border-primary overflow-hidden relative shrink-0">
+                <div className="w-10 h-10 rounded-full bg-surface border border-primary overflow-hidden shrink-0 relative">
                   {userData.avatar_url ? (
                     <Image src={userData.avatar_url} alt="Avatar" fill className="object-cover" unoptimized />
                   ) : (
@@ -95,23 +94,19 @@ export default async function RootLayout({
           )}
         </aside>
 
-        {/* =========================================
-            ÁREA DE CONTEÚDO PRINCIPAL
-            ========================================= */}
         <div className="flex-1 flex flex-col h-screen relative w-full max-w-full">
-
           <header className="h-16 md:h-20 shrink-0 border-b border-border/50 bg-background/80 backdrop-blur-xl flex items-center justify-between px-4 md:px-8 z-40 sticky top-0">
+            
             <div className="flex items-center gap-2">
-              <Link href="/dashboard" className="flex items-center gap-2">
-                <h1 className="text-xl md:text-2xl font-black text-transparent bg-clip-text bg-linear-to-r from-primary to-purple-500 italic tracking-tighter">
-                  NEXUS
-                </h1>
-              </Link>
+              {/* SUBSTITUIÇÃO AQUI: O componente HeaderTitle agora lida com o nome da página */}
+              <HeaderTitle links={navLinks} />
             </div>
 
             <div className="flex items-center gap-2 md:gap-4">
               {userData ? (
                 <>
+                  <NotificationBell />
+
                   <div className="flex items-center gap-1.5 md:gap-2 bg-yellow-500/10 px-3 md:px-4 py-1.5 md:py-2 rounded-full border border-yellow-500/30 shadow-[0_0_10px_rgba(234,179,8,0.1)] cursor-default">
                     <span className="text-yellow-500 text-xs md:text-sm animate-pulse">🪙</span>
                     <span className="text-xs md:text-sm font-black text-yellow-500">{userData.nexus_coins.toLocaleString()}</span>
@@ -140,13 +135,11 @@ export default async function RootLayout({
             </div>
           </main>
 
-          {/* MOBILE BOTTOM NAVIGATION */}
           {userData && (
             <nav className="md:hidden fixed bottom-0 inset-x-0 h-16 bg-surface/90 backdrop-blur-2xl border-t border-border/50 flex items-center justify-around z-50 px-2 pb-safe">
               <MobileNavLinks links={navLinks} />
             </nav>
           )}
-
         </div>
       </body>
     </html>
