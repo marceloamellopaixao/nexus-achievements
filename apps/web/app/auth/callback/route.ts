@@ -1,20 +1,36 @@
-import { createClient } from '@/utils/supabase/server'
-import { NextResponse } from 'next/server'
+import { NextResponse } from "next/server";
+import { createClient } from "@/utils/supabase/server";
 
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url)
-  const code = searchParams.get('code')
-  const next = searchParams.get('next') ?? '/dashboard'
+    const requestUrl = new URL(request.url);
+    const code = requestUrl.searchParams.get("code");
+    let next = requestUrl.searchParams.get("next") ?? "/dashboard";
 
-  if (code) {
-    const supabase = await createClient()
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
-    
-    if (!error) {
-      return NextResponse.redirect(`${origin}${next}`)
+    if (code) {
+        const supabase = await createClient();
+        
+        // Troca o código pela sessão e salva nos cookies automaticamente
+        const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+        
+        if (!error && data.user) {
+            const { data: userData } = await supabase
+                .from('users')
+                .select('username')
+                .eq('id', data.user.id)
+                .single();
+
+            // Validação do username para forçar onboarding
+            const isValidUsername = /^[a-zA-Z0-9_]{3,20}$/.test(userData?.username || '');
+            
+            if (!isValidUsername) {
+                next = "/onboarding";
+            }
+
+            // IMPORTANTE: Use a origem da requisição para evitar problemas de domínio na Vercel
+            return NextResponse.redirect(new URL(next, requestUrl.origin));
+        }
     }
-  }
 
-  // Se der erro, manda para uma página de erro ou login
-  return NextResponse.redirect(`${origin}/login?error=auth_callback_failed`)
+    // Em caso de erro, redireciona para o login
+    return NextResponse.redirect(new URL("/login?error=auth_failed", requestUrl.origin));
 }
