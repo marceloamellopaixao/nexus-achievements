@@ -84,7 +84,7 @@ export async function fetchSteamGamesList() {
   }
 }
 
-// 3. PROCESSA UM ÚNICO JOGO E CALCULA RARIDADE
+// 3. PROCESSA UM ÚNICO JOGO E CALCULA RARIDADE (VERSÃO MULTI-USUÁRIO)
 export async function processSingleGame(game: SteamGame, steamId: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -92,6 +92,8 @@ export async function processSingleGame(game: SteamGame, steamId: string) {
 
   const STEAM_KEY = process.env.STEAM_API_KEY
   const appId = game?.appid?.toString()
+  if (!appId) return { coins: 0, plats: 0 }
+
   const steamGameId = `steam-${appId}`
 
   try {
@@ -109,20 +111,21 @@ export async function processSingleGame(game: SteamGame, steamId: string) {
     const totalCount = achievements.length
     const isPlat = unlockedCount === totalCount && totalCount > 0
 
-    // --- LÓGICA DE IMAGENS COM FALLBACK ---
+    // Upsert do jogo (Metadados Globais)
     let coverUrl = `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${appId}/library_600x900.jpg`;
     let bannerUrl = `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${appId}/header.jpg`;
 
     // Verifica se a imagem da Steam existe (rápido)
     const checkSteam = await fetch(coverUrl, { method: 'HEAD' });
     if (!checkSteam.ok) {
-        // Se falhar, tenta SteamGridDB
-        const backupCover = await getBackupImage(appId, 'grids');
-        const backupBanner = await getBackupImage(appId, 'heroes');
-        if (backupCover) coverUrl = backupCover;
-        if (backupBanner) bannerUrl = backupBanner;
+      // Se falhar, tenta SteamGridDB
+      const backupCover = await getBackupImage(appId, 'grids');
+      const backupBanner = await getBackupImage(appId, 'heroes');
+      if (backupCover) coverUrl = backupCover;
+      if (backupBanner) bannerUrl = backupBanner;
     }
 
+    // Sincroniza o jogo na tabela global
     await supabase.from('games').upsert({
       id: steamGameId,
       title: game.name,
@@ -131,25 +134,46 @@ export async function processSingleGame(game: SteamGame, steamId: string) {
       total_achievements: totalCount
     }, { onConflict: 'id' })
 
-    const { data: existingRecord } = await supabase.from('user_games').select('id, unlocked_achievements, is_platinum').eq('user_id', user.id).eq('game_id', steamGameId).maybeSingle()
+    // Busca progresso individual do usuário logado
+    const { data: existingRecord } = await supabase
+      .from('user_games')
+      .select('id, unlocked_achievements, is_platinum')
+      .eq('user_id', user.id)
+      .eq('game_id', steamGameId)
+      .maybeSingle()
 
     const previousUnlocked = existingRecord?.unlocked_achievements || 0
     const wasPlat = existingRecord?.is_platinum || false
 
+    // Atualiza o registro individual do usuário
     if (existingRecord) {
-      await supabase.from('user_games').update({ playtime_minutes: game.playtime_forever, unlocked_achievements: unlockedCount, total_achievements: totalCount, is_platinum: isPlat, last_synced_at: new Date().toISOString() }).eq('id', existingRecord.id)
+      await supabase.from('user_games').update({
+        playtime_minutes: game.playtime_forever,
+        unlocked_achievements: unlockedCount,
+        total_achievements: totalCount,
+        is_platinum: isPlat,
+        last_synced_at: new Date().toISOString()
+      }).eq('id', existingRecord.id)
     } else {
-      await supabase.from('user_games').insert({ user_id: user.id, game_id: steamGameId, playtime_minutes: game.playtime_forever, unlocked_achievements: unlockedCount, total_achievements: totalCount, is_platinum: isPlat })
+      await supabase.from('user_games').insert({
+        user_id: user.id,
+        game_id: steamGameId,
+        playtime_minutes: game.playtime_forever,
+        unlocked_achievements: unlockedCount,
+        total_achievements: totalCount,
+        is_platinum: isPlat
+      })
     }
 
     let newCoins = 0
     let newPlats = 0
 
+    // Se houve progresso, processamos o Feed e as Moedas
     if (unlockedCount > previousUnlocked) {
       const newAchievementsCount = unlockedCount - previousUnlocked
       const allNewAchievements = unlockedAchievements.slice(0, newAchievementsCount)
 
-      // BUSCA NOMES E ÍCONES REAIS
+      // Busca dados extras (Nomes e Porcentagens)
       const schemaMap = new Map<string, { displayName: string, icon: string }>()
       const schemaRes = await fetch(`http://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?key=${STEAM_KEY}&appid=${appId}`)
       if (schemaRes.ok) {
@@ -158,7 +182,6 @@ export async function processSingleGame(game: SteamGame, steamId: string) {
         schemaAchs.forEach((a: { name: string; displayName: string; icon: string }) => schemaMap.set(a.name, { displayName: a.displayName, icon: a.icon }))
       }
 
-      // BUSCA PORCENTAGENS GLOBAIS
       const percentagesMap = new Map<string, number>()
       const percentRes = await fetch(`http://api.steampowered.com/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v0002/?gameid=${appId}`)
       if (percentRes.ok) {
@@ -168,22 +191,21 @@ export async function processSingleGame(game: SteamGame, steamId: string) {
       }
 
       const activitiesToInsert = []
-      const achievementsForFeed = allNewAchievements.slice(0, 50) 
+      const achievementsForFeed = allNewAchievements.slice(0, 50)
 
       for (const ach of achievementsForFeed) {
         const unlockDate = ach?.unlocktime ? new Date(ach.unlocktime * 1000).toISOString() : new Date().toISOString()
         const schemaData = schemaMap.get(ach.apiname)
         const displayName = schemaData?.displayName || ach.apiname
         const iconUrl = schemaData?.icon || null
-        
+
         const percent = percentagesMap.get(ach.apiname) || 100
         let rarity = 'bronze'
         let pts = 5
-        
         if (percent <= 10) { rarity = 'gold'; pts = 25; }
         else if (percent <= 50) { rarity = 'silver'; pts = 10; }
 
-        newCoins += pts 
+        newCoins += pts
 
         activitiesToInsert.push({
           user_id: user.id,
@@ -191,17 +213,19 @@ export async function processSingleGame(game: SteamGame, steamId: string) {
           game_name: game.name,
           achievement_name: displayName,
           achievement_icon: iconUrl,
-          rarity: rarity, 
+          rarity: rarity,
           points_earned: pts,
           platform: 'Steam',
           created_at: unlockDate
         })
       }
 
+      // Registro da Platina Individual
       if (isPlat && !wasPlat) {
         newPlats += 1
         const platCoins = totalCount >= 10 ? 200 : 20
         newCoins += platCoins
+
         const lastUnlockTime = unlockedAchievements[0]?.unlocktime;
         const platDate = lastUnlockTime ? new Date(lastUnlockTime * 1000).toISOString() : new Date().toISOString();
 
@@ -219,7 +243,9 @@ export async function processSingleGame(game: SteamGame, steamId: string) {
       }
 
       if (activitiesToInsert.length > 0) {
-        await supabase.from('global_activity').insert(activitiesToInsert)
+        await supabase.from('global_activity').upsert(activitiesToInsert, {
+          onConflict: 'user_id, game_id, achievement_name'
+        })
       }
     }
     return { coins: newCoins, plats: newPlats }
@@ -235,7 +261,7 @@ export async function finalizeSync(totalCoinsEarned: number, totalPlatsEarned: n
   if (!user) return
 
   const { data: userData } = await supabase.from('users').select('nexus_coins, total_platinums').eq('id', user.id).maybeSingle()
-  
+
   const finalCoins = (userData?.nexus_coins ?? 0) + totalCoinsEarned
   const finalPlats = (userData?.total_platinums ?? 0) + totalPlatsEarned
 
