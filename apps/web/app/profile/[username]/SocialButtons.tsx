@@ -16,26 +16,48 @@ export default function SocialButtons({ targetId, initialIsFollowing, currentPat
   const handleToggle = async () => {
     setLoading(true)
     const res = await toggleFollow(targetId, currentPath)
-    if (res.error) toast.error(res.error, { theme: 'dark' })
+    
+    if (res?.error) {
+      toast.error(res.error, { theme: 'dark' })
+    } else {
+      toast.success(initialIsFollowing ? 'Deixou de seguir.' : 'Agora você segue este caçador!', { 
+        theme: 'dark',
+        icon: initialIsFollowing ? <span>👋</span> : <span>🤝</span>})
+    }
     setLoading(false)
   }
 
   return (
-    <>
+    <div className="flex items-center gap-3 w-full md:w-auto">
+      
+      {/* Botão de Seguir / Deixar de Seguir */}
       <button 
         onClick={handleToggle} 
         disabled={loading}
-        className={`flex-1 md:flex-none text-center px-6 py-2.5 rounded-lg font-bold text-sm transition-colors shadow-sm disabled:opacity-50 ${
+        className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-black text-sm transition-all duration-300 shadow-md active:scale-95 disabled:opacity-50 ${
           initialIsFollowing 
-            ? 'bg-surface border border-border text-white hover:bg-red-500/20 hover:text-red-400 hover:border-red-500/50' 
-            : 'bg-primary text-white hover:bg-primary/80'
+            ? 'bg-surface/50 border border-border text-gray-300 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/30' 
+            : 'bg-primary border border-primary text-white hover:bg-primary/80 hover:shadow-[0_0_20px_rgba(59,130,246,0.4)]'
         }`}
       >
-        {loading ? '...' : initialIsFollowing ? 'Deixar de Seguir' : '+ Seguir'}
+        {loading ? (
+          <span className="animate-spin text-lg">🔄</span>
+        ) : initialIsFollowing ? (
+          <span className="text-lg">❌</span>
+        ) : (
+          <span className="text-lg">🤝</span>
+        )}
+        {loading ? 'Aguarde...' : initialIsFollowing ? 'Deixar de Seguir' : 'Seguir Caçador'}
       </button>
-      <button className="text-center px-4 py-2.5 bg-surface border border-border text-white hover:bg-surface/80 rounded-lg font-bold text-sm transition-colors shadow-sm">
-        ⚔️ Desafiar
+      
+      {/* Botão de Desafio (Em Breve) */}
+      <button 
+        title="Funcionalidade em desenvolvimento"
+        className="flex-1 md:flex-none flex items-center justify-center gap-2 px-5 py-3 bg-surface/80 border border-border text-white hover:bg-white/10 rounded-xl font-black text-sm transition-all shadow-sm hover:border-white/20 active:scale-95 cursor-not-allowed opacity-80"
+      >
+        <span className="text-lg drop-shadow-md">⚔️</span> Desafiar
       </button>
-    </>
+
+    </div>
   )
 }

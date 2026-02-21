@@ -15,7 +15,20 @@ type ShowcaseGame = {
   cover_url: string;
 };
 
-// Função para calcular "Tempo Atrás" dos recados
+// Interface para organizar os comentários e remover os "any"
+interface ProfileComment {
+  id: string;
+  profile_id: string;
+  author_id: string;
+  content: string;
+  created_at: string;
+  author?: {
+    id: string;
+    username: string;
+    avatar_url: string | null;
+  };
+}
+
 const timeAgo = (dateString: string) => {
   const date = new Date(dateString);
   const diff = Math.floor((new Date().getTime() - date.getTime()) / 1000);
@@ -42,7 +55,7 @@ export default async function PublicProfilePage({ params }: ProfilePageProps) {
   const isOwner = authUser?.id === profile.id;
   const showcaseLimit = profile.showcase_limit || 5;
 
-  // 1. DADOS SOCIAIS (Seguidores e Seguindo)
+  // 1. DADOS SOCIAIS
   const [{ count: followersCount }, { count: followingCount }] = await Promise.all([
     supabase.from('user_follows').select('*', { count: 'exact', head: true }).eq('following_id', profile.id),
     supabase.from('user_follows').select('*', { count: 'exact', head: true }).eq('follower_id', profile.id)
@@ -54,23 +67,22 @@ export default async function PublicProfilePage({ params }: ProfilePageProps) {
     if (data) isFollowing = true;
   }
 
-  // 2. BUSCA O MURAL DE RECADOS (Com os autores)
+  // 2. MURAL DE RECADOS
   const { data: commentsRaw } = await supabase
     .from('profile_comments')
     .select('*')
     .eq('profile_id', profile.id)
     .order('created_at', { ascending: false });
 
-  // Puxa os detalhes dos autores de forma segura
   const authorIds = [...new Set(commentsRaw?.map(c => c.author_id) || [])];
   const { data: authors } = await supabase.from('users').select('id, username, avatar_url').in('id', authorIds);
 
-  const comments = commentsRaw?.map(c => ({
+  const comments: ProfileComment[] = commentsRaw?.map(c => ({
     ...c,
     author: authors?.find(a => a.id === c.author_id)
   })) || [];
 
-  // 3. COSMÉTICOS E ESTANTE (Mantido do anterior)
+  // 3. COSMÉTICOS DA LOJA
   const equippedIds = [profile.equipped_background, profile.equipped_border, profile.equipped_title].filter(Boolean);
   const styles = { background: null as string | null, border: null as string | null, titleStyle: null as string | null, titleName: null as string | null };
 
@@ -85,6 +97,7 @@ export default async function PublicProfilePage({ params }: ProfilePageProps) {
     }
   }
 
+  // 4. ESTANTE DE JOGOS
   let showcaseGames: ShowcaseGame[] = [];
   if (profile.showcase_games && profile.showcase_games.length > 0) {
     const { data: gamesData } = await supabase.from("games").select("id, title, cover_url").in("id", profile.showcase_games);
@@ -96,122 +109,147 @@ export default async function PublicProfilePage({ params }: ProfilePageProps) {
   const joinDate = new Date(profile.created_at).toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' });
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 pb-10 max-w-5xl mx-auto">
+    <div className="min-h-screen pb-20 animate-in fade-in duration-500">
+      
+      {/* =========================================
+          BANNER DO PERFIL (Full-Bleed Sem Rolagem)
+          ========================================= */}
+      <div 
+        className="-mx-4 md:-mx-8 -mt-4 md:-mt-8 h-64 md:h-80 relative overflow-hidden border-b border-border/50 shadow-2xl rounded-b-[2rem] transition-all duration-700 z-0"
+        style={styles.background ? { background: styles.background } : { backgroundColor: '#18181b' }}
+      >
+        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-20 mix-blend-overlay"></div>
+        {/* Gradiente para suavizar a transição do banner para o fundo */}
+        <div className="absolute inset-0 bg-linear-to-t from-background via-background/40 to-transparent" />
+      </div>
 
-      {/* CARD PRINCIPAL DO PERFIL */}
-      <div className="relative bg-surface border border-border rounded-2xl overflow-hidden mt-4 shadow-xl">
-        <div
-          className="h-48 md:h-64 relative border-b border-border shadow-inner transition-all duration-700"
-          style={styles.background ? { background: styles.background } : { backgroundColor: '#18181b' }}
-        >
-          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-20 mix-blend-overlay"></div>
-        </div>
-
-        <div className="px-6 pb-6 relative flex flex-col md:flex-row md:items-end gap-6 -mt-12 md:-mt-16">
-          <div
-            className="relative w-24 h-24 md:w-32 md:h-32 rounded-2xl bg-surface flex items-center justify-center shrink-0 z-10 transition-all duration-700 shadow-2xl border-4"
-            style={styles.border ? { borderImage: styles.border, borderImageSlice: 1 } : { borderColor: '#09090b' }}
+      {/* =========================================
+          CARTÃO DE INFORMAÇÕES DO CAÇADOR
+          ========================================= */}
+      <div className="max-w-5xl mx-auto -mt-24 md:-mt-32 relative z-10 px-2 md:px-0">
+        <div className="bg-surface/60 backdrop-blur-xl border border-border/60 rounded-3xl p-6 md:p-8 shadow-[0_20px_50px_rgba(0,0,0,0.3)] flex flex-col md:flex-row gap-6 md:gap-8 items-center md:items-start">
+          
+          {/* Avatar com Borda Customizada */}
+          <div 
+            className="w-32 h-32 md:w-40 md:h-40 rounded-3xl bg-background border-[4px] md:border-[6px] shrink-0 z-10 transition-all duration-700 shadow-2xl relative overflow-hidden flex items-center justify-center -mt-16 md:-mt-20"
+            style={styles.border ? { borderImage: styles.border, borderImageSlice: 1 } : { borderColor: '#27272a' }}
           >
             {profile.avatar_url ? (
-              <Image src={profile.avatar_url} alt={profile.username} fill className="rounded-xl object-cover" />
+              <Image src={profile.avatar_url} alt={profile.username} fill className="object-cover" unoptimized />
             ) : (
-              <span className="text-4xl font-bold text-white">{profile.username.charAt(0).toUpperCase()}</span>
+              <span className="text-5xl font-black text-white">{profile.username.charAt(0).toUpperCase()}</span>
             )}
           </div>
 
-          <div className="flex-1 space-y-1 mb-2">
-            <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight flex items-center gap-3">
-              {profile.username}
-              <span className="text-xs font-bold bg-primary/20 text-primary border border-primary/50 px-2 py-1 rounded-md uppercase tracking-wider">
-                Lvl {profile.global_level || 1}
+          <div className="flex-1 text-center md:text-left space-y-3 w-full">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight flex items-center justify-center md:justify-start gap-3 drop-shadow-md">
+                  {profile.username}
+                  <span className="text-xs font-black bg-primary/20 text-primary border border-primary/50 px-2.5 py-1 rounded-lg uppercase tracking-wider shadow-sm">
+                    Lvl {profile.global_level || 1}
+                  </span>
+                </h1>
+                
+                <div className="mt-2">
+                  {styles.titleStyle && styles.titleName ? (
+                    <span className="inline-block px-4 py-1.5 rounded-lg border border-white/20 text-xs font-black shadow-lg" style={{ background: styles.titleStyle }}>
+                      {styles.titleName}
+                    </span>
+                  ) : (
+                    <p className="text-primary font-bold text-sm tracking-widest uppercase">{profile.title}</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Botões de Ação */}
+              <div className="shrink-0">
+                {isOwner ? (
+                  <Link href={`/profile/${profile.username}/studio`} className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-white text-black hover:bg-gray-200 rounded-xl font-black text-sm transition-all shadow-[0_0_15px_rgba(255,255,255,0.2)] hover:scale-105 w-full md:w-auto">
+                    <span>⚙️</span> Configurar Perfil
+                  </Link>
+                ) : (
+                  <SocialButtons targetId={profile.id} initialIsFollowing={isFollowing} currentPath={currentPath} />
+                )}
+              </div>
+            </div>
+
+            <p className="text-gray-300 leading-relaxed text-sm md:text-base italic max-w-2xl mx-auto md:mx-0 bg-background/40 p-4 rounded-xl border border-white/5">
+              &quot;{profile.bio || "Este caçador prefere manter o mistério."}&quot;
+            </p>
+
+            <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 pt-2">
+              <div className="flex items-center gap-4 bg-background/60 px-4 py-2 rounded-xl border border-border/50">
+                <Link href={`/profile/${profile.username}/network?tab=followers`} className="text-xs text-gray-400 font-bold uppercase tracking-wider hover:text-primary transition-colors">
+                  <strong className="text-white text-base mr-1">{followersCount || 0}</strong> Seguidores
+                </Link>
+                <div className="w-px h-4 bg-border"></div>
+                <Link href={`/profile/${profile.username}/network?tab=following`} className="text-xs text-gray-400 font-bold uppercase tracking-wider hover:text-primary transition-colors">
+                  <strong className="text-white text-base mr-1">{followingCount || 0}</strong> Seguindo
+                </Link>
+              </div>
+              
+              <span className="text-[11px] text-gray-500 font-bold uppercase tracking-widest px-3 py-2 bg-surface rounded-xl border border-border/50">
+                📅 Entrou em {joinDate}
               </span>
-            </h1>
-            <div>
-              {styles.titleStyle && styles.titleName ? (
-                <span className="inline-block px-3 py-1 rounded-md border text-xs font-bold mt-1 shadow-sm" style={{ background: styles.titleStyle }}>
-                  {styles.titleName}
-                </span>
-              ) : (
-                <p className="text-primary font-medium">{profile.title}</p>
-              )}
             </div>
           </div>
 
-          <div className="mb-2 flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-            {isOwner ? (
-              <Link href={`/profile/${profile.username}/studio`} className="text-center px-6 py-2.5 bg-white text-black hover:bg-gray-200 rounded-lg font-bold text-sm transition-colors shadow-sm">
-                ⚙️ Configurar Perfil
-              </Link>
-            ) : (
-              <SocialButtons targetId={profile.id} initialIsFollowing={isFollowing} currentPath={currentPath} />
-            )}
-          </div>
-        </div>
-
-        <div className="px-6 pb-6 grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t border-white/5">
-          <div className="md:col-span-2">
-            <p className="text-gray-300 leading-relaxed text-sm md:text-base italic">&quot;{profile.bio}&quot;</p>
-            <div className="flex items-center gap-4 mt-3">
-              <p className="text-xs text-gray-500 font-medium uppercase tracking-wider flex gap-1">
-                <span>📅 {joinDate}</span>
-              </p>
-              <p className="text-xs text-gray-500 font-bold uppercase tracking-wider flex gap-4">
-                <Link href={`/profile/${profile.username}/network?tab=followers`} className="hover:text-primary transition-colors group">
-                  <strong className="text-white group-hover:text-primary transition-colors">{followersCount || 0}</strong> Seguidores
-                </Link>
-                <Link href={`/profile/${profile.username}/network?tab=following`} className="hover:text-primary transition-colors group">
-                  <strong className="text-white group-hover:text-primary transition-colors">{followingCount || 0}</strong> Seguindo
-                </Link>
-              </p>
+          {/* Cartões Rápidos de Estatísticas */}
+          <div className="flex md:flex-col gap-3 w-full md:w-auto mt-4 md:mt-0">
+            <div className="flex-1 md:flex-none text-center bg-background/60 border border-border/50 px-5 py-3 rounded-2xl shadow-inner min-w-[110px]">
+              <p className="text-3xl font-black text-white">{profile.total_games || 0}</p>
+              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-1">Jogos</p>
             </div>
-          </div>
-          <div className="flex gap-4 md:justify-end items-center">
-            <div className="text-center bg-background/50 border border-border px-4 py-2 rounded-xl min-w-20">
-              <p className="text-2xl font-black text-white">{profile.total_games || 0}</p>
-              <p className="text-[10px] text-gray-500 font-bold uppercase">Jogos</p>
-            </div>
-            <div className="text-center bg-background/50 border border-border px-4 py-2 rounded-xl min-w-20 relative overflow-hidden">
-              <div className="absolute inset-0 bg-blue-500/10"></div>
-              <p className="text-2xl font-black text-blue-400 relative z-10">{profile.total_platinums || 0}</p>
-              <p className="text-[10px] text-gray-500 font-bold uppercase relative z-10">Platinas</p>
+            <div className="flex-1 md:flex-none text-center bg-blue-500/10 border border-blue-500/20 px-5 py-3 rounded-2xl shadow-inner relative overflow-hidden min-w-[110px]">
+              <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-30 pointer-events-none"></div>
+              <p className="text-3xl font-black text-blue-400 relative z-10 drop-shadow-md">{profile.total_platinums || 0}</p>
+              <p className="text-[10px] text-blue-500 font-bold uppercase tracking-widest mt-1 relative z-10">Platinas</p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ÁREA INFERIOR */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* =========================================
+          ÁREA INFERIOR: ESTANTE & MURAL
+          ========================================= */}
+      <div className="max-w-5xl mx-auto px-4 md:px-0 mt-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
 
         {/* COLUNA ESQUERDA: ESTANTE */}
-        <div className="lg:col-span-2 space-y-4 pt-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-white flex items-center gap-2">🏆 Estante de Troféus</h2>
-            <span className="text-xs font-medium text-gray-500 bg-surface px-2 py-1 rounded border border-border">
+        <div className="lg:col-span-2 space-y-6">
+          <div className="flex items-center justify-between border-b border-border/50 pb-3">
+            <h2 className="text-2xl font-black text-white flex items-center gap-3">
+              <span className="text-3xl drop-shadow-md">🏆</span> Estante de Troféus
+            </h2>
+            <span className="text-xs font-bold text-gray-400 bg-surface px-3 py-1.5 rounded-lg border border-border shadow-inner">
               {showcaseGames.length} / {showcaseLimit} Slots
             </span>
           </div>
 
           {showcaseGames.length === 0 ? (
-            <div className="h-48 bg-surface/30 rounded-3xl border border-dashed border-border flex flex-col items-center justify-center text-gray-500 text-sm font-medium">
-              <span className="text-3xl mb-2 opacity-50">🎮</span>
-              Este caçador ainda não exibiu nenhum troféu.
+            <div className="h-64 bg-surface/30 rounded-3xl border border-dashed border-border/60 flex flex-col items-center justify-center text-center p-6 shadow-inner">
+              <span className="text-5xl mb-4 opacity-50 drop-shadow-md">🎮</span>
+              <h3 className="text-lg font-bold text-white mb-1">Estante Vazia</h3>
+              <p className="text-sm text-gray-500 max-w-sm">
+                {isOwner ? "Vá ao Estúdio de Configuração e escolha os seus maiores orgulhos para exibir aqui." : "Este caçador ainda não exibiu as suas platinas."}
+              </p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 md:gap-5">
               {showcaseGames.map((game, idx) => {
                 const hasCover = typeof game.cover_url === 'string' && game.cover_url.trim() !== '';
                 return (
-                  <Link href={`/games/${game.id}`} key={`${game.id}-${idx}`} className="relative aspect-3/4 rounded-xl border border-border/50 bg-surface overflow-hidden hover:border-primary/50 transition-all cursor-pointer shadow-lg group flex flex-col items-center justify-center">
+                  <Link href={`/games/${game.id}`} key={`${game.id}-${idx}`} className="relative aspect-3/4 rounded-2xl border border-border/50 bg-surface overflow-hidden hover:border-primary/50 transition-all duration-300 cursor-pointer shadow-lg group flex flex-col items-center justify-center hover:shadow-[0_0_20px_rgba(59,130,246,0.2)] hover:-translate-y-1">
                     {hasCover ? (
-                      <img src={game.cover_url} alt={game.title} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
+                      <Image src={game.cover_url} alt={game.title} fill sizes="(max-width: 768px) 50vw, 33vw" className="object-cover z-0 group-hover:scale-105 transition-transform duration-500" unoptimized />
                     ) : (
-                      <div className="w-full h-full flex flex-col items-center justify-center p-3 text-center bg-surface">
-                        <span className="text-3xl mb-2 opacity-50">🎮</span>
-                        <span className="text-[10px] font-bold text-gray-400 leading-tight">{game.title}</span>
+                      <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center bg-surface border border-dashed border-border/50 z-0">
+                        <span className="text-4xl mb-2 opacity-50">🎮</span>
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{game.title}</span>
                       </div>
                     )}
-                    <div className="absolute inset-x-0 bottom-0 bg-linear-to-t from-black/90 via-black/40 to-transparent p-3 pt-12 translate-y-2 group-hover:translate-y-0 transition-transform">
-                      <p className="font-bold text-white text-xs truncate drop-shadow-md z-10 relative">{game.title}</p>
+                    <div className="absolute inset-x-0 bottom-0 bg-linear-to-t from-black via-black/60 to-transparent p-4 pt-16 translate-y-2 group-hover:translate-y-0 transition-transform z-10">
+                      <p className="font-bold text-white text-xs md:text-sm line-clamp-2 drop-shadow-md leading-tight group-hover:text-primary transition-colors">{game.title}</p>
                     </div>
                   </Link>
                 );
@@ -221,46 +259,58 @@ export default async function PublicProfilePage({ params }: ProfilePageProps) {
         </div>
 
         {/* COLUNA DIREITA: MURAL DE RECADOS */}
-        <div className="space-y-4 pt-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold text-white flex items-center gap-2">💬 Mural</h2>
+        <div className="space-y-6">
+          <div className="flex items-center justify-between border-b border-border/50 pb-3">
+            <h2 className="text-2xl font-black text-white flex items-center gap-3">
+              <span className="text-3xl drop-shadow-md">💬</span> Mural
+            </h2>
           </div>
 
-          <div className="bg-surface border border-border rounded-2xl p-4 flex flex-col h-[500px]">
-            {authUser && (
-              <CommentInput profileId={profile.id} currentPath={currentPath} />
+          <div className="bg-surface/50 backdrop-blur-sm border border-border rounded-3xl p-5 flex flex-col h-[600px] shadow-xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl pointer-events-none"></div>
+            
+            {authUser ? (
+              <div className="mb-6 relative z-10">
+                <CommentInput profileId={profile.id} currentPath={currentPath} />
+              </div>
+            ) : (
+              <div className="mb-6 p-4 bg-background/80 rounded-2xl border border-border text-center text-sm text-gray-400 font-bold shadow-inner">
+                Inicie sessão para deixar um recado.
+              </div>
             )}
 
-            <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar relative z-10">
               {comments.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-center opacity-50">
-                  <span className="text-3xl mb-2">📭</span>
-                  <p className="text-xs text-gray-400">O mural está silencioso.</p>
+                <div className="h-full flex flex-col items-center justify-center text-center opacity-60 bg-background/30 rounded-2xl border border-dashed border-border/50">
+                  <span className="text-4xl mb-3 drop-shadow-md">📭</span>
+                  <p className="text-sm font-bold text-white mb-1">O mural está silencioso.</p>
+                  <p className="text-xs text-gray-500 max-w-[200px]">Seja o primeiro a deixar uma mensagem para este caçador!</p>
                 </div>
               ) : (
                 comments.map((comment) => {
                   const canDelete = authUser?.id === comment.author_id || isOwner;
                   return (
-                    <div key={comment.id} className="bg-background border border-border p-3 rounded-xl flex gap-3 group relative">
-                      <Link href={`/profile/${comment.author?.username}`} className="w-8 h-8 rounded-full bg-surface shrink-0 overflow-hidden relative border border-border">
+                    <div key={comment.id} className="bg-background/80 backdrop-blur-md border border-border/80 p-4 rounded-2xl flex gap-3.5 group relative shadow-sm hover:border-primary/30 transition-colors">
+                      <Link href={`/profile/${comment.author?.username}`} className="w-10 h-10 rounded-full bg-surface shrink-0 overflow-hidden relative border border-border group-hover:border-primary/50 transition-colors">
                         {comment.author?.avatar_url ? (
-                          // Tag <img> para avatares de comentários para evitar crashes UGC
-                          <img src={comment.author.avatar_url} alt="Avatar" className="w-full h-full object-cover" loading="lazy" />
+                          <Image src={comment.author.avatar_url} alt="Avatar" fill sizes="40px" className="object-cover" unoptimized />
                         ) : (
-                          <span className="flex items-center justify-center w-full h-full text-xs font-bold">{comment.author?.username?.charAt(0)}</span>
+                          <span className="flex items-center justify-center w-full h-full text-sm font-bold text-primary bg-primary/10">{comment.author?.username?.charAt(0)}</span>
                         )}
                       </Link>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between">
-                          <Link href={`/profile/${comment.author?.username}`} className="font-bold text-white text-xs hover:text-primary transition-colors">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline justify-between gap-2 mb-1">
+                          <Link href={`/profile/${comment.author?.username}`} className="font-bold text-white text-sm hover:text-primary transition-colors truncate">
                             {comment.author?.username}
                           </Link>
-                          <span className="text-[10px] text-gray-500">{timeAgo(comment.created_at)}</span>
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest shrink-0">{timeAgo(comment.created_at)}</span>
                         </div>
-                        <p className="text-sm text-gray-300 mt-1 break-words">{comment.content}</p>
+                        <p className="text-sm text-gray-300 leading-relaxed break-words">{comment.content}</p>
                       </div>
+                      
+                      {/* Botão de Apagar */}
                       {canDelete && (
-                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-background rounded-md shadow-lg border border-border">
+                        <div className="absolute -top-3 -right-3 opacity-0 group-hover:opacity-100 transition-opacity bg-background rounded-full shadow-lg border border-border p-1">
                           <DeleteCommentButton commentId={comment.id} currentPath={currentPath} />
                         </div>
                       )}

@@ -2,7 +2,6 @@ import React from "react";
 import { createClient } from "@/utils/supabase/server";
 import BuyButton from "./BuyButton";
 
-// Tipagem rigorosa para evitar erros de compilação
 type ShopItem = {
     id: string;
     name: string;
@@ -17,14 +16,14 @@ type ShopItem = {
 type ShopCategory = {
     title: string;
     description: string;
-    filter: string; // Adicionado para filtrar no banco
+    filter: string;
+    icon: string;
 };
 
 export default async function ShopPage() {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
-    // 1. Busca os dados reais do banco
     const { data: dbItems } = await supabase
         .from("shop_items")
         .select("*")
@@ -41,104 +40,128 @@ export default async function ShopPage() {
         if (invData) userInventory = invData.map(i => i.item_id);
     }
 
-    // 2. Definição das categorias (idêntica à sua estrutura mockada)
     const categories: ShopCategory[] = [
-        { title: "🌌 Fundos Animados", description: "Personalize o banner do seu perfil público.", filter: "Fundos Animados" },
-        { title: "🖼️ Molduras de Avatar", description: "Destaque a sua foto nos feeds e leaderboards.", filter: "Molduras de Avatar" },
-        { title: "🏷️ Títulos Exclusivos", description: "Exiba a sua especialidade logo abaixo do seu nome.", filter: "Títulos Exclusivos" }
+        { title: "Fundos de Perfil", icon: "🌌", description: "Personalize o banner do seu perfil público.", filter: "Fundos Animados" },
+        { title: "Molduras de Avatar", icon: "🖼️", description: "Destaque a sua foto nos feeds e leaderboards.", filter: "Molduras de Avatar" },
+        { title: "Títulos Exclusivos", icon: "🏷️", description: "Exiba a sua especialidade logo abaixo do seu nome.", filter: "Títulos Exclusivos" }
     ];
 
     return (
-        <div className="space-y-10 animate-in fade-in duration-500 pb-10 max-w-6xl mx-auto">
+        <div className="space-y-12 animate-in fade-in duration-700 pb-20 max-w-6xl mx-auto px-4 md:px-0">
 
-            {/* Cabeçalho da Loja e Saldo */}
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 bg-surface/50 border border-border p-8 rounded-2xl relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 blur-[100px] rounded-full pointer-events-none"></div>
+            {/* HEADER COM DESIGN GLASSMORPISM */}
+            <div className="relative bg-surface/40 backdrop-blur-xl border border-border/50 p-8 md:p-12 rounded-[2.5rem] overflow-hidden shadow-2xl mt-4">
+                <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/10 blur-[120px] rounded-full pointer-events-none translate-x-1/2 -translate-y-1/2"></div>
+                <div className="absolute bottom-0 left-0 w-64 h-64 bg-purple-500/5 blur-[100px] rounded-full pointer-events-none"></div>
 
-                <div className="relative z-10">
-                    <h2 className="text-4xl font-black text-white tracking-tight">🛒 Loja do Nexus</h2>
-                    <p className="text-gray-400 mt-2 text-lg">
-                        Gaste as suas Nexus Coins duramente conquistadas em cosméticos exclusivos.
-                    </p>
-                </div>
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8 relative z-10">
+                    <div className="max-w-xl">
+                        <div className="inline-flex items-center gap-2 px-3 py-1 bg-primary/10 border border-primary/20 rounded-full text-primary text-[10px] font-black uppercase tracking-widest mb-4">
+                            💎 Mercado Oficial Nexus
+                        </div>
+                        <h2 className="text-4xl md:text-6xl font-black text-white tracking-tighter leading-tight">
+                            Loja de <span className="text-transparent bg-clip-text bg-linear-to-r from-primary to-blue-400">Cosméticos</span>
+                        </h2>
+                        <p className="text-gray-400 mt-4 text-base md:text-lg font-medium leading-relaxed">
+                            Aprimore a sua identidade visual. Use as suas moedas para desbloquear estilos que refletem a sua mestria nos jogos.
+                        </p>
+                    </div>
 
-                <div className="relative z-10 bg-background border border-border px-6 py-4 rounded-xl flex items-center gap-4 shadow-lg">
-                    <div className="text-4xl text-yellow-500 drop-shadow-[0_0_10px_rgba(234,179,8,0.3)]">🪙</div>
-                    <div>
-                        <p className="text-xs text-gray-500 font-bold uppercase tracking-wider">O Seu Saldo</p>
-                        <p className="text-3xl font-black text-white">{userBalance.toLocaleString()}</p>
+                    {/* CARTÃO DE SALDO PREMIUM */}
+                    <div className="bg-background/80 backdrop-blur-md border border-white/10 p-6 md:p-8 rounded-3xl flex items-center gap-6 shadow-[0_20px_50px_rgba(0,0,0,0.4)] border-t-white/20 min-w-[280px]">
+                        <div className="w-16 h-16 bg-yellow-500/10 rounded-2xl flex items-center justify-center text-5xl shadow-inner border border-yellow-500/20">
+                            <span className="drop-shadow-[0_0_15px_rgba(234,179,8,0.5)]">🪙</span>
+                        </div>
+                        <div>
+                            <p className="text-[10px] text-gray-500 font-black uppercase tracking-[0.2em] mb-1">O Seu Saldo</p>
+                            <p className="text-4xl font-black text-white tracking-tighter tabular-nums">
+                                {userBalance.toLocaleString()}
+                            </p>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            {/* Categorias da Loja */}
-            <div className="space-y-12">
+            {/* CONTEÚDO DA LOJA */}
+            <div className="space-y-16">
                 {categories.map((category, catIndex) => {
                     const itemsInCategory = (dbItems as ShopItem[] || []).filter(item => item.category === category.filter);
                     if (itemsInCategory.length === 0) return null;
 
                     return (
-                        <div key={catIndex} className="space-y-4">
-                            <div>
-                                <h3 className="text-2xl font-bold text-white">{category.title}</h3>
-                                <p className="text-gray-400 text-sm mt-1">{category.description}</p>
+                        <div key={catIndex} className="space-y-8 animate-in slide-in-from-bottom-5 duration-500 delay-100">
+                            <div className="flex items-center gap-4 border-b border-border/50 pb-4">
+                                <span className="text-4xl">{category.icon}</span>
+                                <div>
+                                    <h3 className="text-2xl md:text-3xl font-black text-white tracking-tight">{category.title}</h3>
+                                    <p className="text-gray-500 text-sm font-medium">{category.description}</p>
+                                </div>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
                                 {itemsInCategory.map((item) => {
                                     const isOwned = userInventory.includes(item.id);
+                                    const isLegendary = item.rarity_type === 'Legendary';
+                                    const isEpic = item.rarity_type === 'Epic';
                                     
-                                    const bannerClass = item.gradient ? `bg-linear-to-r ${item.gradient}` : "bg-linear-to-r from-primary/40 via-purple-900/40 to-background";
-
                                     return (
-                                        <div key={item.id} className="bg-surface border border-border rounded-xl overflow-hidden hover:border-primary/50 transition-all group flex flex-col">
-                                            <div className="h-32 bg-background flex items-center justify-center p-4 relative overflow-hidden">
-                                                <div className={`absolute top-2 left-2 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border z-20 ${
-                                                    item.rarity_type === 'Legendary' ? 'bg-orange-500/20 text-orange-400 border-orange-500/50' :
-                                                    item.rarity_type === 'Epic' ? 'bg-purple-500/20 text-purple-400 border-purple-500/50' :
-                                                    'bg-blue-500/20 text-blue-400 border-blue-500/50'
+                                        <div key={item.id} className={`group bg-surface/50 backdrop-blur-sm border rounded-[2rem] overflow-hidden transition-all duration-500 hover:-translate-y-2 flex flex-col shadow-lg hover:shadow-2xl ${
+                                            isLegendary ? 'border-orange-500/30 hover:border-orange-500/60' : 
+                                            isEpic ? 'border-purple-500/30 hover:border-purple-500/60' : 'border-border/50 hover:border-primary/50'
+                                        }`}>
+                                            
+                                            {/* PREVIEW DO ITEM */}
+                                            <div className="h-44 bg-background relative flex items-center justify-center p-6 overflow-hidden border-b border-white/5">
+                                                {/* Efeitos de Raridade de Fundo */}
+                                                {isLegendary && <div className="absolute inset-0 bg-orange-500/5 animate-pulse"></div>}
+                                                {isEpic && <div className="absolute inset-0 bg-purple-500/5 animate-pulse"></div>}
+
+                                                {/* Raridade Badge */}
+                                                <div className={`absolute top-4 left-4 text-[9px] font-black uppercase tracking-[0.15em] px-3 py-1 rounded-full border z-20 shadow-sm ${
+                                                    isLegendary ? 'bg-orange-500/20 text-orange-400 border-orange-500/40' :
+                                                    isEpic ? 'bg-purple-500/20 text-purple-400 border-purple-500/40' :
+                                                    'bg-blue-500/20 text-blue-400 border-blue-500/40'
                                                 }`}>
                                                     {item.rarity_type}
                                                 </div>
 
-                                                {/* FUNDO (STYLE INLINE) */}
-                                                {item.gradient && (
-                                                    <div 
-                                                        className={`absolute inset-0 w-full h-full opacity-80 ${bannerClass}`}
-                                                    ></div>
-                                                )}
+                                                {/* Visualização Real do Item */}
+                                                <div className="relative z-10 w-full h-full flex items-center justify-center">
+                                                    {item.category === "Fundos Animados" && (
+                                                        <div className="w-full h-full rounded-2xl border border-white/10 shadow-2xl transition-transform duration-700 group-hover:scale-110" style={{ background: item.gradient }}></div>
+                                                    )}
 
-                                                {/* MOLDURA */}
-                                                {item.border_style && (
-                                                    <div 
-                                                        className="w-16 h-16 rounded-full border-4 bg-surface flex items-center justify-center z-10"
-                                                        style={{ borderImage: item.border_style, borderImageSlice: 1 }}
-                                                    >
-                                                        <span className="text-2xl">👤</span>
-                                                    </div>
-                                                )}
+                                                    {item.category === "Molduras de Avatar" && (
+                                                        <div className="w-24 h-24 rounded-full border-[6px] bg-surface flex items-center justify-center shadow-2xl transition-transform duration-500 group-hover:rotate-12" style={{ borderImage: item.border_style, borderImageSlice: 1 }}>
+                                                            <span className="text-3xl grayscale group-hover:grayscale-0 transition-all">👤</span>
+                                                        </div>
+                                                    )}
 
-                                                {/* TAG */}
-                                                {item.tag_style && (
-                                                    <div 
-                                                        className="px-4 py-1.5 rounded-md border text-sm font-bold z-10"
-                                                        style={{ background: item.tag_style }}
-                                                    >
-                                                        {item.name}
-                                                    </div>
-                                                )}
+                                                    {item.category === "Títulos Exclusivos" && (
+                                                        <div className="px-6 py-2.5 rounded-xl border border-white/20 text-sm font-black shadow-2xl transition-all duration-500 group-hover:tracking-widest" style={{ background: item.tag_style }}>
+                                                            {item.name}
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
 
-                                            <div className="p-5 flex-1 flex flex-col justify-between gap-4">
-                                                <h4 className="text-lg font-bold text-white group-hover:text-primary transition-colors">{item.name}</h4>
+                                            {/* INFO E COMPRA */}
+                                            <div className="p-6 flex-1 flex flex-col justify-between gap-6">
+                                                <div>
+                                                    <h4 className="text-xl font-black text-white group-hover:text-primary transition-colors leading-tight">
+                                                        {item.name}
+                                                    </h4>
+                                                </div>
                                                 
-                                                {isOwned ? (
-                                                    <button disabled className="w-full py-2.5 bg-green-500/10 text-green-400 border border-green-500/20 rounded-lg font-bold text-sm cursor-default">
-                                                        ✓ Adquirido
-                                                    </button>
-                                                ) : (
-                                                    <BuyButton itemId={item.id} price={item.price} />
-                                                )}
+                                                <div className="pt-2">
+                                                    {isOwned ? (
+                                                        <div className="w-full py-3 bg-green-500/10 text-green-400 border border-green-500/20 rounded-xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 cursor-default">
+                                                            <span className="text-lg">✓</span> Adquirido
+                                                        </div>
+                                                    ) : (
+                                                        <BuyButton itemId={item.id} price={item.price} />
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     );
