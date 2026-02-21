@@ -49,15 +49,6 @@ export default function SocialButtons({ targetId, initialIsFollowing, currentPat
         )}
         {loading ? 'Aguarde...' : initialIsFollowing ? 'Deixar de Seguir' : 'Seguir Caçador'}
       </button>
-      
-      {/* Botão de Desafio (Em Breve) */}
-      <button 
-        title="Funcionalidade em desenvolvimento"
-        className="flex-1 md:flex-none flex items-center justify-center gap-2 px-5 py-3 bg-surface/80 border border-border text-white hover:bg-white/10 rounded-xl font-black text-sm transition-all shadow-sm hover:border-white/20 active:scale-95 cursor-not-allowed opacity-80"
-      >
-        <span className="text-lg drop-shadow-md">⚔️</span> Desafiar
-      </button>
-
     </div>
   )
 }
