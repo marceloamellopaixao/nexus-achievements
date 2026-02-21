@@ -15,7 +15,6 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "lh3.googleusercontent.com", port: "", pathname: "/**" },
       { protocol: 'https', hostname: 'images.igdb.com', port: '', pathname: '/**' },
       { protocol: 'https', hostname: 'shared.akamai.steamstatic.com', port: '', pathname: '/**' },
-      { protocol: "https", hostname: "", port: "", pathname: "/**" }
     ],
   },
 };
