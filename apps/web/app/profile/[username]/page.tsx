@@ -15,7 +15,6 @@ type ShowcaseGame = {
   cover_url: string;
 };
 
-// Interface para organizar os comentários e remover os "any"
 interface ProfileComment {
   id: string;
   profile_id: string;
@@ -84,16 +83,16 @@ export default async function PublicProfilePage({ params }: ProfilePageProps) {
 
   // 3. COSMÉTICOS DA LOJA
   const equippedIds = [profile.equipped_background, profile.equipped_border, profile.equipped_title].filter(Boolean);
-  const styles = { background: null as string | null, border: null as string | null, titleStyle: null as string | null, titleName: null as string | null };
+  const styles = { background: '', border: '', titleStyle: '', titleName: '' };
 
   if (equippedIds.length > 0) {
     const { data: shopItems } = await supabase.from("shop_items").select("*").in("id", equippedIds);
     if (shopItems) {
-      styles.background = shopItems.find(i => i.id === profile.equipped_background)?.gradient || null;
-      styles.border = shopItems.find(i => i.id === profile.equipped_border)?.border_style || null;
+      styles.background = shopItems.find(i => i.id === profile.equipped_background)?.gradient || '';
+      styles.border = shopItems.find(i => i.id === profile.equipped_border)?.border_style || '';
       const t = shopItems.find(i => i.id === profile.equipped_title);
-      styles.titleStyle = t?.tag_style || null;
-      styles.titleName = t?.name || null;
+      styles.titleStyle = t?.tag_style || '';
+      styles.titleName = t?.name || '';
     }
   }
 
@@ -111,34 +110,33 @@ export default async function PublicProfilePage({ params }: ProfilePageProps) {
   return (
     <div className="min-h-screen pb-20 animate-in fade-in duration-500">
       
-      {/* =========================================
-          BANNER DO PERFIL (Full-Bleed Sem Rolagem)
-          ========================================= */}
+      {/* BANNER DO PERFIL (Full-Bleed Corrigido) */}
       <div 
-        className="-mx-4 md:-mx-8 -mt-4 md:-mt-8 h-64 md:h-80 relative overflow-hidden border-b border-border/50 shadow-2xl rounded-b-[2rem] transition-all duration-700 z-0"
-        style={styles.background ? { background: styles.background } : { backgroundColor: '#18181b' }}
+        className="-mx-4 md:-mx-8 -mt-4 md:-mt-8 h-64 md:h-80 relative overflow-hidden border-b border-border/50 shadow-2xl rounded-b-4xl transition-all duration-700 z-0"
+        style={{ background: styles.background || '#18181b' }}
       >
         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-20 mix-blend-overlay"></div>
-        {/* Gradiente para suavizar a transição do banner para o fundo */}
         <div className="absolute inset-0 bg-linear-to-t from-background via-background/40 to-transparent" />
       </div>
 
-      {/* =========================================
-          CARTÃO DE INFORMAÇÕES DO CAÇADOR
-          ========================================= */}
+      {/* CARTÃO DE INFORMAÇÕES DO CAÇADOR */}
       <div className="max-w-5xl mx-auto -mt-24 md:-mt-32 relative z-10 px-2 md:px-0">
-        <div className="bg-surface/60 backdrop-blur-xl border border-border/60 rounded-3xl p-6 md:p-8 shadow-[0_20px_50px_rgba(0,0,0,0.3)] flex flex-col md:flex-row gap-6 md:gap-8 items-center md:items-start">
+        <div className="bg-surface/60 backdrop-blur-xl border border-border/60 rounded-3xl p-6 md:p-8 shadow-2xl flex flex-col md:flex-row gap-6 md:gap-8 items-center md:items-start">
           
-          {/* Avatar com Borda Customizada */}
-          <div 
-            className="w-32 h-32 md:w-40 md:h-40 rounded-3xl bg-background border-[4px] md:border-[6px] shrink-0 z-10 transition-all duration-700 shadow-2xl relative overflow-hidden flex items-center justify-center -mt-16 md:-mt-20"
-            style={styles.border ? { borderImage: styles.border, borderImageSlice: 1 } : { borderColor: '#27272a' }}
-          >
-            {profile.avatar_url ? (
-              <Image src={profile.avatar_url} alt={profile.username} fill className="object-cover" unoptimized />
-            ) : (
-              <span className="text-5xl font-black text-white">{profile.username.charAt(0).toUpperCase()}</span>
-            )}
+          {/* Avatar com Aro de Gradiente (Correção das Pontas) */}
+          <div className="relative w-32 h-32 md:w-40 md:h-40 shrink-0 z-10 -mt-16 md:-mt-20">
+            <div 
+              className="absolute inset-0 rounded-3xl md:rounded-4xl p-1 shadow-2xl transition-all duration-700"
+              style={{ background: styles.border || 'transparent' }}
+            >
+              <div className="w-full h-full rounded-2xl md:rounded-3xl bg-background overflow-hidden relative flex items-center justify-center">
+                {profile.avatar_url ? (
+                  <Image src={profile.avatar_url} alt={profile.username} fill className="object-cover" unoptimized />
+                ) : (
+                  <span className="text-5xl font-black text-white">{profile.username.charAt(0).toUpperCase()}</span>
+                )}
+              </div>
+            </div>
           </div>
 
           <div className="flex-1 text-center md:text-left space-y-3 w-full">
@@ -150,7 +148,6 @@ export default async function PublicProfilePage({ params }: ProfilePageProps) {
                     Lvl {profile.global_level || 1}
                   </span>
                 </h1>
-                
                 <div className="mt-2">
                   {styles.titleStyle && styles.titleName ? (
                     <span className="inline-block px-4 py-1.5 rounded-lg border border-white/20 text-xs font-black shadow-lg" style={{ background: styles.titleStyle }}>
@@ -161,11 +158,9 @@ export default async function PublicProfilePage({ params }: ProfilePageProps) {
                   )}
                 </div>
               </div>
-
-              {/* Botões de Ação */}
               <div className="shrink-0">
                 {isOwner ? (
-                  <Link href={`/profile/${profile.username}/studio`} className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-white text-black hover:bg-gray-200 rounded-xl font-black text-sm transition-all shadow-[0_0_15px_rgba(255,255,255,0.2)] hover:scale-105 w-full md:w-auto">
+                  <Link href={`/profile/${profile.username}/studio`} className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-white text-black hover:bg-gray-200 rounded-xl font-black text-sm transition-all shadow-md hover:scale-105 w-full md:w-auto">
                     <span>⚙️</span> Configurar Perfil
                   </Link>
                 ) : (
@@ -188,20 +183,18 @@ export default async function PublicProfilePage({ params }: ProfilePageProps) {
                   <strong className="text-white text-base mr-1">{followingCount || 0}</strong> Seguindo
                 </Link>
               </div>
-              
               <span className="text-[11px] text-gray-500 font-bold uppercase tracking-widest px-3 py-2 bg-surface rounded-xl border border-border/50">
                 📅 Entrou em {joinDate}
               </span>
             </div>
           </div>
 
-          {/* Cartões Rápidos de Estatísticas */}
           <div className="flex md:flex-col gap-3 w-full md:w-auto mt-4 md:mt-0">
-            <div className="flex-1 md:flex-none text-center bg-background/60 border border-border/50 px-5 py-3 rounded-2xl shadow-inner min-w-[110px]">
+            <div className="flex-1 md:flex-none text-center bg-background/60 border border-border/50 px-5 py-3 rounded-2xl shadow-inner min-w-27.5">
               <p className="text-3xl font-black text-white">{profile.total_games || 0}</p>
               <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-1">Jogos</p>
             </div>
-            <div className="flex-1 md:flex-none text-center bg-blue-500/10 border border-blue-500/20 px-5 py-3 rounded-2xl shadow-inner relative overflow-hidden min-w-[110px]">
+            <div className="flex-1 md:flex-none text-center bg-blue-500/10 border border-blue-500/20 px-5 py-3 rounded-2xl shadow-inner relative overflow-hidden min-w-27.5">
               <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-30 pointer-events-none"></div>
               <p className="text-3xl font-black text-blue-400 relative z-10 drop-shadow-md">{profile.total_platinums || 0}</p>
               <p className="text-[10px] text-blue-500 font-bold uppercase tracking-widest mt-1 relative z-10">Platinas</p>
@@ -210,12 +203,8 @@ export default async function PublicProfilePage({ params }: ProfilePageProps) {
         </div>
       </div>
 
-      {/* =========================================
-          ÁREA INFERIOR: ESTANTE & MURAL
-          ========================================= */}
+      {/* ÁREA INFERIOR: ESTANTE & MURAL */}
       <div className="max-w-5xl mx-auto px-4 md:px-0 mt-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
-
-        {/* COLUNA ESQUERDA: ESTANTE */}
         <div className="lg:col-span-2 space-y-6">
           <div className="flex items-center justify-between border-b border-border/50 pb-3">
             <h2 className="text-2xl font-black text-white flex items-center gap-3">
@@ -258,17 +247,14 @@ export default async function PublicProfilePage({ params }: ProfilePageProps) {
           )}
         </div>
 
-        {/* COLUNA DIREITA: MURAL DE RECADOS */}
         <div className="space-y-6">
           <div className="flex items-center justify-between border-b border-border/50 pb-3">
             <h2 className="text-2xl font-black text-white flex items-center gap-3">
               <span className="text-3xl drop-shadow-md">💬</span> Mural
             </h2>
           </div>
-
-          <div className="bg-surface/50 backdrop-blur-sm border border-border rounded-3xl p-5 flex flex-col h-[600px] shadow-xl relative overflow-hidden">
+          <div className="bg-surface/50 backdrop-blur-sm border border-border rounded-3xl p-5 flex flex-col h-150 shadow-xl relative overflow-hidden">
             <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl pointer-events-none"></div>
-            
             {authUser ? (
               <div className="mb-6 relative z-10">
                 <CommentInput profileId={profile.id} currentPath={currentPath} />
@@ -278,13 +264,12 @@ export default async function PublicProfilePage({ params }: ProfilePageProps) {
                 Inicie sessão para deixar um recado.
               </div>
             )}
-
             <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar relative z-10">
               {comments.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center opacity-60 bg-background/30 rounded-2xl border border-dashed border-border/50">
                   <span className="text-4xl mb-3 drop-shadow-md">📭</span>
                   <p className="text-sm font-bold text-white mb-1">O mural está silencioso.</p>
-                  <p className="text-xs text-gray-500 max-w-[200px]">Seja o primeiro a deixar uma mensagem para este caçador!</p>
+                  <p className="text-xs text-gray-500 max-w-50">Seja o primeiro a deixar uma mensagem para este caçador!</p>
                 </div>
               ) : (
                 comments.map((comment) => {
@@ -305,10 +290,8 @@ export default async function PublicProfilePage({ params }: ProfilePageProps) {
                           </Link>
                           <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest shrink-0">{timeAgo(comment.created_at)}</span>
                         </div>
-                        <p className="text-sm text-gray-300 leading-relaxed break-words">{comment.content}</p>
+                        <p className="text-sm text-gray-300 leading-relaxed wrap-break-word">{comment.content}</p>
                       </div>
-                      
-                      {/* Botão de Apagar */}
                       {canDelete && (
                         <div className="absolute -top-3 -right-3 opacity-0 group-hover:opacity-100 transition-opacity bg-background rounded-full shadow-lg border border-border p-1">
                           <DeleteCommentButton commentId={comment.id} currentPath={currentPath} />
@@ -321,9 +304,7 @@ export default async function PublicProfilePage({ params }: ProfilePageProps) {
             </div>
           </div>
         </div>
-
       </div>
-
     </div>
   );
 }

@@ -156,8 +156,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             <p className="text-sm text-gray-500 mt-1">Nenhuma atividade recente encontrada.</p>
           </div>
         ) : (
-          <div className="relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-[2px] before:bg-linear-to-b before:from-primary/50 before:via-border before:to-transparent">
-            
+          <div className="relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full  before:bg-linear-to-b before:from-primary/50 before:via-border before:to-transparent">
+            before:w-[2px]
             {activities.map((activity) => {
               const activityUser = activity.users;
               if (!activityUser) return null;

@@ -1,6 +1,20 @@
 import { createClient } from "@/utils/supabase/server";
 import ChatClient from "./ChatClient";
 
+// Interfaces para tipagem estrita dos dados brutos do Supabase
+interface ChatUser {
+  username: string;
+  avatar_url: string | null;
+}
+
+interface RawChatMessage {
+  id: string;
+  content: string;
+  created_at: string;
+  user_id: string;
+  users: ChatUser | ChatUser[] | null;
+}
+
 export default async function ChatPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -12,10 +26,24 @@ export default async function ChatPage() {
     .order('created_at', { ascending: false })
     .limit(50);
 
-  const initialMessages = (messagesData as any[] || []).map(m => ({
-    ...m,
-    users: Array.isArray(m.users) ? m.users[0] : m.users
-  })).reverse();
+  // Mapeamento corrigido eliminando o 'any' e garantindo compatibilidade com o ChatClient
+  const initialMessages = ((messagesData as unknown as RawChatMessage[]) || []).map(m => {
+    const userData = Array.isArray(m.users) ? m.users[0] : m.users;
+    
+    return {
+      id: m.id,
+      content: m.content,
+      created_at: m.created_at,
+      user_id: m.user_id,
+      users: userData || null
+    };
+  }).reverse();
 
-  return <ChatClient initialMessages={initialMessages} currentUserId={user?.id} channelId="global" />;
+  return (
+    <ChatClient 
+      initialMessages={initialMessages} 
+      currentUserId={user?.id} 
+      channelId="global" 
+    />
+  );
 }

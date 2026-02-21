@@ -30,7 +30,7 @@ export default async function StudioPage({ params }: StudioPageProps) {
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) return (
-    <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
+    <div className="flex flex-col items-center justify-center min-h-88 space-y-4">
       <span className="text-6xl mb-2 drop-shadow-md">🔒</span>
       <h2 className="text-2xl font-black text-white">Acesso Restrito</h2>
       <p className="text-gray-400 font-bold text-center">Inicie sessão no Nexus para aceder ao seu Estúdio de Customização.</p>
@@ -45,7 +45,7 @@ export default async function StudioPage({ params }: StudioPageProps) {
 
   if (userData?.username !== username) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
+      <div className="flex flex-col items-center justify-center min-h-88 space-y-4">
         <span className="text-6xl mb-2 drop-shadow-md">🛑</span>
         <h2 className="text-2xl font-black text-white">Área Privada</h2>
         <p className="text-gray-400 font-bold text-center">Você só pode editar o seu próprio perfil.</p>
@@ -53,7 +53,6 @@ export default async function StudioPage({ params }: StudioPageProps) {
     );
   }
 
-  // Busca TODOS os jogos, o ShowcaseEditor vai lidar com a exibição paginada/com scroll
   const { data: allGames } = await supabase
     .from("games")
     .select("id, title, cover_url")
@@ -92,8 +91,8 @@ export default async function StudioPage({ params }: StudioPageProps) {
             <p className="text-gray-400 mt-1 font-medium">Lapide a sua identidade visual e exiba as suas conquistas.</p>
           </div>
         </div>
-        <Link href={`/profile/${username}`} className="px-6 py-3 bg-white text-black font-black rounded-xl hover:bg-gray-200 transition-all shadow-[0_0_15px_rgba(255,255,255,0.2)] hover:scale-105 shrink-0 flex items-center justify-center gap-2">
-          Voltar ao Perfil
+        <Link href={`/profile/${username}`} className="px-6 py-3 bg-white text-black font-black rounded-xl hover:bg-gray-200 transition-all shadow-md hover:scale-105 shrink-0 flex items-center justify-center gap-2">
+          <span>👀</span> Voltar ao Perfil
         </Link>
       </div>
 
@@ -142,7 +141,7 @@ export default async function StudioPage({ params }: StudioPageProps) {
             </h2>
             <p className="text-sm text-gray-400 mt-1">Cosméticos adquiridos na Loja de Pontos.</p>
           </div>
-          <Link href="/shop" className="px-5 py-2.5 bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 font-bold rounded-xl text-sm hover:bg-yellow-500/20 transition-all shadow-[0_0_15px_rgba(234,179,8,0.1)] shrink-0 flex items-center justify-center gap-2">
+          <Link href="/shop" className="px-5 py-2.5 bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 font-bold rounded-xl text-sm hover:bg-yellow-500/20 transition-all shadow-md shrink-0 flex items-center justify-center gap-2">
             🛒 Ir à Loja
           </Link>
         </div>
@@ -151,7 +150,7 @@ export default async function StudioPage({ params }: StudioPageProps) {
           <div className="bg-surface/30 border border-border border-dashed rounded-3xl p-16 text-center flex flex-col items-center justify-center shadow-inner">
             <span className="text-6xl mb-4 drop-shadow-md">🕸️</span>
             <h3 className="text-xl font-black text-white mb-2">Inventário Vazio</h3>
-            <p className="text-gray-400 text-sm max-w-sm">Você ainda não comprou nenhum cosmético. Visite a loja e gaste as suas Nexus Coins para destacar o seu perfil!</p>
+            <p className="text-gray-400 text-sm max-w-50">Você ainda não comprou nenhum cosmético. Visite a loja e gaste as suas Nexus Coins para destacar o seu perfil!</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
@@ -159,23 +158,32 @@ export default async function StudioPage({ params }: StudioPageProps) {
               const isEquipped = item.id === equipped.background || item.id === equipped.border || item.id === equipped.title;
 
               return (
-                <div key={item.id} className={`bg-background/80 backdrop-blur-sm border rounded-3xl p-5 flex flex-col gap-5 transition-all duration-300 group hover:-translate-y-1 ${isEquipped ? 'border-primary shadow-[0_0_20px_rgba(59,130,246,0.15)] bg-primary/5' : 'border-border/50 hover:border-border shadow-md hover:shadow-xl'}`}>
+                <div key={item.id} className={`bg-background/80 backdrop-blur-sm border rounded-3xl p-5 flex flex-col gap-5 transition-all duration-300 group hover:-translate-y-1 ${isEquipped ? 'border-primary shadow-md bg-primary/5' : 'border-border/50 hover:border-border shadow-md hover:shadow-xl'}`}>
                   
-                  {/* Caixa de Exibição do Item */}
+                  {/* Caixa de Exibição do Item Corrigida */}
                   <div className="h-32 bg-surface rounded-2xl flex items-center justify-center relative overflow-hidden border border-border/50 shadow-inner group-hover:border-border transition-colors">
                     
                     {/* Background */}
-                    {item.gradient && (
+                    {item.category === "Fundos Animados" && item.gradient && (
                       <div className="absolute inset-0 w-full h-full opacity-90 transition-transform duration-700 group-hover:scale-105" style={{ background: item.gradient }}></div>
                     )}
 
-                    {/* Moldura Avatar */}
-                    {item.border_style && (
-                      <div className="relative z-10 w-16 h-16 rounded-full border-[5px] bg-background shadow-xl" style={{ borderImage: item.border_style, borderImageSlice: 1 }}></div>
+                    {/* Moldura Avatar Corrigida (Círculo perfeito) */}
+                    {item.category === "Molduras de Avatar" && item.border_style && (
+                      <div className="relative w-16 h-16 flex items-center justify-center z-10 transition-transform duration-500 group-hover:rotate-12">
+                        <div 
+                          className="absolute inset-0 rounded-full p-0.75" 
+                          style={{ background: item.border_style }}
+                        >
+                          <div className="w-full h-full rounded-full bg-background flex items-center justify-center">
+                            <span className="text-xl grayscale group-hover:grayscale-0 transition-all">👤</span>
+                          </div>
+                        </div>
+                      </div>
                     )}
 
                     {/* Tag de Título */}
-                    {item.tag_style && (
+                    {item.category === "Títulos Exclusivos" && item.tag_style && (
                       <div className="relative z-10 px-4 py-1.5 rounded-lg border border-white/20 text-xs font-black shadow-lg" style={{ background: item.tag_style }}>
                         {item.name}
                       </div>
@@ -189,7 +197,6 @@ export default async function StudioPage({ params }: StudioPageProps) {
                     )}
                   </div>
 
-                  {/* Detalhes e Botão */}
                   <div className="flex-1 flex flex-col justify-between gap-4">
                     <div className="text-center">
                       <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-1.5">{item.category}</p>

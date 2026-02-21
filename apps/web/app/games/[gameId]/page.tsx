@@ -18,12 +18,42 @@ interface GuideAuthor { username: string; avatar_url: string | null; title: stri
 interface GameGuide { id: string; title: string; content: string; upvotes: number; created_at: string; users: GuideAuthor | null; }
 interface GuideComment { id: string; content: string; created_at: string; users: { username: string; avatar_url: string | null; } | null; }
 
+// Tipagem para os dados brutos do Supabase
+interface RawGuideData {
+  id: string;
+  game_id: string;
+  author_id: string;
+  title: string;
+  content: string;
+  upvotes: number;
+  created_at: string;
+  users: GuideAuthor | GuideAuthor[];
+}
+
+interface RawCommentData {
+  id: string;
+  content: string;
+  created_at: string;
+  users: { username: string; avatar_url: string | null } | { username: string; avatar_url: string | null }[];
+}
+
 const renderGuideContent = (text: string) => {
   const parts = text.split(/(!\[.*?\]\(.*?\))/g);
   return parts.map((part, index) => {
     const match = part.match(/!\[(.*?)\]\((.*?)\)/);
     if (match) {
-      return <img key={index} src={match[2]} alt={match[1] || 'Imagem do guia'} className="rounded-2xl my-6 max-w-full h-auto border border-border shadow-2xl" loading="lazy" />;
+      // Corrigido: Uso de <Image /> em vez de <img> para performance e linting
+      return (
+        <div key={index} className="relative w-full aspect-video my-6">
+           <Image 
+            src={match[2] as string} 
+            alt={match[1] || 'Imagem do guia'} 
+            fill 
+            className="rounded-2xl border border-border shadow-2xl object-contain" 
+            unoptimized 
+          />
+        </div>
+      );
     }
     return <span key={index}>{part}</span>;
   });
@@ -65,14 +95,16 @@ export default async function GamePage(props: GamePageProps) {
 
   if (activeTab === 'overview' && STEAM_KEY && !isNaN(Number(appId))) {
     try {
-      const schemaRes = await fetch(`http://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?key=${STEAM_KEY}&appid=${appId}&l=brazilian`, { next: { revalidate: 86400 } }); if (schemaRes.ok) {
+      const schemaRes = await fetch(`http://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?key=${STEAM_KEY}&appid=${appId}&l=brazilian`, { next: { revalidate: 86400 } }); 
+      if (schemaRes.ok) {
         const schemaData = await schemaRes.json();
         if (schemaData.game?.availableGameStats?.achievements) achievementsDetails = schemaData.game.availableGameStats.achievements;
       }
       if (user && userProgress) {
         const { data: userData } = await supabase.from('users').select('steam_id').eq('id', user.id).single();
         if (userData?.steam_id) {
-          const playerAchRes = await fetch(`http://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v0001/?appid=${appId}&key=${STEAM_KEY}&steamid=${userData.steam_id}&l=brazilian`, { cache: 'no-store' }); if (playerAchRes.ok) {
+          const playerAchRes = await fetch(`http://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v0001/?appid=${appId}&key=${STEAM_KEY}&steamid=${userData.steam_id}&l=brazilian`, { cache: 'no-store' }); 
+          if (playerAchRes.ok) {
             const playerAchData = await playerAchRes.json();
             if (playerAchData.playerstats?.achievements) {
               playerAchData.playerstats.achievements.forEach((ach: SteamPlayerAchievement) => { playerUnlockedMap[ach.apiname] = ach.achieved === 1; });
@@ -91,14 +123,26 @@ export default async function GamePage(props: GamePageProps) {
 
   if (activeTab === 'guides') {
     const { data: guidesData } = await supabase.from('game_guides').select('id, game_id, author_id, title, content, upvotes, created_at, users!game_guides_author_id_fkey ( username, avatar_url, title )').eq('game_id', gameId).order('created_at', { ascending: false });
+    
     if (guidesData) {
-      guides = guidesData.map((g: any) => ({ ...g, users: Array.isArray(g.users) ? g.users[0] : g.users })) as GameGuide[];
+      // Corrigido: Remoção de 'any' com tipagem RawGuideData
+      guides = (guidesData as unknown as RawGuideData[]).map((g) => ({ 
+        ...g, 
+        users: Array.isArray(g.users) ? g.users[0] : g.users 
+      })) as GameGuide[];
     }
+
     if (guideId && guides.length > 0) {
       selectedGuide = guides.find(g => g.id === guideId) || null;
       if (selectedGuide) {
         const { data: commentsData } = await supabase.from('guide_comments').select('id, content, created_at, users ( username, avatar_url )').eq('guide_id', guideId).order('created_at', { ascending: true });
-        if (commentsData) selectedGuideComments = commentsData.map((c: any) => ({ ...c, users: Array.isArray(c.users) ? c.users[0] : c.users })) as GuideComment[];
+        if (commentsData) {
+          // Corrigido: Remoção de 'any' com tipagem RawCommentData
+          selectedGuideComments = (commentsData as unknown as RawCommentData[]).map((c) => ({ 
+            ...c, 
+            users: Array.isArray(c.users) ? c.users[0] : c.users 
+          })) as GuideComment[];
+        }
         if (user) {
           const { data: vote } = await supabase.from('guide_votes').select('guide_id').eq('guide_id', guideId).eq('user_id', user.id).maybeSingle();
           if (vote) hasVoted = true;
@@ -113,10 +157,8 @@ export default async function GamePage(props: GamePageProps) {
   return (
     <div className="min-h-screen pb-20 animate-in fade-in duration-500">
 
-      {/* =========================================
-          BANNER SEGURO (Sem rolagem horizontal)
-          ========================================= */}
-      <div className="-mx-4 md:-mx-8 -mt-4 md:-mt-8 h-80 md:h-125 relative bg-surface overflow-hidden border-b border-border/50 shadow-2xl rounded-b-[2rem]">
+      {/* BANNER SEGURO - Corrigido: rounded-b-4xl */}
+      <div className="-mx-4 md:-mx-8 -mt-4 md:-mt-8 h-80 md:h-125 relative bg-surface overflow-hidden border-b border-border/50 shadow-2xl rounded-b-4xl">
         {hasBanner ? (
           <Image
             src={game.banner_url}
@@ -133,9 +175,7 @@ export default async function GamePage(props: GamePageProps) {
         <div className="absolute inset-0 bg-linear-to-r from-background/80 via-transparent to-background/80" />
       </div>
 
-      {/* =========================================
-          ÁREA DO PERFIL DO JOGO
-          ========================================= */}
+      {/* PERFIL DO JOGO */}
       <div className="max-w-6xl mx-auto -mt-32 md:-mt-48 relative z-10 px-2 md:px-0">
         <div className="flex flex-col md:flex-row gap-6 md:gap-10 items-start md:items-end">
 
@@ -182,7 +222,8 @@ export default async function GamePage(props: GamePageProps) {
                     </div>
                   </div>
 
-                  <div className="bg-background/60 px-5 py-3 rounded-2xl border border-white/5 flex flex-col items-center justify-center min-w-[140px] shadow-inner">
+                  {/* Corrigido: min-w-35 */}
+                  <div className="bg-background/60 px-5 py-3 rounded-2xl border border-white/5 flex flex-col items-center justify-center min-w-35 shadow-inner">
                     <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Tempo de Jogo</span>
                     <span className="text-xl font-black text-white">{playtimeHours}<span className="text-gray-500 text-sm font-bold mx-0.5">h</span> {playtimeMins}<span className="text-gray-500 text-sm font-bold ml-0.5">m</span></span>
                   </div>
@@ -236,18 +277,11 @@ export default async function GamePage(props: GamePageProps) {
 
                     return (
                       <div key={ach.name} className={`flex items-start gap-4 border p-4 rounded-2xl transition-all duration-300 group ${isUnlocked ? 'border-primary/30 bg-primary/5 hover:border-primary/60 hover:bg-primary/10 shadow-sm' : 'border-border/40 bg-surface/30 opacity-70 grayscale hover:grayscale-0 hover:opacity-100'}`}>
-
-                        {/* A CAIXA DA IMAGEM E O SEU PONTO VERDE */}
                         <div className="relative w-14 h-14 shrink-0 group-hover:scale-105 transition-transform">
-
-                          {/* A Imagem em si, com o overflow escondido para ficar redonda */}
                           <div className="w-full h-full rounded-xl overflow-hidden border border-border/50 relative">
                             <Image src={iconUrl} alt={ach.displayName} fill className="object-cover" unoptimized />
                           </div>
-
-                          {/* O código exato que me enviou (por cima da imagem, no canto superior direito) */}
                           {isUnlocked && <div className="absolute top-0 right-0 w-4 h-4 bg-green-500 rounded-full border-2 border-background shadow-[0_0_10px_rgba(34,197,94,0.8)] z-10"></div>}
-
                         </div>
 
                         <div className="min-w-0 flex-1">
@@ -267,7 +301,8 @@ export default async function GamePage(props: GamePageProps) {
         {activeTab === 'guides' && (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
             {guideId && selectedGuide ? (
-              <div className="bg-surface/30 border border-border rounded-[2rem] p-6 md:p-10 shadow-2xl relative overflow-hidden">
+              // Corrigido: rounded-4xl
+              <div className="bg-surface/30 border border-border rounded-4xl p-6 md:p-10 shadow-2xl relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-full h-2 bg-linear-to-r from-primary via-purple-500 to-primary"></div>
                 <Link href={`/games/${gameId}?tab=guides`} className="inline-flex items-center gap-2 text-gray-400 hover:text-white font-bold text-sm mb-8 transition-colors bg-background/50 px-4 py-2 rounded-xl border border-border">
                   ← Voltar à Biblioteca de Guias

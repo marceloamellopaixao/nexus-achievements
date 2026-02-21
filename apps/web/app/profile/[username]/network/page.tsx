@@ -108,7 +108,7 @@ export default async function NetworkPage({ params, searchParams }: NetworkPageP
           LISTA DE UTILIZADORES EM GRID
           ========================================= */}
       {usersList.length === 0 ? (
-        <div className="bg-surface/30 border border-border border-dashed rounded-[2rem] p-20 text-center flex flex-col items-center justify-center shadow-inner">
+        <div className="bg-surface/30 border border-border border-dashed rounded-4xl p-20 text-center flex flex-col items-center justify-center shadow-inner">
           <span className="text-6xl opacity-30 mb-4 grayscale">👥</span>
           <h3 className="text-xl font-bold text-gray-400">Nenhum caçador por aqui...</h3>
           <p className="text-sm text-gray-500 mt-2 max-w-xs">
@@ -121,7 +121,7 @@ export default async function NetworkPage({ params, searchParams }: NetworkPageP
             <Link 
               href={`/profile/${u.username}`} 
               key={u.id} 
-              className="bg-surface/50 backdrop-blur-sm border border-border/60 rounded-[1.5rem] p-5 flex items-center gap-5 hover:border-primary/50 hover:bg-surface/80 transition-all group shadow-sm hover:shadow-[0_10px_30px_rgba(0,0,0,0.3)] hover:-translate-y-1"
+              className="bg-surface/50 backdrop-blur-sm border border-border/60 rounded-3xl p-5 flex items-center gap-5 hover:border-primary/50 hover:bg-surface/80 transition-all group shadow-sm hover:shadow-[0_10px_30px_rgba(0,0,0,0.3)] hover:-translate-y-1"
             >
               {/* Avatar do Usuário na Lista */}
               <div className="w-16 h-16 rounded-2xl bg-background overflow-hidden relative border border-border/50 shrink-0 shadow-lg group-hover:border-primary/50 transition-colors">

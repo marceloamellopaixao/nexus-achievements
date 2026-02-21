@@ -49,9 +49,9 @@ export default async function ShopPage() {
     return (
         <div className="space-y-12 animate-in fade-in duration-700 pb-20 max-w-6xl mx-auto px-4 md:px-0">
 
-            {/* HEADER COM DESIGN GLASSMORPISM */}
+            {/* HEADER COM DESIGN GLASSMORPISM - Classes Padronizadas h-125 e w-125 */}
             <div className="relative bg-surface/40 backdrop-blur-xl border border-border/50 p-8 md:p-12 rounded-[2.5rem] overflow-hidden shadow-2xl mt-4">
-                <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/10 blur-[120px] rounded-full pointer-events-none translate-x-1/2 -translate-y-1/2"></div>
+                <div className="absolute top-0 right-0 w-125 h-125 bg-primary/10 blur-[120px] rounded-full pointer-events-none translate-x-1/2 -translate-y-1/2"></div>
                 <div className="absolute bottom-0 left-0 w-64 h-64 bg-purple-500/5 blur-[100px] rounded-full pointer-events-none"></div>
 
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8 relative z-10">
@@ -67,8 +67,8 @@ export default async function ShopPage() {
                         </p>
                     </div>
 
-                    {/* CARTÃO DE SALDO PREMIUM */}
-                    <div className="bg-background/80 backdrop-blur-md border border-white/10 p-6 md:p-8 rounded-3xl flex items-center gap-6 shadow-[0_20px_50px_rgba(0,0,0,0.4)] border-t-white/20 min-w-[280px]">
+                    {/* CARTÃO DE SALDO PREMIUM - Classe Padronizada min-w-70 */}
+                    <div className="bg-background/80 backdrop-blur-md border border-white/10 p-6 md:p-8 rounded-3xl flex items-center gap-6 shadow-[0_20px_50px_rgba(0,0,0,0.4)] border-t-white/20 min-w-70">
                         <div className="w-16 h-16 bg-yellow-500/10 rounded-2xl flex items-center justify-center text-5xl shadow-inner border border-yellow-500/20">
                             <span className="drop-shadow-[0_0_15px_rgba(234,179,8,0.5)]">🪙</span>
                         </div>
@@ -103,56 +103,64 @@ export default async function ShopPage() {
                                     const isOwned = userInventory.includes(item.id);
                                     const isLegendary = item.rarity_type === 'Legendary';
                                     const isEpic = item.rarity_type === 'Epic';
-                                    
+
                                     return (
-                                        <div key={item.id} className={`group bg-surface/50 backdrop-blur-sm border rounded-[2rem] overflow-hidden transition-all duration-500 hover:-translate-y-2 flex flex-col shadow-lg hover:shadow-2xl ${
-                                            isLegendary ? 'border-orange-500/30 hover:border-orange-500/60' : 
-                                            isEpic ? 'border-purple-500/30 hover:border-purple-500/60' : 'border-border/50 hover:border-primary/50'
-                                        }`}>
-                                            
+                                        // Classe Padronizada rounded-4xl
+                                        <div key={item.id} className={`group bg-surface/50 backdrop-blur-sm border rounded-4xl overflow-hidden transition-all duration-500 hover:-translate-y-2 flex flex-col shadow-lg hover:shadow-2xl ${isLegendary ? 'border-orange-500/30 hover:border-orange-500/60' :
+                                                isEpic ? 'border-purple-500/30 hover:border-purple-500/60' : 'border-border/50 hover:border-primary/50'
+                                            }`}>
+
                                             {/* PREVIEW DO ITEM */}
                                             <div className="h-44 bg-background relative flex items-center justify-center p-6 overflow-hidden border-b border-white/5">
-                                                {/* Efeitos de Raridade de Fundo */}
                                                 {isLegendary && <div className="absolute inset-0 bg-orange-500/5 animate-pulse"></div>}
                                                 {isEpic && <div className="absolute inset-0 bg-purple-500/5 animate-pulse"></div>}
 
-                                                {/* Raridade Badge */}
-                                                <div className={`absolute top-4 left-4 text-[9px] font-black uppercase tracking-[0.15em] px-3 py-1 rounded-full border z-20 shadow-sm ${
-                                                    isLegendary ? 'bg-orange-500/20 text-orange-400 border-orange-500/40' :
-                                                    isEpic ? 'bg-purple-500/20 text-purple-400 border-purple-500/40' :
-                                                    'bg-blue-500/20 text-blue-400 border-blue-500/40'
-                                                }`}>
+                                                <div className={`absolute top-4 left-4 text-[9px] font-black uppercase tracking-[0.15em] px-3 py-1 rounded-full border z-20 shadow-sm ${isLegendary ? 'bg-orange-500/20 text-orange-400 border-orange-500/40' :
+                                                        isEpic ? 'bg-purple-500/20 text-purple-400 border-purple-500/40' :
+                                                            'bg-blue-500/20 text-blue-400 border-blue-500/40'
+                                                    }`}>
                                                     {item.rarity_type}
                                                 </div>
 
-                                                {/* Visualização Real do Item */}
                                                 <div className="relative z-10 w-full h-full flex items-center justify-center">
                                                     {item.category === "Fundos Animados" && (
-                                                        <div className="w-full h-full rounded-2xl border border-white/10 shadow-2xl transition-transform duration-700 group-hover:scale-110" style={{ background: item.gradient }}></div>
+                                                        <div
+                                                            className="w-full h-full rounded-2xl border border-white/10 shadow-2xl transition-transform duration-700 group-hover:scale-110"
+                                                            style={{ background: item.gradient || '#18181b' }}
+                                                        ></div>
                                                     )}
 
                                                     {item.category === "Molduras de Avatar" && (
-                                                        <div className="w-24 h-24 rounded-full border-[6px] bg-surface flex items-center justify-center shadow-2xl transition-transform duration-500 group-hover:rotate-12" style={{ borderImage: item.border_style, borderImageSlice: 1 }}>
-                                                            <span className="text-3xl grayscale group-hover:grayscale-0 transition-all">👤</span>
+                                                        <div className="relative w-24 h-24 flex items-center justify-center group-hover:rotate-12 transition-transform duration-500">
+                                                            {/* O Círculo Colorido (Borda Fake) */}
+                                                            <div
+                                                                className="absolute inset-0 rounded-full p-1" // Espessura da borda
+                                                                style={{ background: item.border_style || 'transparent' }}
+                                                            >
+                                                                {/* O Fundo escuro interno para criar o efeito de "linha" */}
+                                                                <div className="w-full h-full rounded-full bg-surface flex items-center justify-center">
+                                                                    <span className="text-3xl grayscale group-hover:grayscale-0 transition-all">👤</span>
+                                                                </div>
+                                                            </div>
                                                         </div>
                                                     )}
 
                                                     {item.category === "Títulos Exclusivos" && (
-                                                        <div className="px-6 py-2.5 rounded-xl border border-white/20 text-sm font-black shadow-2xl transition-all duration-500 group-hover:tracking-widest" style={{ background: item.tag_style }}>
+                                                        <div
+                                                            className="px-6 py-2.5 rounded-xl border border-white/20 text-sm font-black shadow-2xl transition-all duration-500 group-hover:tracking-widest"
+                                                            style={{ background: item.tag_style || '#27272a' }}
+                                                        >
                                                             {item.name}
                                                         </div>
                                                     )}
                                                 </div>
                                             </div>
 
-                                            {/* INFO E COMPRA */}
                                             <div className="p-6 flex-1 flex flex-col justify-between gap-6">
-                                                <div>
-                                                    <h4 className="text-xl font-black text-white group-hover:text-primary transition-colors leading-tight">
-                                                        {item.name}
-                                                    </h4>
-                                                </div>
-                                                
+                                                <h4 className="text-xl font-black text-white group-hover:text-primary transition-colors leading-tight">
+                                                    {item.name}
+                                                </h4>
+
                                                 <div className="pt-2">
                                                     {isOwned ? (
                                                         <div className="w-full py-3 bg-green-500/10 text-green-400 border border-green-500/20 rounded-xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 cursor-default">

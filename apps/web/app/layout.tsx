@@ -4,12 +4,19 @@ import Link from "next/link";
 import { createClient } from "@/utils/supabase/server";
 import Image from "next/image";
 import { ToastContainer } from "react-toastify";
-import { DesktopNavLinks, MobileNavLinks } from "./components/NavLinks"; // <-- Importamos os novos botões
+import { DesktopNavLinks, MobileNavLinks } from "./components/NavLinks";
 
 export const metadata: Metadata = {
-  title: "Nexus Achievements",
-  description: "O seu hub definitivo de conquistas gamer e networking.",
+  title: 'Nexus Achievements | Sua Jornada Gamer',
+  description: 'A plataforma definitiva para caçadores de conquistas da Steam.',
 };
+
+// Interface para evitar o uso de 'any' e resolver erros de tipagem
+interface UserData {
+  username: string;
+  avatar_url: string | null;
+  nexus_coins: number;
+}
 
 export default async function RootLayout({
   children,
@@ -19,7 +26,7 @@ export default async function RootLayout({
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  let userData = null;
+  let userData: UserData | null = null;
 
   if (user) {
     const { data } = await supabase
@@ -28,7 +35,7 @@ export default async function RootLayout({
       .eq("id", user.id)
       .single();
 
-    userData = data;
+    userData = data as UserData;
   }
 
   const navLinks = [
@@ -38,13 +45,13 @@ export default async function RootLayout({
     { href: "/chat", icon: "💬", label: "Taverna", mobile: true },
     { href: userData?.username ? `/profile/${userData.username}` : "/dashboard", icon: "👤", label: "Meu Perfil", mobile: true },
     { href: "/shop", icon: "🛒", label: "Loja", mobile: true },
-    { href: "/integrations", icon: "⚙️", label: "Integrações", mobile: false }, 
+    { href: "/integrations", icon: "⚙️", label: "Integrações", mobile: false },
   ];
 
   return (
     <html lang="pt-BR" className="dark">
       <body className="antialiased flex h-screen overflow-hidden bg-background text-foreground selection:bg-primary/30">
-        
+
         {/* =========================================
             DESKTOP SIDEBAR
             ========================================= */}
@@ -56,13 +63,10 @@ export default async function RootLayout({
               </h1>
             </Link>
           </div>
-          
+
           <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto custom-scrollbar">
             <p className="px-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 mt-4">Menu Principal</p>
-            
-            {/* Aqui usamos o Componente Inteligente de Desktop */}
             <DesktopNavLinks links={navLinks} />
-
           </nav>
 
           {userData && (
@@ -70,7 +74,7 @@ export default async function RootLayout({
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-10 h-10 rounded-full bg-surface border border-primary overflow-hidden relative shrink-0">
                   {userData.avatar_url ? (
-                    <Image src={userData.avatar_url} alt="Avatar" fill className="object-cover" />
+                    <Image src={userData.avatar_url} alt="Avatar" fill className="object-cover" unoptimized />
                   ) : (
                     <span className="flex items-center justify-center w-full h-full font-bold text-primary">{userData.username.charAt(0)}</span>
                   )}
@@ -93,13 +97,10 @@ export default async function RootLayout({
             ÁREA DE CONTEÚDO PRINCIPAL
             ========================================= */}
         <div className="flex-1 flex flex-col h-screen relative w-full max-w-full">
-          
-          {/* TOP HEADER */}
+
           <header className="h-16 md:h-20 shrink-0 border-b border-border/50 bg-background/80 backdrop-blur-xl flex items-center justify-between px-4 md:px-8 z-40 sticky top-0">
-            
-            <div className="flex items-center gap-2">              
+            <div className="flex items-center gap-2">
               <Link href="/dashboard" className="flex items-center gap-2">
-                
                 <h1 className="text-xl md:text-2xl font-black text-transparent bg-clip-text bg-linear-to-r from-primary to-purple-500 italic tracking-tighter">
                   NEXUS
                 </h1>
@@ -113,10 +114,10 @@ export default async function RootLayout({
                     <span className="text-yellow-500 text-xs md:text-sm animate-pulse">🪙</span>
                     <span className="text-xs md:text-sm font-black text-yellow-500">{userData.nexus_coins.toLocaleString()}</span>
                   </div>
-                  
+
                   <Link href={`/profile/${userData.username}`} className="md:hidden w-8 h-8 rounded-full border border-primary overflow-hidden relative">
                     {userData.avatar_url ? (
-                      <Image src={userData.avatar_url} alt="Avatar" fill className="object-cover" />
+                      <Image src={userData.avatar_url} alt="Avatar" fill className="object-cover" unoptimized />
                     ) : (
                       <span className="flex items-center justify-center w-full h-full font-bold text-white text-xs bg-surface">{userData.username.charAt(0)}</span>
                     )}
@@ -137,15 +138,10 @@ export default async function RootLayout({
             </div>
           </main>
 
-          {/* =========================================
-              MOBILE BOTTOM NAVIGATION
-              ========================================= */}
+          {/* MOBILE BOTTOM NAVIGATION */}
           {userData && (
             <nav className="md:hidden fixed bottom-0 inset-x-0 h-16 bg-surface/90 backdrop-blur-2xl border-t border-border/50 flex items-center justify-around z-50 px-2 pb-safe">
-              
-              {/* Aqui usamos o Componente Inteligente Mobile */}
               <MobileNavLinks links={navLinks} />
-
             </nav>
           )}
 

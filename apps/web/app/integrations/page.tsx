@@ -4,7 +4,6 @@ import React, { useState, useEffect } from "react";
 import { saveSteamId, syncSteamAchievements } from "./actions";
 import { toast } from "react-toastify";
 import { createClient } from "@/utils/supabase/client";
-import Image from "next/image";
 
 export default function IntegrationsPage() {
   const [steamId, setSteamId] = useState("");
@@ -47,7 +46,6 @@ export default function IntegrationsPage() {
     setLoadingSync(false);
   };
 
-  // Lista de Integrações Futuras
   const upcomingIntegrations = [
     { name: "PlayStation Network", icon: "🎮", color: "from-blue-600 to-blue-800", borderColor: "border-blue-500/20" },
     { name: "Xbox Live", icon: "🟢", color: "from-green-600 to-green-800", borderColor: "border-green-500/20" },
@@ -68,15 +66,10 @@ export default function IntegrationsPage() {
 
       <div className="grid grid-cols-1 gap-6 pt-4">
 
-        {/* =======================================
-            STEAM INTEGRATION (Ativo)
-            ======================================= */}
         <div className="bg-surface/50 border border-border rounded-3xl p-6 md:p-8 flex flex-col md:flex-row gap-8 items-start relative overflow-hidden shadow-2xl group">
           
-          {/* Fundo Decorativo */}
           <div className="absolute top-0 right-0 w-64 h-64 bg-blue-900/10 rounded-full blur-3xl pointer-events-none group-hover:bg-blue-800/20 transition-colors"></div>
 
-          {/* Ícone */}
           <div className="w-20 h-20 bg-linear-to-br from-blue-900 to-black text-white rounded-2xl flex items-center justify-center text-4xl shrink-0 border border-blue-500/30 shadow-[0_0_20px_rgba(59,130,246,0.2)] z-10">
             <span className="drop-shadow-lg">☁️</span>
           </div>
@@ -89,7 +82,8 @@ export default function IntegrationsPage() {
                 Cada conquista desbloqueada será convertida em <span className="text-yellow-500 font-bold">🪙 Nexus Coins</span>.
               </p>
               <div className="mt-2 text-xs font-bold text-yellow-500/80 bg-yellow-500/10 inline-block px-3 py-1 rounded-md border border-yellow-500/20">
-                ⚠️ O seu perfil e os detalhes dos jogos na Steam precisam estar "Públicos".
+                {/* Corrigido: Uso de &quot; para aspas no texto */}
+                ⚠️ O seu perfil e os detalhes dos jogos na Steam precisam estar &quot;Públicos&quot;.
               </div>
             </div>
 
@@ -138,9 +132,6 @@ export default function IntegrationsPage() {
           </div>
         </div>
 
-        {/* =======================================
-            INTEGRAÇÕES FUTURAS (Bloqueadas)
-            ======================================= */}
         <h3 className="text-xl font-black text-white mt-8 mb-2 flex items-center gap-2">
           <span>🔮</span> Em Desenvolvimento
         </h3>
@@ -148,7 +139,6 @@ export default function IntegrationsPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {upcomingIntegrations.map((integration, index) => (
             <div key={index} className="bg-surface/30 border border-border rounded-3xl p-6 relative overflow-hidden group cursor-not-allowed">
-              {/* Overlay Escuro com Cadeado */}
               <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px] z-20 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                 <span className="text-3xl mb-2 drop-shadow-lg">🔒</span>
                 <span className="text-sm font-bold text-white uppercase tracking-wider bg-black/50 px-3 py-1 rounded-full">Em Breve</span>
