@@ -2,6 +2,12 @@ import { createClient } from "@/utils/supabase/server";
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import GameCardImage from "@/app/components/GameCardImage";
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Comparar Perfil | Nexus Achievements",
+  description: "Compare seu perfil de conquistas com outros membros da comunidade do Nexus Achievements. Veja quem tem mais conquistas desbloqueadas, compare níveis globais e descubra quais jogos vocês têm em comum para desafiar um ao outro.",
+}
 
 interface ComparePageProps {
   params: Promise<{ username: string }>;

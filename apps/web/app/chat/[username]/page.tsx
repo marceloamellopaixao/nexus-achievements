@@ -2,6 +2,12 @@ import { createClient } from "@/utils/supabase/server";
 import ChatClient from "../ChatClient";
 import { notFound, redirect } from "next/navigation";
 import Image from "next/image";
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Mensagem Direta | Nexus Achievements",
+  description: "Converse em privado com outros membros da comunidade do Nexus Achievements. Envie mensagens diretas para compartilhar dicas, conquistas e socializar de forma mais íntima enquanto explora o mundo dos games.",
+}
 
 interface ChatUser {
   username: string;
@@ -55,7 +61,6 @@ export default async function DirectMessagePage({ params }: DmPageProps) {
       content: m.content,
       created_at: m.created_at,
       user_id: m.user_id,
-      // Garantimos que retornamos null em vez de undefined caso não exista usuário
       users: userData || null 
     };
   }).reverse();

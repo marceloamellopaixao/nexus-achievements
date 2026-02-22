@@ -8,13 +8,16 @@ import { DesktopNavLinks, MobileNavLinks } from "./components/NavLinks";
 import NotificationBell from "./components/NotificationBell";
 import HeaderTitle from "./components/HeaderTitle";
 import AnnouncementBanner from "./components/AnnouncementBanner";
+import OnlineUsers from "./components/OnlineUsers"; // IMPORTAÇÃO DO RADAR
 
 export const metadata: Metadata = {
   title: 'Nexus Achievements | Sua Jornada Gamer',
   description: 'A plataforma definitiva para caçadores de conquistas da Steam.',
 };
 
+// Adicionado o 'id' na interface
 interface UserData {
+  id: string;
   username: string;
   avatar_url: string | null;
   nexus_coins: number;
@@ -29,27 +32,29 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   let totalUnreadDMs = 0;
 
   if (user) {
-    const { data } = await supabase.from("users").select("username, avatar_url, nexus_coins, role").eq("id", user.id).maybeSingle();
+    // IMPORTANTE: Adicionado o 'id' no select para o Radar funcionar
+    const { data } = await supabase.from("users").select("id, username, avatar_url, nexus_coins, role").eq("id", user.id).maybeSingle();
     if (data) userData = data as UserData;
 
-    // BUSCA TOTAL DE MENSAGENS NÃO LIDAS
+    // BUSCA TOTAL DE MENSAGENS NÃO LIDAS NAS DMs
     const { count } = await supabase
       .from('chat_messages')
       .select('*', { count: 'exact', head: true })
-      .like('channel', `%${user.id}%`) // Apenas DMs nossas
+      .like('channel', `%${user.id}%`)
       .eq('is_read', false)
-      .neq('user_id', user.id); // Apenas mensagens enviadas por outros
-      
+      .neq('user_id', user.id);
+
     totalUnreadDMs = count || 0;
   }
 
   const { data: announcement } = await supabase.from('system_announcements').select('*').eq('is_active', true).maybeSingle();
 
+  // ALTERADO: De /social para /social e renomeado para "Comunidade"
   const navLinks = [
-    { href: "/dashboard", icon: "🏠", label: "Início", mobile: true },
+    { href: "/social", icon: "🌍", label: "Comunidade", mobile: true },
     { href: "/games", icon: "🎮", label: "Jogos", mobile: true },
     { href: "/leaderboards", icon: "🏆", label: "Hall da Fama", mobile: true },
-    { href: "/chat", icon: "💬", label: totalUnreadDMs > 0 ? `Chat (${totalUnreadDMs})` : "Chat", mobile: true },
+    { href: "/chat", icon: "💬", label: totalUnreadDMs > 0 ? `Taverna (${totalUnreadDMs})` : "Taverna", mobile: true },
     { href: userData?.username ? `/profile/${userData.username}` : "/login", icon: "👤", label: "Meu Perfil", mobile: true },
     { href: "/shop", icon: "🛒", label: "Loja", mobile: true },
     { href: "/integrations", icon: "⚙️", label: "Integrações", mobile: true },
@@ -62,11 +67,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="pt-BR" className="dark">
       <body className="antialiased flex h-screen overflow-hidden bg-background text-foreground">
-        
-        {/* DESKTOP SIDEBAR */}
-        <aside className="w-64 xl:w-72 border-r border-border/50 bg-surface/30 backdrop-blur-xl hidden md:flex flex-col z-50">
+
+        {/* DESKTOP SIDEBAR (Esquerda - Menu de Navegação) */}
+        <aside className="w-64 xl:w-72 border-r border-border/50 bg-surface/30 backdrop-blur-xl hidden md:flex flex-col z-50 shrink-0">
           <div className="h-20 flex items-center px-8 border-b border-border/50">
-            <Link href="/dashboard" className="flex items-center gap-2 group text-2xl font-black text-transparent bg-clip-text bg-linear-to-r from-primary to-purple-500 italic tracking-tighter">
+            <Link href="/social" className="flex items-center gap-2 group text-2xl font-black text-transparent bg-clip-text bg-linear-to-r from-primary to-purple-500 italic tracking-tighter">
               NEXUS
             </Link>
           </div>
@@ -98,9 +103,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           )}
         </aside>
 
-        <div className="flex-1 flex flex-col h-screen relative w-full max-w-full overflow-hidden">
-          
-          {/* BANNER FECHÁVEL */}
+        {/* ÁREA DE CONTEÚDO CENTRAL */}
+        <div className="flex-1 flex flex-col h-screen relative min-w-0 overflow-hidden">
+
           {announcement && (
             <AnnouncementBanner message={announcement.message} type={announcement.type} />
           )}
@@ -125,7 +130,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
           <main className="flex-1 overflow-y-auto bg-background/50 p-4 md:p-8 pb-24 md:pb-8 custom-scrollbar">
             <ToastContainer theme="dark" position="bottom-right" />
-            <div className="max-w-7xl mx-auto w-full">
+
+            <div className="max-w-5xl mx-auto w-full">
+              {/* O seu conteúdo central fica todo aqui! Limpei a div do Radar daqui de dentro */}
               {children}
             </div>
           </main>
@@ -136,6 +143,20 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             </nav>
           )}
         </div>
+
+        {/* DESKTOP SIDEBAR (Direita - Radar de Caçadores Online) */}
+        {userData && (
+          <aside className="w-64 border-l border-border/50 bg-surface/30 backdrop-blur-xl hidden lg:flex flex-col z-40 shrink-0">
+            <OnlineUsers
+              currentUser={{
+                user_id: userData.id,
+                username: userData.username,
+                avatar_url: userData.avatar_url
+              }}
+            />
+          </aside>
+        )}
+
       </body>
     </html>
   );

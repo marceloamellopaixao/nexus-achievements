@@ -11,7 +11,7 @@ export default function HeaderTitle({ links }: { links: NavLink[] }) {
   const pathname = usePathname();
 
   const currentPath = links.find(link => 
-    pathname === link.href || (link.href !== '/dashboard' && pathname.startsWith(link.href))
+    pathname === link.href || (link.href !== '/social' && pathname.startsWith(link.href))
   );
 
   return (

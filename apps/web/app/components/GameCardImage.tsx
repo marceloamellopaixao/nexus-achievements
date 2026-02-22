@@ -6,7 +6,7 @@ import Image from 'next/image';
 interface GameCardImageProps {
   src?: string | null;
   title: string;
-  isBanner?: boolean; // Se for true, usa proporção horizontal (dashboard), false usa vertical (biblioteca)
+  isBanner?: boolean; // Se for true, usa proporção horizontal (social), false usa vertical (biblioteca)
 }
 
 export default function GameCardImage({ src, title, isBanner = false }: GameCardImageProps) {

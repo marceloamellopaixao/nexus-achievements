@@ -28,9 +28,9 @@ export default function ChatClient({
   initialMessages,
   currentUserId,
   channelId = 'global',
-  chatTitle = 'Taverna do Nexus',
+  chatTitle = 'Nexus Chat',
   chatSubtitle = 'Chat Global ao Vivo',
-  icon = '🍻'
+  icon = '💬'
 }: ChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
   const [newMessage, setNewMessage] = useState('')
@@ -44,8 +44,8 @@ export default function ChatClient({
 
   // MARCA MENSAGENS COMO LIDAS AO ENTRAR NA SALA OU RECEBER NOVA
   useEffect(() => {
-    if (channelId.startsWith('dm_') && currentUserId) {
-      // Pequeno delay para garantir que a inserção no banco terminou antes do update
+    if (currentUserId) {
+      // O delay garante que a mensagem nova chegou ao banco antes de a marcarmos como lida
       const timer = setTimeout(() => {
         markChannelAsRead(channelId);
       }, 500);
@@ -152,7 +152,7 @@ export default function ChatClient({
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full opacity-40 grayscale pt-20">
             <span className="text-5xl mb-4">💬</span>
-            <p className="text-sm font-black uppercase tracking-widest text-gray-400">O silêncio reina na Taverna...</p>
+            <p className="text-sm font-black uppercase tracking-widest text-gray-400">O silêncio reina no Nexus...</p>
           </div>
         )}
         <div ref={messagesEndRef} />

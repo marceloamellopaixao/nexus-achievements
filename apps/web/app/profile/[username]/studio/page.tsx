@@ -5,6 +5,12 @@ import { notFound } from "next/navigation";
 import EquipButton from "./EquipButton";
 import ProfileForm from "./ProfileForm";
 import ShowcaseEditor from "./ShowcaseEditor";
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Estúdio de Personalização | Nexus Achievements",
+  description: "Personalize o seu perfil do Nexus Achievements com fundos animados, molduras de avatar e títulos exclusivos. Exiba os seus jogos favoritos na vitrine e destaque a sua identidade única como caçador de troféus.",
+}
 
 type ShopItem = {
   id: string;
@@ -90,7 +96,7 @@ export default async function StudioPage({ params }: StudioPageProps) {
           </div>
           <div>
             <h1 className="text-4xl font-black text-white tracking-tighter italic">Personalização</h1>
-            <p className="text-gray-400 font-medium">Lapide a sua identidade visual e exiba as suas conquistas.</p>
+            <p className="text-gray-400 font-medium">Personalize a sua identidade visual e exiba as suas conquistas.</p>
           </div>
         </div>
         <Link href={`/profile/${username}`} className="px-6 py-3 bg-white text-black font-black rounded-xl hover:bg-gray-100 transition-all shadow-xl hover:-translate-y-1 shrink-0 flex items-center justify-center gap-2">

@@ -35,7 +35,7 @@ export async function proxy(request: NextRequest) {
   const url = request.nextUrl.clone()
 
   // 1. Se NÃO está logado e tenta ir para rota protegida, manda para /login
-  const protectedRoutes = ['/dashboard', '/studio', '/shop', '/chat', '/profile', '/integrations']
+  const protectedRoutes = ['/social', '/studio', '/shop', '/chat', '/profile', '/integrations']
   const isProtectedRoute = protectedRoutes.some(path => url.pathname.startsWith(path))
 
   if (!user && isProtectedRoute) {
@@ -62,9 +62,9 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(url)
     }
 
-    // Se NÃO precisa de onboarding (perfil 100% OK) e tenta acessar telas iniciais, manda pro dashboard
+    // Se NÃO precisa de onboarding (perfil 100% OK) e tenta acessar telas iniciais, manda pro social
     if (!needsOnboarding && (url.pathname === '/login' || url.pathname === '/onboarding' || url.pathname === '/')) {
-      url.pathname = '/dashboard'
+      url.pathname = '/social'
       return NextResponse.redirect(url)
     }
   }

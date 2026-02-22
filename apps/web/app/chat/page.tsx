@@ -1,5 +1,11 @@
 import { createClient } from "@/utils/supabase/server";
 import ChatClient from "./ChatClient";
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Chat Global | Nexus Achievements",
+  description: "Participe do chat global do Nexus Achievements e converse com outros membros da comunidade em tempo real. Compartilhe dicas, conquistas e socialize enquanto explora o mundo dos games.",
+}
 
 // Interfaces para tipagem estrita dos dados brutos do Supabase
 interface ChatUser {
@@ -26,7 +32,6 @@ export default async function ChatPage() {
     .order('created_at', { ascending: false })
     .limit(50);
 
-  // Mapeamento corrigido eliminando o 'any' e garantindo compatibilidade com o ChatClient
   const initialMessages = ((messagesData as unknown as RawChatMessage[]) || []).map(m => {
     const userData = Array.isArray(m.users) ? m.users[0] : m.users;
     

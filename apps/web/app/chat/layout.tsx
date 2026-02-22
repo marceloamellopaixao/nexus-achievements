@@ -15,37 +15,35 @@ export default async function ChatLayout({ children }: { children: React.ReactNo
 
   let followingUsers: FollowingUser[] = [];
   const unreadCounts: Record<string, number> = {};
+  let unreadGlobalCount = 0;
 
   if (user) {
-    const { data: follows } = await supabase
-      .from('user_follows')
-      .select('following_id')
-      .eq('follower_id', user.id);
-
+    // 1. Busca os amigos
+    const { data: follows } = await supabase.from('user_follows').select('following_id').eq('follower_id', user.id);
     const followingIds = follows?.map(f => f.following_id) || [];
 
     if (followingIds.length > 0) {
-      const { data: usersData } = await supabase
-        .from('users')
-        .select('id, username, avatar_url')
-        .in('id', followingIds);
-
+      const { data: usersData } = await supabase.from('users').select('id, username, avatar_url').in('id', followingIds);
       followingUsers = (usersData as FollowingUser[]) || [];
     }
 
-    // Busca todas as mensagens não lidas destinadas a nós (que tenham o nosso ID no channel)
-    const { data: unreadData } = await supabase
-      .from('chat_messages')
-      .select('user_id')
-      .like('channel', `%${user.id}%`)
-      .eq('is_read', false)
-      .neq('user_id', user.id);
-
+    // 2. Busca mensagens privadas não lidas
+    const { data: unreadData } = await supabase.from('chat_messages').select('user_id').like('channel', `%${user.id}%`).eq('is_read', false).neq('user_id', user.id);
     if (unreadData) {
-      unreadData.forEach(msg => {
-        unreadCounts[msg.user_id] = (unreadCounts[msg.user_id] || 0) + 1;
-      });
+      unreadData.forEach(msg => { unreadCounts[msg.user_id] = (unreadCounts[msg.user_id] || 0) + 1; });
     }
+
+    // 3. NOVO: Busca quantas mensagens globais existem depois da nossa última leitura
+    const { data: currentUserData } = await supabase.from('users').select('last_global_read').eq('id', user.id).single();
+    const lastGlobalRead = currentUserData?.last_global_read || new Date(0).toISOString();
+
+    const { count: globalCount } = await supabase
+      .from('chat_messages')
+      .select('*', { count: 'exact', head: true })
+      .eq('channel', 'global')
+      .gt('created_at', lastGlobalRead)
+      .neq('user_id', user.id); 
+    unreadGlobalCount = globalCount || 0;
   }
 
   return (
@@ -54,21 +52,35 @@ export default async function ChatLayout({ children }: { children: React.ReactNo
       {/* SIDEBAR DE CONTATOS */}
       <div className="w-full md:w-80 bg-surface/40 backdrop-blur-xl border border-border/50 rounded-3xl p-5 flex flex-col shadow-2xl shrink-0 overflow-hidden">
         <div className="flex items-center justify-between mb-6 px-1">
-          <h2 className="font-black text-white text-xl tracking-tight italic">Mensagens</h2>
+          <h2 className="font-black text-white text-xl tracking-tight">Mensagens</h2>
           <span className="bg-primary/10 text-primary text-[10px] font-black px-2 py-1 rounded-lg border border-primary/20 uppercase tracking-widest">Live</span>
         </div>
 
-        <Link
-          href="/chat"
+        <Link 
+          href="/chat" 
           className="flex items-center gap-3 p-3.5 rounded-2xl hover:bg-primary/10 transition-all mb-6 border border-border/50 bg-background/40 group active:scale-95"
         >
-          <div className="w-10 h-10 bg-primary/20 rounded-xl flex items-center justify-center text-xl shadow-inner border border-primary/20 group-hover:scale-110 transition-transform">
-            🌍
+          <div className="relative shrink-0">
+            <div className="w-10 h-10 bg-primary/20 rounded-xl flex items-center justify-center text-xl shadow-inner border border-primary/20 group-hover:scale-110 transition-transform">
+              🌍
+            </div>
+            {/* BOLINHA VERMELHA NO GLOBO */}
+            {unreadGlobalCount > 0 && (
+              <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-red-500 border-2 border-background rounded-full animate-pulse z-10 shadow-sm"></div>
+            )}
           </div>
-          <div>
+          
+          <div className="flex-1">
             <div className="font-black text-white text-sm">Chat Global</div>
             <div className="text-[10px] text-primary font-bold uppercase tracking-tighter">Chat da Comunidade</div>
           </div>
+
+          {/* NÚMERO DE MENSAGENS NOVAS */}
+          {unreadGlobalCount > 0 && (
+             <div className="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shrink-0 shadow-[0_0_10px_rgba(239,68,68,0.5)]">
+               {unreadGlobalCount > 99 ? '99+' : unreadGlobalCount}
+             </div>
+          )}
         </Link>
 
         <div className="flex items-center gap-2 mb-4 px-1">
@@ -79,7 +91,7 @@ export default async function ChatLayout({ children }: { children: React.ReactNo
         <div className="flex-1 overflow-y-auto space-y-2 custom-scrollbar pr-1">
           {followingUsers.length === 0 ? (
             <div className="bg-background/20 border border-dashed border-border/50 rounded-2xl p-6 text-center">
-              <p className="text-xs text-gray-500 font-medium leading-relaxed italic">
+              <p className="text-xs text-gray-500 font-medium leading-relaxed">
                 Siga outros caçadores para iniciar chats privados.
               </p>
             </div>

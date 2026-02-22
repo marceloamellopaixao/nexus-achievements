@@ -5,6 +5,12 @@ import Link from "next/link";
 import SocialButtons from "./SocialButtons";
 import { CommentInput } from "./CommentForm";
 import MuralList from "./MuralList";
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Perfil Público | Nexus Achievements",
+  description: "Explore o perfil público de um caçador de troféus no Nexus Achievements. Veja suas conquistas, jogos em destaque, comentários e conexões com outros membros da comunidade. Descubra a jornada única de cada jogador e inspire-se para alcançar novas alturas em seus próprios desafios de troféus.",
+}
 
 interface ProfilePageProps {
   params: Promise<{ username: string }>;
@@ -191,7 +197,7 @@ export default async function PublicProfilePage({ params }: ProfilePageProps) {
               <div className="flex gap-2 shrink-0">
                 {!isOwner && <Link href={`/compare/${profile.username}`} className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-primary/10 text-primary hover:bg-primary hover:text-white border border-primary/30 rounded-xl font-black text-sm transition-all shadow-lg hover:-translate-y-1">⚔️ Comparar</Link>}
                 {isOwner ? (
-                  <Link href={`/profile/${profile.username}/studio`} className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-white text-black hover:bg-gray-200 rounded-xl font-black text-sm transition-all shadow-md hover:scale-105 w-full md:w-auto">⚙️ Configurar</Link>
+                  <Link href={`/profile/${profile.username}/studio`} className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-white text-black hover:bg-gray-200 rounded-xl font-black text-sm transition-all shadow-md hover:scale-105 w-full md:w-auto">⚙️ Editar Perfil</Link>
                 ) : (
                   <SocialButtons targetId={profile.id} initialIsFollowing={isFollowing} currentPath={currentPath} />
                 )}

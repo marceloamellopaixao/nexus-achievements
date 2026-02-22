@@ -18,7 +18,7 @@ export function DesktopNavLinks({ links }: { links: NavLinkType[] }) {
     <>
       {links.map((link) => {
         // Verifica se a rota atual bate com o link (mantém aceso mesmo em subpáginas como /games/123)
-        const isActive = link.href === '/dashboard' ? pathname === link.href : pathname.startsWith(link.href);
+        const isActive = link.href === '/social' ? pathname === link.href : pathname.startsWith(link.href);
         const isShop = link.label === 'Loja';
 
         return (
@@ -53,7 +53,7 @@ export function MobileNavLinks({ links }: { links: NavLinkType[] }) {
   return (
     <>
       {links.filter(link => link.mobile).map((link) => {
-        const isActive = link.href === '/dashboard' ? pathname === link.href : pathname.startsWith(link.href);
+        const isActive = link.href === '/social' ? pathname === link.href : pathname.startsWith(link.href);
         const isShop = link.label === 'Loja';
 
         return (

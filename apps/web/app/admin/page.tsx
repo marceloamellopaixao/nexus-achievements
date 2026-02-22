@@ -1,6 +1,12 @@
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import AdminClientPage from "./AdminClientPage";
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Administração | Nexus Achievements",
+  description: "Acesse o painel de administração do Nexus Achievements para gerenciar usuários, guias e monitorar o estado do sistema. Tenha controle total sobre o ecossistema e garanta uma experiência excepcional para a comunidade de jogadores.",
+}
 
 export default async function AdminPage() {
   const supabase = await createClient();
@@ -9,7 +15,7 @@ export default async function AdminPage() {
   if (!user) redirect("/login");
 
   const { data: profile } = await supabase.from("users").select("role").eq("id", user.id).single();
-  if (profile?.role !== 'admin') redirect("/dashboard");
+  if (profile?.role !== 'admin') redirect("/social");
 
   // Estatísticas Rápidas
   const { count: totalUsers } = await supabase.from('users').select('*', { count: 'exact', head: true });

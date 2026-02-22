@@ -4,14 +4,14 @@ import React, { useState, useEffect } from "react";
 import { saveSteamId, fetchSteamGamesList, processSingleGame, finalizeSync } from "./actions";
 import { toast } from "react-toastify";
 import { createClient } from "@/utils/supabase/client";
+import { FaPlaystation, FaSteam, FaXbox } from "react-icons/fa";
+import { SiEpicgames } from "react-icons/si";
 
 export default function IntegrationsPage() {
   const [steamId, setSteamId] = useState("");
   const [savedSteamId, setSavedSteamId] = useState<string | null>(null);
   const [loadingSave, setLoadingSave] = useState(false);
   const [loadingSync, setLoadingSync] = useState(false);
-
-  // NOVOS ESTADOS PARA A BARRA DE PROGRESSO
   const [syncProgress, setSyncProgress] = useState(0);
   const [syncMessage, setSyncMessage] = useState("");
   const [syncStats, setSyncStats] = useState({ coins: 0, plats: 0 });
@@ -32,20 +32,6 @@ export default function IntegrationsPage() {
     loadUser();
   }, [supabase]);
 
-  useEffect(() => {
-    async function loadUser() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data } = await supabase.from('users').select('steam_id').eq('id', user.id).single();
-        if (data?.steam_id) {
-          setSavedSteamId(data.steam_id);
-          setSteamId(data.steam_id);
-        }
-      }
-    }
-    loadUser();
-  }, [supabase]);
-
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoadingSave(true);
@@ -55,12 +41,11 @@ export default function IntegrationsPage() {
     setLoadingSave(false);
   };
 
-  // A MÁGICA DA SINCRONIZAÇÃO EM LOTES
   const handleSync = async () => {
     setLoadingSync(true);
     setSyncProgress(0);
     setSyncStats({ coins: 0, plats: 0 });
-    setSyncMessage("A procurar a tua biblioteca na Steam...");
+    setSyncMessage("Procurando a sua biblioteca na Steam...");
 
     // 1. Pega a lista total
     const listResult = await fetchSteamGamesList();
@@ -77,7 +62,10 @@ export default function IntegrationsPage() {
     // 2. Processa 1 por 1
     for (let i = 0; i < games.length; i++) {
       const game = games[i];
-      setSyncMessage(`A sincronizar: ${game.name} (${i + 1}/${games.length})`);
+
+      if (!game) continue;
+
+      setSyncMessage(`Sincronizando: ${game.name} (${i + 1}/${games.length})`);
 
       const result = await processSingleGame(game, listResult.steamId);
 
@@ -90,19 +78,19 @@ export default function IntegrationsPage() {
     }
 
     // 3. Finaliza salvando o saldo
-    setSyncMessage("A guardar os teus ganhos no Nexus...");
+    setSyncMessage("Guardando os seus ganhos no Nexus...");
     await finalizeSync(totalCoins, totalPlats, games.length);
 
-    toast.success(`Sincronização épica! Ganhaste +${totalCoins} Moedas e ${totalPlats} Platinas!`);
+    toast.success(`Sincronização épica! Ganhou +${totalCoins} Nexus Coins e ${totalPlats} Platinas!`);
     setSyncMessage("");
     setSyncProgress(0);
     setLoadingSync(false);
   };
 
   const upcomingIntegrations = [
-    { name: "PlayStation Network", icon: "🎮", color: "from-blue-600 to-blue-800", borderColor: "border-blue-500/20" },
-    { name: "Xbox Live", icon: "🟢", color: "from-green-600 to-green-800", borderColor: "border-green-500/20" },
-    { name: "Epic Games", icon: "⬛", color: "from-gray-700 to-gray-900", borderColor: "border-gray-500/20" }
+    { name: "PlayStation Network", icon: <FaPlaystation />, color: "from-blue-600 to-blue-800", borderColor: "border-blue-500/20" },
+    { name: "Xbox Live", icon: <FaXbox />, color: "from-green-600 to-green-800", borderColor: "border-green-500/20" },
+    { name: "Epic Games", icon: <SiEpicgames />, color: "from-gray-700 to-gray-900", borderColor: "border-gray-500/20" }
   ];
 
   return (
@@ -124,7 +112,7 @@ export default function IntegrationsPage() {
           <div className="absolute top-0 right-0 w-64 h-64 bg-blue-900/10 rounded-full blur-3xl pointer-events-none group-hover:bg-blue-800/20 transition-colors"></div>
 
           <div className="w-20 h-20 bg-linear-to-br from-blue-900 to-black text-white rounded-2xl flex items-center justify-center text-4xl shrink-0 border border-blue-500/30 shadow-[0_0_20px_rgba(59,130,246,0.2)] z-10">
-            <span className="drop-shadow-lg">☁️</span>
+            <span className="drop-shadow-lg"><FaSteam /></span>
           </div>
 
           <div className="flex-1 space-y-6 z-10 w-full">
@@ -135,7 +123,6 @@ export default function IntegrationsPage() {
                 Cada conquista desbloqueada será convertida em <span className="text-yellow-500 font-bold">🪙 Nexus Coins</span>.
               </p>
               <div className="mt-2 text-xs font-bold text-yellow-500/80 bg-yellow-500/10 inline-block px-3 py-1 rounded-md border border-yellow-500/20">
-                {/* Corrigido: Uso de &quot; para aspas no texto */}
                 ⚠️ O seu perfil e os detalhes dos jogos na Steam precisam estar &quot;Públicos&quot;.
               </div>
             </div>

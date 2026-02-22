@@ -6,6 +6,12 @@ import GuideForm from "./GuideForm";
 import { GuideVoteButton, GuideCommentForm, DeleteGuideButton } from "./GuideInteractions";
 import GameCardImage from "@/app/components/GameCardImage";
 import Trophy from "@/app/components/Trophy";
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Detalhes do Jogo | Nexus Achievements",
+  description: "Explore os detalhes do jogo no Nexus Achievements, veja seu progresso em conquistas, compare com a comunidade e descubra guias criados por outros jogadores para alcançar a platina. Mergulhe fundo no universo dos games e maximize sua experiência de conquista.",
+}
 
 interface GamePageProps {
   params: Promise<{ gameId: string }>;

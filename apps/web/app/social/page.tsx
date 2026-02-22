@@ -5,8 +5,14 @@ import Link from "next/link";
 import AutoSync from "../components/AutoSync";
 import Trophy from "../components/Trophy";
 import { FaSteam } from "react-icons/fa";
+import { Metadata } from "next";
 
-interface DashboardPageProps { searchParams: Promise<{ feed?: string }>; }
+export const metadata: Metadata = {
+  title: "Social | Nexus Achievements",
+  description: "Acompanhe suas conquistas recentes, compare seu progresso com amigos e explore o feed de atividades da comunidade no Social do Nexus Achievements. Mantenha-se atualizado sobre seus jogos favoritos e inspire-se com as conquistas dos outros jogadores.",
+}
+
+interface SocialPageProps { searchParams: Promise<{ feed?: string }>; }
 
 type GlobalActivity = {
   id: string; user_id: string; game_id: string | null; game_name: string; achievement_name: string; achievement_icon: string | null; rarity: string | null; points_earned: number; platform: string; created_at: string;
@@ -14,7 +20,7 @@ type GlobalActivity = {
   games: { banner_url: string | null; cover_url: string | null; } | null;
 };
 
-export default async function DashboardPage({ searchParams }: DashboardPageProps) {
+export default async function SocialPage({ searchParams }: SocialPageProps) {
   const { feed } = await searchParams;
   const activeFeed = feed === 'following' ? 'following' : 'global';
 
@@ -98,11 +104,11 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
       <div className="flex flex-col sm:flex-row items-center justify-between bg-surface/40 backdrop-blur-md border border-border p-4 md:p-6 rounded-3xl shadow-lg">
         <div className="flex gap-4">
-          <Link href="/dashboard?feed=global" className={`px-5 py-2 rounded-full text-sm font-bold transition-all ${activeFeed === 'global' ? 'bg-primary text-white shadow-[0_0_15px_rgba(59,130,246,0.4)]' : 'bg-transparent text-gray-400 hover:text-white hover:bg-white/5'}`}>
+          <Link href="/social?feed=global" className={`px-5 py-2 rounded-full text-sm font-bold transition-all ${activeFeed === 'global' ? 'bg-primary text-white shadow-[0_0_15px_rgba(59,130,246,0.4)]' : 'bg-transparent text-gray-400 hover:text-white hover:bg-white/5'}`}>
             Feed Global
           </Link>
-          <Link href="/dashboard?feed=following" className={`px-5 py-2 rounded-full text-sm font-bold transition-all ${activeFeed === 'following' ? 'bg-primary text-white shadow-[0_0_15px_rgba(59,130,246,0.4)]' : 'bg-transparent text-gray-400 hover:text-white hover:bg-white/5'}`}>
-            A Seguir
+          <Link href="/social?feed=following" className={`px-5 py-2 rounded-full text-sm font-bold transition-all ${activeFeed === 'following' ? 'bg-primary text-white shadow-[0_0_15px_rgba(59,130,246,0.4)]' : 'bg-transparent text-gray-400 hover:text-white hover:bg-white/5'}`}>
+            Feed de Amigos
           </Link>
         </div>
         <Link href="/integrations" className="mt-4 sm:mt-0 flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10 rounded-full text-sm font-bold transition-all">

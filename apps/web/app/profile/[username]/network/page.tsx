@@ -2,6 +2,12 @@ import { createClient } from "@/utils/supabase/server";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Rede de Amigos | Nexus Achievements",
+  description: "Explore a rede de amigos do perfil do Nexus Achievements, veja quem são os seguidores e as pessoas que este usuário segue. Conecte-se com outros caçadores de troféus, descubra novos perfis interessantes e fortaleça sua presença na comunidade de gamers.",
+}
 
 interface NetworkPageProps {
   params: Promise<{ username: string }>;
@@ -100,7 +106,7 @@ export default async function NetworkPage({ params, searchParams }: NetworkPageP
           className={`pb-4 text-sm font-black uppercase tracking-widest transition-all relative ${activeTab === 'following' ? 'text-primary' : 'text-gray-500 hover:text-gray-300'}`}
         >
           {activeTab === 'following' && <span className="absolute bottom-0 left-0 w-full h-1 bg-primary rounded-t-full shadow-[0_0_10px_rgba(59,130,246,0.5)]"></span>}
-          A Seguir ({activeTab === 'following' ? usersList.length : '...'})
+          Seguindo ({activeTab === 'following' ? usersList.length : '...'})
         </Link>
       </div>
 

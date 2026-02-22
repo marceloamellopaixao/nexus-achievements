@@ -47,11 +47,11 @@ export default function NotificationBell() {
       // O filtro garante que você só ouça as notificações destinadas a você
       const channel = supabase
         .channel(`realtime-notifications-${user_id}`)
-        .on('postgres_changes', { 
-          event: 'INSERT', 
-          schema: 'public', 
+        .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
           table: 'notifications',
-          filter: `user_id=eq.${user_id}` // FILTRO CRÍTICO
+          filter: `user_id=eq.${user_id}`
         }, async (payload) => {
           // Busca dados do ator para a nova notificação
           const { data: actorData } = await supabase
@@ -67,8 +67,6 @@ export default function NotificationBell() {
 
           setNotifications(prev => [newNotif, ...prev].slice(0, 10));
           setUnreadCount(prev => prev + 1);
-          
-          // Opcional: Tocar um som ou mostrar um toast aqui
         })
         .subscribe();
 
@@ -148,7 +146,7 @@ export default function NotificationBell() {
             )}
           </div>
           <Link href="/notifications" className="p-3 text-center block text-[10px] font-black text-gray-500 uppercase hover:text-white transition-colors bg-background/20">
-             Ver Histórico Completo
+            Ver Histórico Completo
           </Link>
         </div>
       )}

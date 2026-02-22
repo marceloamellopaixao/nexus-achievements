@@ -1,6 +1,11 @@
 import React from "react";
 import { createClient } from "@/utils/supabase/server";
 import BuyButton from "./BuyButton";
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+    title: "Loja de Cosméticos | Nexus Achievements",
+}
 
 type ShopItem = { id: string; name: string; category: string; price: number; rarity_type: string; gradient?: string; border_style?: string; tag_style?: string; };
 type ShopCategory = { title: string; description: string; filter: string; icon: string; };

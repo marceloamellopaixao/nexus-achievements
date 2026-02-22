@@ -20,7 +20,6 @@ export async function toggleFollow(targetUserId: string, currentPath: string) {
   let isNowFollowing = false;
 
   if (existing) {
-    // CAPTURA DE ERRO NO DELETE
     const { error } = await supabase.from('user_follows').delete().eq('follower_id', user.id).eq('following_id', targetUserId)
     if (error) {
       console.error("Erro ao deixar de seguir:", error.message)
@@ -28,16 +27,14 @@ export async function toggleFollow(targetUserId: string, currentPath: string) {
     }
     isNowFollowing = false;
   } else {
-    // CAPTURA DE ERRO NO INSERT
     const { error } = await supabase.from('user_follows').insert({ follower_id: user.id, following_id: targetUserId })
     if (error) {
       console.error("Erro ao seguir:", error.message)
-      return { error: `Erro do banco: ${error.message}` } // Vai mostrar o erro real no Toast!
+      return { error: `Erro do banco: ${error.message}` }
     }
     isNowFollowing = true;
   }
 
-  // Usar 'layout' limpa o cache de forma mais agressiva para atualizar os números
   revalidatePath(currentPath, 'layout')
   
   return { success: true, isNowFollowing }

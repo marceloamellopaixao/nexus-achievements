@@ -3,6 +3,12 @@ import Link from "next/link";
 import GameSearch from "./GameSearch";
 import GameCardImage from "../components/GameCardImage";
 import { FaSteam } from "react-icons/fa";
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Biblioteca de Jogos | Nexus Achievements",
+  description: "Explore a biblioteca de jogos do Nexus Achievements, onde você pode encontrar uma vasta coleção de títulos jogados pela comunidade. Descubra novos jogos, veja detalhes sobre conquistas e mergulhe no universo dos games com o apoio da comunidade.",
+}
 
 interface GamesLibraryProps {
   searchParams: Promise<{ q?: string }>;

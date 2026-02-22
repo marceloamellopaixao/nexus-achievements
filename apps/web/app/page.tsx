@@ -1,6 +1,13 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Gradient } from "@repo/ui/gradient";
+import { FaDiscord, FaSteam } from "react-icons/fa";
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Nexus Achievements - Sua Jornada Gamer Transformada",
+  description: "Plataforma definitiva para caçadores de troféus. Sincronize suas conquistas, exiba seu progresso e domine o ranking em uma experiência visual premium.",
+}
 
 const FEATURES = [
   {
@@ -28,7 +35,7 @@ const FEATURES = [
 export default function Page() {
   return (
     <main className="flex flex-col items-center min-h-screen bg-background overflow-hidden">
-      
+
       {/* =========================================
           HERO SECTION
           ========================================= */}
@@ -39,7 +46,7 @@ export default function Page() {
         </div>
 
         <div className="relative z-10 flex flex-col items-center text-center max-w-4xl space-y-8 animate-in fade-in slide-in-from-bottom-10 duration-1000">
-          
+
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-black uppercase tracking-[0.2em] shadow-[0_0_20px_rgba(59,130,246,0.2)]">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
@@ -56,19 +63,19 @@ export default function Page() {
           </h1>
 
           <p className="text-gray-400 text-lg md:text-xl max-w-2xl font-medium leading-relaxed">
-            Nexus é a plataforma definitiva para caçadores de troféus. Sincronize suas conquistas, 
+            Nexus é a plataforma definitiva para caçadores de troféus. Sincronize suas conquistas,
             exiba seu progresso e domine o ranking em uma experiência visual premium.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center gap-4 pt-6">
-            <Link 
-              href="/login" 
+            <Link
+              href="/login"
               className="px-8 py-4 bg-white text-black font-black rounded-2xl hover:bg-gray-200 transition-all hover:scale-105 active:scale-95 shadow-[0_0_30px_rgba(255,255,255,0.3)] min-w-50"
             >
               Começar Agora
             </Link>
-            <Link 
-              href="/leaderboards" 
+            <Link
+              href="/leaderboards"
               className="px-8 py-4 bg-surface/50 backdrop-blur-md border border-border text-white font-black rounded-2xl hover:bg-surface transition-all active:scale-95 min-w-50"
             >
               Ver Ranking
@@ -94,8 +101,8 @@ export default function Page() {
       <section className="relative z-10 w-full max-w-6xl px-6 pb-40">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {FEATURES.map((feature, index) => (
-            <div 
-              key={index} 
+            <div
+              key={index}
               className="group bg-surface/40 backdrop-blur-xl border border-border/50 p-8 rounded-[2.5rem] hover:border-primary/50 transition-all duration-500 hover:-translate-y-2 shadow-xl"
             >
               <div className="w-14 h-14 bg-background border border-border rounded-2xl flex items-center justify-center text-3xl mb-6 shadow-inner group-hover:scale-110 transition-transform">
@@ -119,13 +126,13 @@ export default function Page() {
         <div className="w-full aspect-video rounded-[3rem] bg-linear-to-b from-surface/80 to-background border border-border shadow-[0_0_100px_rgba(0,0,0,0.5)] relative overflow-hidden flex items-center justify-center group">
           {/* Efeito de brilho de fundo no mockup */}
           <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-1000"></div>
-          
+
           <div className="text-center space-y-4">
-             <div className="text-7xl drop-shadow-glow animate-bounce">🌌</div>
-             <p className="text-primary font-black uppercase tracking-widest text-sm">Dashboard em Tempo Real</p>
-             <h2 className="text-3xl text-white font-black tracking-tighter">Estatísticas que inspiram.</h2>
+            <div className="text-7xl drop-shadow-glow animate-bounce">🌌</div>
+            <p className="text-primary font-black uppercase tracking-widest text-sm">Social em Tempo Real</p>
+            <h2 className="text-3xl text-white font-black tracking-tighter">Estatísticas que inspiram.</h2>
           </div>
-          
+
           {/* Gradiente Overlay */}
           <div className="absolute inset-0 bg-linear-to-t from-background via-transparent to-transparent"></div>
         </div>
@@ -141,15 +148,14 @@ export default function Page() {
           </div>
           <span className="font-black text-white tracking-widest uppercase text-sm italic">Nexus Achievements</span>
         </div>
-        
+
         <p className="text-gray-500 text-xs font-bold uppercase tracking-widest">
           Desenvolvido para verdadeiros caçadores • 2026
         </p>
 
         <div className="flex gap-6">
-          <a href="#" className="text-gray-400 hover:text-white transition-colors"><span className="sr-only">Steam</span>👾</a>
-          <a href="#" className="text-gray-400 hover:text-white transition-colors"><span className="sr-only">Discord</span>💬</a>
-          <a href="#" className="text-gray-400 hover:text-white transition-colors"><span className="sr-only">Twitter</span>🐦</a>
+          <a href="#" className="text-gray-400 hover:text-white transition-colors"><span className="sr-only">Steam</span><FaSteam /></a>
+          <a href="#" className="text-gray-400 hover:text-white transition-colors"><span className="sr-only">Discord</span><FaDiscord /></a>
         </div>
       </footer>
     </main>
