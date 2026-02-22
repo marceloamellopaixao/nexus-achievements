@@ -86,24 +86,23 @@ export async function toggleGuideVote(guideId: string, gameId: string) {
     await supabase.from('guide_votes').insert({ guide_id: guideId, user_id: user.id })
   }
 
-  // 2. Conta os votos totais reais
+  // 2. Conta os votos totais reais imediatamente após a ação
   const { count } = await supabase
     .from('guide_votes')
     .select('*', { count: 'exact', head: true })
     .eq('guide_id', guideId)
 
   // 3. Atualiza na tabela principal do guia
-  const { error: updateError } = await supabase
+  await supabase
     .from('game_guides')
     .update({ upvotes: count || 0 })
     .eq('id', guideId)
 
-  if (updateError) console.error("Erro ao atualizar contador de votos:", updateError);
+  // 4. Força a revalidação da página específica do guia para limpar o cache
+  revalidatePath(`/games/${gameId}`)
 
-  // 4. Força o Next.js a limpar o cache da página toda, incluindo parâmetros da URL
-  revalidatePath(`/games/${gameId}`, 'page')
-
-  return { success: true, newCount: count || 0 }
+  // Retornamos a contagem real para o frontend não se perder
+  return { success: true, newCount: count || 0, isVoted: !existing }
 }
 
 export async function postGuideComment(guideId: string, gameId: string, content: string) {
