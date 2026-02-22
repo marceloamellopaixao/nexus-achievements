@@ -73,7 +73,7 @@ export default async function PublicProfilePage({ params }: ProfilePageProps) {
     .from("users")
     .select("*")
     .eq("username", username)
-    .single();
+    .maybeSingle();
 
   if (error || !profile) notFound();
 

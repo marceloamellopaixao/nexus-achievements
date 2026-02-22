@@ -30,7 +30,6 @@ export default async function StudioPage({ params }: StudioPageProps) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  // Correção dos erros de sintaxe (linhas 34 e 42 do log)
   if (!user) return (
     <div className="flex flex-col items-center justify-center min-h-88 space-y-4">
       <span className="text-6xl mb-2 drop-shadow-md">🔒</span>
@@ -47,7 +46,7 @@ export default async function StudioPage({ params }: StudioPageProps) {
 
   if (userData?.username !== username) return notFound();
 
-  // 1. BUSCA OS JOGOS DO UTILIZADOR PARA O EDITOR (Resolve erro 'myGames' não encontrado)
+  // 1. BUSCA OS JOGOS DO UTILIZADOR PARA O EDITOR
   const { data: myGamesRaw } = await supabase
     .from("user_games")
     .select("games (id, title, cover_url)")
@@ -55,7 +54,7 @@ export default async function StudioPage({ params }: StudioPageProps) {
 
   const myGames = (myGamesRaw?.map(g => g.games).filter(Boolean) as unknown as { id: string, title: string, cover_url: string }[]) || [];
 
-  // 2. BUSCA E FILTRA O INVENTÁRIO (Remove duplicatas e separa Expansões)
+  // 2. BUSCA E FILTRA O INVENTÁRIO
   const { data: inventoryData } = await supabase
     .from("user_inventory")
     .select(`item_id, shop_items (id, name, category, rarity_type, gradient, border_style, tag_style)`)
@@ -73,6 +72,12 @@ export default async function StudioPage({ params }: StudioPageProps) {
     border: userData?.equipped_border,
     title: userData?.equipped_title,
   };
+
+  // 3. TRATAMENTO DE SEGURANÇA PARA A ESTANTE (Showcase)
+  // Garante que enviamos um array limpo, evitando o erro "selected.includes is not a function"
+  const initialShowcase = Array.isArray(userData?.showcase_games) 
+    ? userData.showcase_games 
+    : [];
 
   return (
     <div className="space-y-12 animate-in fade-in duration-500 pb-20 max-w-5xl mx-auto px-4 md:px-0">
@@ -130,12 +135,12 @@ export default async function StudioPage({ params }: StudioPageProps) {
         <p className="text-sm text-gray-400 mb-8">Escolha os jogos que deseja exibir no topo do seu perfil.</p>
         <ShowcaseEditor
           availableGames={myGames}
-          initialShowcase={userData?.showcase_games || []}
+          initialShowcase={initialShowcase}
           limit={userData?.showcase_limit || 5}
         />
       </section>
 
-      {/* SEÇÃO 3: INVENTÁRIO VISUAL (APENAS COSMÉTICOS) */}
+      {/* SEÇÃO 3: INVENTÁRIO VISUAL */}
       <section className="space-y-8">
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-black text-white flex items-center gap-3">
@@ -176,7 +181,7 @@ export default async function StudioPage({ params }: StudioPageProps) {
                     )}
 
                     {item.category === "Títulos Exclusivos" && item.tag_style && (
-                      <div className="relative z-10 px-4 py-2 rounded-xl border border-white/10 text-xs font-black shadow-2xl" style={{ background: item.tag_style }}>
+                      <div className="relative z-10 px-4 py-2 rounded-xl border border-white/10 text-xs font-black shadow-2xl text-white" style={{ background: item.tag_style }}>
                         {item.name}
                       </div>
                     )}
@@ -196,7 +201,7 @@ export default async function StudioPage({ params }: StudioPageProps) {
                     <EquipButton itemId={item.id} category={item.category} isEquipped={isEquipped} />
                   </div>
                 </div>
-              )
+              );
             })}
           </div>
         )}
