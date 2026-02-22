@@ -243,13 +243,21 @@ export async function processSingleGame(game: SteamGame, steamId: string) {
       }
 
       if (activitiesToInsert.length > 0) {
-        await supabase.from('global_activity').upsert(activitiesToInsert, {
-          onConflict: 'user_id, game_id, achievement_name'
-        })
+        // O segredo está no onConflict: deve ser IDÊNTICO à constraint do SQL
+        const { error: activityError } = await supabase
+          .from('global_activity')
+          .upsert(activitiesToInsert, {
+            onConflict: 'user_id, game_id, achievement_name'
+          });
+
+        if (activityError) {
+          console.error(`❌ Erro ao inserir atividades do jogo ${game.name}:`, activityError.message);
+        }
       }
     }
     return { coins: newCoins, plats: newPlats }
-  } catch {
+  } catch (err) {
+    console.error("❌ Falha crítica no processSingleGame:", err);
     return { coins: 0, plats: 0 }
   }
 }
