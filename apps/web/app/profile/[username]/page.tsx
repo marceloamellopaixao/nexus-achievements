@@ -218,6 +218,9 @@ export default async function PublicProfilePage({ params }: ProfilePageProps) {
               <p className="text-3xl font-black text-blue-400 relative z-10 drop-shadow-md">{profile.total_platinums || 0}</p>
               <p className="text-[10px] text-blue-500 font-bold uppercase tracking-widest mt-1 relative z-10">Platinas</p>
             </div>
+            <div>
+              <Link href={`/chat/${profile.username}`} className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-primary/10 text-primary hover:bg-primary hover:text-white border border-primary/30 rounded-xl font-black text-sm transition-all shadow-lg hover:-translate-y-1">💬 Enviar Mensagem</Link>
+            </div>
           </div>
         </div>
       </div>
