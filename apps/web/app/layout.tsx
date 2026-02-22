@@ -6,8 +6,8 @@ import Image from "next/image";
 import { ToastContainer } from "react-toastify";
 import { DesktopNavLinks, MobileNavLinks } from "./components/NavLinks";
 import NotificationBell from "./components/NotificationBell";
-// Importe o novo componente
 import HeaderTitle from "./components/HeaderTitle";
+import AnnouncementBanner from "./components/AnnouncementBanner";
 
 export const metadata: Metadata = {
   title: 'Nexus Achievements | Sua Jornada Gamer',
@@ -16,6 +16,7 @@ export const metadata: Metadata = {
 
 interface UserData {
   username: string;
+  role: string;
   avatar_url: string | null;
   nexus_coins: number;
 }
@@ -42,6 +43,10 @@ export default async function RootLayout({
     }
   }
 
+  // BUSCA ANÚNCIO ATIVO
+  const { data: announcement } = await supabase.from('system_announcements').select('*').eq('is_active', true).maybeSingle();
+
+  // NAVLINKS DINÂMICOS
   const navLinks = [
     { href: "/dashboard", icon: "🏠", label: "Início", mobile: true },
     { href: "/games", icon: "🎮", label: "Jogos", mobile: true },
@@ -51,6 +56,10 @@ export default async function RootLayout({
     { href: "/shop", icon: "🛒", label: "Loja", mobile: true },
     { href: "/integrations", icon: "⚙️", label: "Integrações", mobile: true },
   ];
+
+  if (userData?.role === 'admin') {
+    navLinks.push({ href: "/admin", icon: "🛡️", label: "Painel Admin", mobile: true });
+  }
 
   return (
     <html lang="pt-BR" className="dark">
@@ -95,10 +104,14 @@ export default async function RootLayout({
         </aside>
 
         <div className="flex-1 flex flex-col h-screen relative w-full max-w-full">
+          {/* BANNER FECHÁVEL */}
+          {announcement && (
+            <AnnouncementBanner message={announcement.message} type={announcement.type} />
+          )}
+
           <header className="h-16 md:h-20 shrink-0 border-b border-border/50 bg-background/80 backdrop-blur-xl flex items-center justify-between px-4 md:px-8 z-40 sticky top-0">
-            
+
             <div className="flex items-center gap-2">
-              {/* SUBSTITUIÇÃO AQUI: O componente HeaderTitle agora lida com o nome da página */}
               <HeaderTitle links={navLinks} />
             </div>
 
