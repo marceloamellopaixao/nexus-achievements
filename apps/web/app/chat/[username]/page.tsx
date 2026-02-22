@@ -3,7 +3,6 @@ import ChatClient from "../ChatClient";
 import { notFound, redirect } from "next/navigation";
 import Image from "next/image";
 
-// 1. Interfaces ajustadas para bater exatamente com o que o ChatClient espera
 interface ChatUser {
   username: string;
   avatar_url: string | null;
@@ -28,7 +27,6 @@ export default async function DirectMessagePage({ params }: DmPageProps) {
 
   if (!user) redirect('/login');
 
-  // Busca o utilizador com quem queremos falar
   const { data: targetUser } = await supabase
     .from('users')
     .select('id, username, avatar_url')
@@ -37,14 +35,11 @@ export default async function DirectMessagePage({ params }: DmPageProps) {
 
   if (!targetUser) notFound();
 
-  // Se tentar falar com si mesmo, volta para o global
   if (targetUser.id === user.id) redirect('/chat');
 
-  // String ÚNICA de sala (alfabética)
   const sortedIds = [user.id, targetUser.id].sort();
   const channelId = `dm_${sortedIds[0]}_${sortedIds[1]}`;
 
-  // Busca o histórico do chat privado - Removido o .from() duplicado que causava erro 2339
   const { data: messagesData } = await supabase
     .from('chat_messages')
     .select('id, content, created_at, user_id, users(username, avatar_url)')
@@ -52,7 +47,6 @@ export default async function DirectMessagePage({ params }: DmPageProps) {
     .order('created_at', { ascending: false })
     .limit(50);
 
-  // 2. Mapeamento garantindo que 'users' nunca seja undefined para bater com o tipo ChatMessage
   const initialMessages = ((messagesData as unknown as RawChatMessage[]) || []).map(m => {
     const userData = Array.isArray(m.users) ? m.users[0] : m.users;
     
