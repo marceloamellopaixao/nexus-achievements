@@ -1,8 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { toggleGuideVote, postGuideComment } from './actions'
+import { toggleGuideVote, postGuideComment, deleteGuide } from './actions'
 import { toast } from 'react-toastify'
+import { useRouter } from 'next/navigation'
 
 export function GuideVoteButton({ guideId, gameId, initialVotes, hasVoted }: { guideId: string, gameId: string, initialVotes: number, hasVoted: boolean }) {
   const [loading, setLoading] = useState(false)
@@ -75,5 +76,42 @@ export function GuideCommentForm({ guideId, gameId }: { guideId: string, gameId:
         {loading ? 'A enviar...' : 'Enviar'}
       </button>
     </form>
+  )
+}
+
+export function DeleteGuideButton({ guideId, gameId }: { guideId: string, gameId: string }) {
+  const [isDeleting, setIsDeleting] = useState(false)
+  const router = useRouter()
+
+  const handleDelete = async () => {
+    const confirmed = window.confirm("Tem a certeza de que deseja apagar este guia? Esta ação é irreversível.")
+    if (!confirmed) return
+
+    setIsDeleting(true)
+    const res = await deleteGuide(guideId, gameId)
+
+    if (res.error) {
+      toast.error(res.error, { theme: 'dark' })
+      setIsDeleting(false)
+    } else {
+      toast.success('Guia apagado com sucesso.', { theme: 'dark' })
+
+      // Força o Next.js a limpar o cache do navegador
+      router.refresh()
+
+      // Redireciona
+      router.push(`/games/${gameId}?tab=guides`)
+    }
+  }
+
+  return (
+    <button
+      onClick={handleDelete}
+      disabled={isDeleting}
+      className="flex items-center gap-2 px-4 py-2 bg-red-500/10 text-red-500 border border-red-500/20 rounded-xl font-bold text-sm hover:bg-red-500 hover:text-white transition-all disabled:opacity-50 shadow-sm"
+    >
+      {isDeleting ? <span className="animate-spin">🔄</span> : <span>🗑️</span>}
+      {isDeleting ? 'A apagar...' : 'Apagar Guia'}
+    </button>
   )
 }
