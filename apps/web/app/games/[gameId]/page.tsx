@@ -16,7 +16,7 @@ interface GamePageProps {
 type SteamSchemaAchievement = { name: string; defaultvalue: number; displayName: string; hidden: number; description?: string; icon: string; icongray: string; };
 type SteamPlayerAchievement = { apiname: string; achieved: number; unlocktime?: number; };
 type CommunityUser = { user_id: string; is_platinum: boolean; unlocked_achievements: number; total_achievements: number; playtime_minutes: number; last_synced_at: string; users: { username: string; avatar_url: string | null; } | null; };
-interface SteamPercentage { name: string; percent: number; } // RESOLVE O ERRO DE ANY
+interface SteamPercentage { name: string; percent: number; }
 
 interface GuideAuthor { username: string; avatar_url: string | null; title: string | null; }
 interface GameGuide { id: string; author_id: string; title: string; content: string; upvotes: number; created_at: string; users: GuideAuthor | null; }
@@ -51,6 +51,51 @@ export default async function GamePage(props: GamePageProps) {
   const { data: game, error } = await supabase.from("games").select("*").eq("id", gameId).single();
   if (error || !game) notFound();
 
+  const appId = gameId.replace("steam-", "");
+  const STEAM_KEY = process.env.STEAM_API_KEY;
+  const SGDB_KEY = process.env.STEAMGRIDDB_API_KEY;
+
+  // --- 🚀 MOTOR DE CACHE: STEAMGRIDDB -> SUPABASE ---
+  let updatedBanner = game.banner_url;
+  let updatedCover = game.cover_url;
+  let needsDbUpdate = false;
+
+  // Se o jogo não tiver Banner ou Cover, buscamos na API e guardamos para sempre
+  if ((!game.banner_url || !game.cover_url) && SGDB_KEY) {
+    try {
+      // 1. Busca o Banner (Heroes)
+      if (!game.banner_url) {
+        const heroRes = await fetch(`https://www.steamgriddb.com/api/v2/heroes/steam/${appId}`, { headers: { Authorization: `Bearer ${SGDB_KEY}` } });
+        const heroData = await heroRes.json();
+        if (heroData.success && heroData.data.length > 0) {
+          updatedBanner = heroData.data[0].url;
+          needsDbUpdate = true;
+        }
+      }
+
+      // 2. Busca a Capa (Grids)
+      if (!game.cover_url) {
+        const gridRes = await fetch(`https://www.steamgriddb.com/api/v2/grids/steam/${appId}`, { headers: { Authorization: `Bearer ${SGDB_KEY}` } });
+        const gridData = await gridRes.json();
+        if (gridData.success && gridData.data.length > 0) {
+          updatedCover = gridData.data[0].url;
+          needsDbUpdate = true;
+        }
+      }
+
+      // 3. Salva no Banco de Dados para não buscar novamente na próxima visita!
+      if (needsDbUpdate) {
+        await supabase.from('games').update({ 
+          banner_url: updatedBanner, 
+          cover_url: updatedCover 
+        }).eq('id', gameId);
+      }
+    } catch (e) {
+      console.error("Erro ao fazer cache do SteamGridDB:", e);
+    }
+  }
+  // ---------------------------------------------------
+
   const { data: communityRaw } = await supabase.from("user_games").select(`user_id, is_platinum, unlocked_achievements, total_achievements, playtime_minutes, last_synced_at, users ( username, avatar_url )`).eq("game_id", gameId);
   const communityData = (communityRaw as unknown as CommunityUser[]) || [];
   const userProgress = communityData.find(p => p.user_id === user?.id) || null;
@@ -67,8 +112,6 @@ export default async function GamePage(props: GamePageProps) {
   const playtimeHours = userProgress ? Math.floor(userProgress.playtime_minutes / 60) : 0;
   const playtimeMins = userProgress ? userProgress.playtime_minutes % 60 : 0;
 
-  const appId = gameId.replace("steam-", "");
-  const STEAM_KEY = process.env.STEAM_API_KEY;
   let achievementsDetails: SteamSchemaAchievement[] = [];
   const playerUnlockedMap: Record<string, boolean> = {};
   const globalPercentages: Record<string, number> = {};
@@ -84,7 +127,6 @@ export default async function GamePage(props: GamePageProps) {
       const pctRes = await fetch(`http://api.steampowered.com/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v0002/?gameid=${appId}`, { next: { revalidate: 3600 } });
       if (pctRes.ok) {
         const pctData = await pctRes.json();
-        // CORRIGIDO: Tipagem explicita removendo o 'any'
         pctData.achievementpercentages?.achievements.forEach((a: SteamPercentage) => {
           globalPercentages[a.name] = a.percent;
         });
@@ -140,14 +182,16 @@ export default async function GamePage(props: GamePageProps) {
   return (
     <div className="min-h-screen pb-20 animate-in fade-in duration-500">
       <div className="-mx-4 md:-mx-8 -mt-4 md:-mt-8 h-80 md:h-125 relative overflow-hidden border-b border-border/50 shadow-2xl rounded-b-4xl bg-background">
-        <GameCardImage src={game.banner_url} title={game.title} isBanner={true} />
+        {/* USAMOS O BANNER ATUALIZADO (Cache ou Novo) */}
+        <GameCardImage src={updatedBanner} title={game.title} isBanner={true} />
         <div className="absolute inset-0 bg-linear-to-t from-background via-background/40 to-transparent z-10" />
       </div>
 
       <div className="max-w-6xl mx-auto -mt-32 md:-mt-48 relative z-20 px-4 md:px-0">
         <div className="flex flex-col md:flex-row gap-6 md:gap-10 items-start md:items-end">
           <div className="w-32 md:w-64 aspect-3/4 rounded-2xl md:rounded-3xl border-4 md:border-[6px] border-background bg-surface overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.5)] relative shrink-0 group z-30">
-            <GameCardImage src={game.cover_url} title={game.title} />
+            {/* USAMOS A CAPA ATUALIZADA (Cache ou Novo) */}
+            <GameCardImage src={updatedCover} title={game.title} />
           </div>
 
           <div className="flex-1 w-full pb-2 md:pb-6">
@@ -160,7 +204,6 @@ export default async function GamePage(props: GamePageProps) {
 
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
                   <div className="flex-1 flex items-center gap-6">
-                    {/* TROFÉU DE PLATINA EXIBIDO NO STATUS */}
                     {isPlat && (
                       <div className="shrink-0 w-16 h-16 animate-pulse drop-shadow-[0_0_15px_rgba(34,211,238,0.8)] hidden sm:block">
                         <Trophy type="platinum" className="w-full h-full" />
@@ -220,14 +263,17 @@ export default async function GamePage(props: GamePageProps) {
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                 {achievementsDetails.map((ach) => {
                   const isUnlocked = playerUnlockedMap[ach.name];
-                  const iconUrl = isUnlocked ? ach.icon : (ach.icongray || ach.icon);
                   const rarity = getTrophyType(ach.name);
+                  
+                  // PLANO B PARA A CONQUISTA: Se ela não tiver ícone, mostramos a capa do jogo
+                  const baseIconUrl = isUnlocked ? ach.icon : (ach.icongray || ach.icon);
+                  const finalIconUrl = baseIconUrl || updatedCover || 'https://via.placeholder.com/64/1a1a1a/ffffff?text=X';
 
                   return (
                     <div key={ach.name} className={`flex items-start gap-4 border p-4 rounded-2xl transition-all duration-300 group ${isUnlocked ? 'border-primary/30 bg-primary/5 shadow-sm' : 'border-border/40 bg-surface/30 opacity-70 grayscale hover:grayscale-0 hover:opacity-100'}`}>
                       <div className="relative w-14 h-14 shrink-0 group-hover:scale-105 transition-transform">
-                        <div className="w-full h-full rounded-xl overflow-hidden border border-border/50 relative">
-                          <Image src={iconUrl} alt={ach.displayName} fill className="object-cover" unoptimized />
+                        <div className="w-full h-full rounded-xl overflow-hidden border border-border/50 relative bg-background">
+                          <Image src={finalIconUrl} alt={ach.displayName} fill className="object-cover" unoptimized />
                         </div>
                         <div className="absolute -bottom-1.5 -right-1.5 w-6 h-6 drop-shadow-[0_2px_5px_rgba(0,0,0,0.8)] z-10">
                           <Trophy type={rarity} className="w-full h-full" />
