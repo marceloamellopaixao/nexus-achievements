@@ -10,8 +10,6 @@ interface NavLink {
 export default function HeaderTitle({ links }: { links: NavLink[] }) {
   const pathname = usePathname();
 
-  // Encontra o link que corresponde ao início da rota atual
-  // Ex: se estiver em /games/123, ele reconhece como "Jogos" (/games)
   const currentPath = links.find(link => 
     pathname === link.href || (link.href !== '/dashboard' && pathname.startsWith(link.href))
   );
