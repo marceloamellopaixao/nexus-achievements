@@ -24,13 +24,13 @@ interface ChatProps {
   icon?: string | React.ReactNode;
 }
 
-export default function ChatClient({ 
-  initialMessages, 
-  currentUserId, 
-  channelId = 'global', 
-  chatTitle = 'Taverna do Nexus', 
-  chatSubtitle = 'Chat Global ao Vivo', 
-  icon = '🍻' 
+export default function ChatClient({
+  initialMessages,
+  currentUserId,
+  channelId = 'global',
+  chatTitle = 'Taverna do Nexus',
+  chatSubtitle = 'Chat Global ao Vivo',
+  icon = '🍻'
 }: ChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
   const [newMessage, setNewMessage] = useState('')
@@ -45,52 +45,54 @@ export default function ChatClient({
   useEffect(() => {
     const channel = supabase
       .channel(`chat_room_${channelId}`)
-      .on('postgres_changes', { 
-        event: 'INSERT', 
-        schema: 'public', 
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
         table: 'chat_messages',
-        filter: `channel=eq.${channelId}` 
+        filter: `channel=eq.${channelId}`
       }, async (payload) => {
-        // Busca os dados do usuário que acabou de postar
+        const payloadNew = payload.new as { id: string, content: string, created_at: string, user_id: string };
+
         const { data: userData } = await supabase
           .from('users')
           .select('username, avatar_url')
-          .eq('id', payload.new.user_id)
-          .single()
-        
+          .eq('id', payloadNew.user_id)
+          .single();
+
         const newMsg: ChatMessage = {
           id: payload.new.id,
           content: payload.new.content,
           created_at: payload.new.created_at,
-          user_id: payload.new.user_id, // Atribuição segura
+          user_id: payload.new.user_id,
           users: userData
-        }
+        };
 
         setMessages(prev => {
-          if (prev.find(m => m.id === newMsg.id)) return prev;
+          if (prev.some(m => m.id === newMsg.id)) return prev;
           return [...prev, newMsg];
-        })
+        });
       })
-      .subscribe()
+      .subscribe();
 
     return () => { supabase.removeChannel(channel) }
-  }, [supabase, channelId])
+  }, [supabase, channelId]);
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newMessage.trim() || !currentUserId) return
-    
+
     setLoading(true)
     const contentToSend = newMessage
-    setNewMessage('') 
-    
+    setNewMessage('')
+
     await sendMessage(contentToSend, channelId)
     setLoading(false)
   }
 
+
   return (
     <div className="flex flex-col h-full bg-surface/40 backdrop-blur-xl border border-border rounded-3xl overflow-hidden shadow-2xl animate-in fade-in duration-500">
-      
+
       {/* Header do Chat */}
       <div className="bg-background/60 backdrop-blur-md border-b border-border p-4 flex items-center gap-4 z-10 shadow-sm">
         <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-2xl border border-primary/20 shadow-inner">
@@ -106,10 +108,10 @@ export default function ChatClient({
       <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 custom-scrollbar bg-background/20">
         {messages.map((msg) => {
           const isMe = currentUserId === msg.user_id; // Verificação tipada sem erro
-          
+
           return (
             <div key={msg.id} className={`flex gap-3 animate-in fade-in slide-in-from-bottom-2 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
-              
+
               <Link href={`/profile/${msg.users?.username}`} className="w-10 h-10 rounded-full overflow-hidden shrink-0 border border-border/50 bg-surface relative hover:border-primary transition-all group shadow-md">
                 {msg.users?.avatar_url ? (
                   <Image src={msg.users.avatar_url} alt="Avatar" fill className="object-cover group-hover:scale-110 transition-transform" unoptimized />
@@ -125,12 +127,11 @@ export default function ChatClient({
                     {new Date(msg.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
-                
-                <div className={`border px-4 py-3 rounded-2xl text-sm shadow-sm leading-relaxed wrap-break-word transition-all ${
-                  isMe 
-                    ? 'bg-primary border-primary/30 text-white rounded-tr-none shadow-primary/10' 
-                    : 'bg-surface/80 border-border/50 text-gray-200 rounded-tl-none'
-                }`}>
+
+                <div className={`border px-4 py-3 rounded-2xl text-sm shadow-sm leading-relaxed wrap-break-word transition-all ${isMe
+                  ? 'bg-primary border-primary/30 text-white rounded-tr-none shadow-primary/10'
+                  : 'bg-surface/80 border-border/50 text-gray-200 rounded-tl-none'
+                  }`}>
                   {msg.content}
                 </div>
               </div>
@@ -149,17 +150,17 @@ export default function ChatClient({
       {/* Input de Mensagem */}
       {currentUserId ? (
         <form onSubmit={handleSend} className="bg-background/80 backdrop-blur-xl border-t border-border/50 p-4 md:p-6 flex gap-3 z-20">
-          <input 
-            type="text" 
-            value={newMessage} 
-            onChange={(e) => setNewMessage(e.target.value)} 
-            placeholder="Digite sua mensagem para a guilda..." 
-            className="flex-1 bg-surface border border-border/50 rounded-xl px-5 py-3.5 text-sm text-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all shadow-inner placeholder:text-gray-600" 
-            maxLength={500} 
+          <input
+            type="text"
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            placeholder="Digite sua mensagem para a guilda..."
+            className="flex-1 bg-surface border border-border/50 rounded-xl px-5 py-3.5 text-sm text-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all shadow-inner placeholder:text-gray-600"
+            maxLength={500}
           />
-          <button 
-            type="submit" 
-            disabled={loading || !newMessage.trim()} 
+          <button
+            type="submit"
+            disabled={loading || !newMessage.trim()}
             className="px-8 py-3.5 bg-primary text-white font-black text-sm rounded-xl hover:bg-primary/80 hover:shadow-[0_0_20px_rgba(59,130,246,0.4)] transition-all active:scale-95 disabled:opacity-50 disabled:grayscale shrink-0 flex items-center justify-center gap-2"
           >
             {loading ? <span className="animate-spin text-lg">🔄</span> : <span>Enviar</span>}
