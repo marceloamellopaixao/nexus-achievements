@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache'
 export async function toggleFollow(targetUserId: string, currentPath: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-
+  
   if (!user) return { error: 'Tens de ter sessão iniciada para seguir caçadores.' }
   if (user.id === targetUserId) return { error: 'Não podes seguir-te a ti próprio.' }
 
@@ -20,14 +20,26 @@ export async function toggleFollow(targetUserId: string, currentPath: string) {
   let isNowFollowing = false;
 
   if (existing) {
-    await supabase.from('user_follows').delete().eq('follower_id', user.id).eq('following_id', targetUserId)
+    // CAPTURA DE ERRO NO DELETE
+    const { error } = await supabase.from('user_follows').delete().eq('follower_id', user.id).eq('following_id', targetUserId)
+    if (error) {
+      console.error("Erro ao deixar de seguir:", error.message)
+      return { error: 'Falha no banco de dados ao tentar deixar de seguir.' }
+    }
     isNowFollowing = false;
   } else {
-    await supabase.from('user_follows').insert({ follower_id: user.id, following_id: targetUserId })
+    // CAPTURA DE ERRO NO INSERT
+    const { error } = await supabase.from('user_follows').insert({ follower_id: user.id, following_id: targetUserId })
+    if (error) {
+      console.error("Erro ao seguir:", error.message)
+      return { error: `Erro do banco: ${error.message}` } // Vai mostrar o erro real no Toast!
+    }
     isNowFollowing = true;
   }
 
-  revalidatePath(currentPath)
+  // Usar 'layout' limpa o cache de forma mais agressiva para atualizar os números
+  revalidatePath(currentPath, 'layout')
+  
   return { success: true, isNowFollowing }
 }
 
