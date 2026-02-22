@@ -121,3 +121,30 @@ export async function postGuideComment(guideId: string, gameId: string, content:
   revalidatePath(`/games/${gameId}`)
   return { success: true }
 }
+
+export async function deleteGuide(guideId: string, gameId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) return { error: 'Não autorizado.' }
+
+  // Tenta apagar apenas se for o dono e pede o retorno do dado apagado
+  const { data, error } = await supabase
+    .from('game_guides')
+    .delete()
+    .eq('id', guideId)
+    .eq('author_id', user.id)
+    .select()
+
+  if (error) {
+    console.error("Erro ao apagar guia:", error.message)
+    return { error: 'Falha no banco de dados. Verifica o SQL de CASCADE.' }
+  }
+
+  if (!data || data.length === 0) {
+    return { error: 'Sem permissão para apagar este guia no banco de dados.' }
+  }
+
+  revalidatePath(`/games/${gameId}`, 'page')
+  return { success: true }
+}
