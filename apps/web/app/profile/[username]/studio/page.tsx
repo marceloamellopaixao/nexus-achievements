@@ -94,7 +94,7 @@ export default async function StudioPage({ params }: StudioPageProps) {
           </div>
         </div>
         <Link href={`/profile/${username}`} className="px-6 py-3 bg-white text-black font-black rounded-xl hover:bg-gray-100 transition-all shadow-xl hover:-translate-y-1 shrink-0 flex items-center justify-center gap-2">
-          <span>👀</span> Visualizar Perfil
+          Visualizar Perfil
         </Link>
       </div>
 
