@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import GuideForm from "./GuideForm";
-import { GuideVoteButton, GuideCommentForm } from "./GuideInteractions";
+import { GuideVoteButton, GuideCommentForm, DeleteGuideButton } from "./GuideInteractions";
 import GameCardImage from "@/app/components/GameCardImage";
 import Trophy from "@/app/components/Trophy";
 
@@ -19,7 +19,7 @@ type CommunityUser = { user_id: string; is_platinum: boolean; unlocked_achieveme
 interface SteamPercentage { name: string; percent: number; } // RESOLVE O ERRO DE ANY
 
 interface GuideAuthor { username: string; avatar_url: string | null; title: string | null; }
-interface GameGuide { id: string; title: string; content: string; upvotes: number; created_at: string; users: GuideAuthor | null; }
+interface GameGuide { id: string; author_id: string; title: string; content: string; upvotes: number; created_at: string; users: GuideAuthor | null; }
 interface GuideComment { id: string; content: string; created_at: string; users: { username: string; avatar_url: string | null; } | null; }
 
 interface RawGuideData { id: string; game_id: string; author_id: string; title: string; content: string; upvotes: number; created_at: string; users: GuideAuthor | GuideAuthor[]; }
@@ -166,7 +166,7 @@ export default async function GamePage(props: GamePageProps) {
                         <Trophy type="platinum" className="w-full h-full" />
                       </div>
                     )}
-                    
+
                     <div className="flex-1">
                       <div className="flex items-center justify-between mb-3">
                         <h3 className="text-sm font-black uppercase tracking-widest text-white">
@@ -209,7 +209,7 @@ export default async function GamePage(props: GamePageProps) {
 
         {activeTab === 'overview' && (
           <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
-             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
               <div className="bg-surface/40 backdrop-blur-sm border border-border p-5 rounded-3xl flex items-center gap-4"><div className="w-12 h-12 bg-blue-500/10 text-blue-400 rounded-2xl flex items-center justify-center text-2xl">👥</div><div><p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Caçadores</p><p className="text-xl md:text-3xl font-black text-white">{totalPlayers}</p></div></div>
               <div className="bg-surface/40 backdrop-blur-sm border border-border p-5 rounded-3xl flex items-center gap-4"><div className="w-12 h-12 bg-yellow-500/10 text-yellow-500 rounded-2xl flex items-center justify-center text-2xl">👑</div><div><p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Platinas Reais</p><p className="text-xl md:text-3xl font-black text-white">{totalPlatinums}</p></div></div>
               <div className="bg-surface/40 backdrop-blur-sm border border-border p-5 rounded-3xl flex items-center gap-4"><div className="w-12 h-12 bg-green-500/10 text-green-400 rounded-2xl flex items-center justify-center text-2xl">📈</div><div><p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Taxa Global</p><p className="text-xl md:text-3xl font-black text-white">{completionRate}%</p></div></div>
@@ -253,9 +253,15 @@ export default async function GamePage(props: GamePageProps) {
             {guideId && selectedGuide ? (
               <div className="bg-surface/30 border border-border rounded-4xl p-6 md:p-10 shadow-2xl relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-full h-2 bg-linear-to-r from-primary via-purple-500 to-primary"></div>
-                <Link href={`/games/${gameId}?tab=guides`} className="inline-flex items-center gap-2 text-gray-400 hover:text-white font-bold text-sm mb-8 transition-colors bg-background/50 px-4 py-2 rounded-xl border border-border">
-                  ← Voltar à Biblioteca de Guias
-                </Link>
+                <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
+                  <Link href={`/games/${gameId}?tab=guides`} className="inline-flex items-center gap-2 text-gray-400 hover:text-white font-bold text-sm transition-colors bg-background/50 px-4 py-2 rounded-xl border border-border">
+                    ← Voltar à Biblioteca de Guias
+                  </Link>
+
+                  {user?.id === selectedGuide.author_id && (
+                    <DeleteGuideButton guideId={selectedGuide.id} gameId={gameId} />
+                  )}
+                </div>
                 <h2 className="text-3xl md:text-5xl font-black text-white mb-6 leading-tight drop-shadow-lg">{selectedGuide.title}</h2>
                 <div className="flex items-center gap-4 mb-8 pb-8 border-b border-border/50">
                   <div className="w-14 h-14 rounded-full overflow-hidden bg-background border-2 border-border relative">
