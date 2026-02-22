@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/utils/supabase/client'
-import { sendMessage } from './actions'
+import { sendMessage, markChannelAsRead } from './actions'
 import Image from 'next/image'
 import Link from 'next/link'
 
@@ -41,6 +41,17 @@ export default function ChatClient({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  // MARCA MENSAGENS COMO LIDAS AO ENTRAR NA SALA OU RECEBER NOVA
+  useEffect(() => {
+    if (channelId.startsWith('dm_') && currentUserId) {
+      // Pequeno delay para garantir que a inserção no banco terminou antes do update
+      const timer = setTimeout(() => {
+        markChannelAsRead(channelId);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [channelId, currentUserId, messages.length]);
 
   useEffect(() => {
     const channel = supabase
