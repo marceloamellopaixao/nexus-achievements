@@ -3,7 +3,6 @@
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 
-// --- INTERFACES DE TIPAGEM ESTRITA ---
 interface SteamGame {
   appid: number;
   name: string;
@@ -31,15 +30,43 @@ interface SteamGlobalPercentage {
 
 const SGDB_KEY = process.env.STEAMGRIDDB_API_KEY;
 
+// ==========================================
+// 1. SISTEMA DE BUSCA SGDB COM LOGS E DIMENSÕES
+// ==========================================
 async function getBackupImage(appId: string, type: 'grids' | 'heroes' | 'logos') {
-  if (!SGDB_KEY) return null;
+  if (!SGDB_KEY) {
+    console.log(`❌ [SGDB] ERRO: Chave STEAMGRIDDB_API_KEY não foi encontrada no ficheiro .env!`);
+    return null;
+  }
+
   try {
-    const response = await fetch(`https://www.steamgriddb.com/api/v2/${type}/steam/${appId}`, {
+    let url = `https://www.steamgriddb.com/api/v2/${type}/steam/${appId}`;
+
+    if (type === 'grids') {
+      url += '?dimensions=600x900'; 
+    } else if (type === 'heroes') {
+      url += '?dimensions=1920x620'; 
+    }
+
+    console.log(`🔎 [SGDB] Procurando ${type} para o jogo ${appId} (Dimensões forçadas)...`);
+
+    const response = await fetch(url, {
       headers: { 'Authorization': `Bearer ${SGDB_KEY}` }
     });
+
     const resData = await response.json();
-    return resData.success && resData.data.length > 0 ? resData.data[0].url : null;
-  } catch { return null; }
+
+    if (resData.success && resData.data && resData.data.length > 0) {
+      console.log(`✅ [SGDB] SUCESSO! ${type} encontrada:`, resData.data[0].url);
+      return resData.data[0].url; 
+    } else {
+      console.log(`⚠️ [SGDB] FALHA para ${appId} (${type}). Motivo:`, JSON.stringify(resData));
+      return null;
+    }
+  } catch (err) {
+    console.error(`🚨 [SGDB] ERRO CRÍTICO no servidor ao contactar SteamGridDB:`, err);
+    return null;
+  }
 }
 
 export async function saveSteamId(steamId: string) {
@@ -52,7 +79,6 @@ export async function saveSteamId(steamId: string) {
   return { success: 'Steam ID vinculada!' }
 }
 
-// 2. BUSCA LISTA DE JOGOS (MELHORADO PARA FAMILY SHARING)
 export async function fetchSteamGamesList() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -65,7 +91,6 @@ export async function fetchSteamGamesList() {
   const steamId = userData.steam_id
 
   try {
-    // Busca jogos próprios + Busca jogos jogados recentemente (captura Family Sharing)
     const [ownedRes, recentRes] = await Promise.all([
       fetch(`http://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key=${STEAM_KEY}&steamid=${steamId}&format=json&include_appinfo=1&include_played_free_games=1`),
       fetch(`http://api.steampowered.com/IPlayerService/GetRecentlyPlayedGames/v0001/?key=${STEAM_KEY}&steamid=${steamId}&format=json`)
@@ -88,7 +113,6 @@ export async function fetchSteamGamesList() {
   } catch { return { error: 'Falha ao buscar dados na Steam.' } }
 }
 
-// 3. PROCESSA UM ÚNICO JOGO (TIPAGEM CORRIGIDA)
 export async function processSingleGame(game: SteamGame, steamId: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -97,6 +121,10 @@ export async function processSingleGame(game: SteamGame, steamId: string) {
   const STEAM_KEY = process.env.STEAM_API_KEY
   const appId = game.appid.toString()
   const steamGameId = `steam-${appId}`
+
+  console.log(`\n===========================================`);
+  console.log(`🎮 PROCESSANDO JOGO: ${game.name} (${appId})`);
+  console.log(`===========================================`);
 
   try {
     const res = await fetch(`http://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v0001/?appid=${appId}&key=${STEAM_KEY}&steamid=${steamId}`)
@@ -111,21 +139,60 @@ export async function processSingleGame(game: SteamGame, steamId: string) {
     const totalCount = achievements.length
     const isPlat = unlockedCount === totalCount && totalCount > 0
 
-    // Upsert do Jogo
+    // ==========================================
+    // LÓGICA DE IMAGENS (SGDB PRIMEIRO)
+    // ==========================================
     let coverUrl = `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${appId}/library_600x900.jpg`;
-
     let bannerUrl = `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${appId}/header.jpg`;
 
-    // Verifica se a imagem da Steam existe (rápido)
-    const checkSteam = await fetch(coverUrl, { method: 'HEAD' });
-    if (!checkSteam.ok) {
-      // Se falhar, tenta SteamGridDB
-      const backupCover = await getBackupImage(appId, 'grids');
-      const backupBanner = await getBackupImage(appId, 'heroes');
-      if (backupCover) coverUrl = backupCover;
-      if (backupBanner) bannerUrl = backupBanner;
+    console.log(`📡 Procurando arte Premium no SteamGridDB primeiro...`);
+    const premiumCover = await getBackupImage(appId, 'grids');
+    const premiumBanner = await getBackupImage(appId, 'heroes');
+
+    if (premiumCover) {
+      console.log(`✅ [SGDB] Capa Premium aplicada!`);
+      coverUrl = premiumCover;
+    } else {
+      console.log(`⚠️ [SGDB] Sem capa Premium. Usando Steam oficial como fallback.`);
     }
-    await supabase.from('games').upsert({ id: steamGameId, title: game.name, cover_url: coverUrl, banner_url: bannerUrl, total_achievements: totalCount }, { onConflict: 'id' })
+
+    if (premiumBanner) {
+      console.log(`✅ [SGDB] Banner Premium aplicado!`);
+      bannerUrl = premiumBanner;
+    } else {
+      console.log(`⚠️ [SGDB] Sem banner Premium. Usando Steam oficial como fallback.`);
+    }
+
+    console.log(`🔗 [FINAL] Capa escolhida: ${coverUrl}`);
+    console.log(`🔗 [FINAL] Banner escolhido: ${bannerUrl}`);
+
+    // 🚀 PUXANDO GÊNEROS OFICIAIS DA LOJA DA STEAM!
+    let gameCategories: string[] = [];
+    try {
+      console.log(`🏷️ Buscando categorias na Loja Steam para ${appId}...`);
+      const storeRes = await fetch(`https://store.steampowered.com/api/appdetails?appids=${appId}&l=portuguese`);
+      if (storeRes.ok) {
+        const storeData = await storeRes.json();
+        if (storeData?.[appId]?.success) {
+          // CORREÇÃO ESLINT: Removido o tipo "any" e tipado explicitamente
+          gameCategories = storeData[appId].data.genres?.map((g: { id: string; description: string }) => g.description) || [];
+          console.log(`✅ [STEAM STORE] Gêneros encontrados:`, gameCategories);
+        }
+      }
+    } catch (error) {
+      // CORREÇÃO ESLINT: Variável "e" alterada para "error" e utilizada no log
+      console.log(`⚠️ Falha ao buscar categorias para o jogo ${appId}.`, error);
+    }
+
+    await supabase.from('games').upsert({
+      id: steamGameId,
+      title: game.name,
+      cover_url: coverUrl,
+      banner_url: bannerUrl,
+      total_achievements: totalCount,
+      platform: 'Steam',
+      categories: gameCategories
+    }, { onConflict: 'id' })
 
     const { data: existingRecord } = await supabase.from('user_games').select('id, unlocked_achievements, is_platinum').eq('user_id', user.id).eq('game_id', steamGameId).maybeSingle()
     const previousUnlocked = existingRecord?.unlocked_achievements || 0
@@ -140,7 +207,6 @@ export async function processSingleGame(game: SteamGame, steamId: string) {
     let newCoins = 0, newPlats = 0;
 
     if (unlockedCount > previousUnlocked) {
-      // Busca Schema e Porcentagens com Tipagem Segura
       const schemaMap = new Map<string, { displayName: string, icon: string }>()
       const schemaRes = await fetch(`http://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?key=${STEAM_KEY}&appid=${appId}`)
       if (schemaRes.ok) {
@@ -187,10 +253,12 @@ export async function processSingleGame(game: SteamGame, steamId: string) {
       }
     }
     return { coins: newCoins, plats: newPlats }
-  } catch { return { coins: 0, plats: 0 } }
+  } catch (err) {
+    console.log(`❌ ERRO GERAL NO JOGO ${game.name}:`, err)
+    return { coins: 0, plats: 0 }
+  }
 }
 
-// 4. AÇÃO PARA SINCRONIZAR JOGO ESPECÍFICO (PARA JOGOS DE FAMÍLIA ANTIGOS)
 export async function syncSpecificGame(appId: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -199,11 +267,10 @@ export async function syncSpecificGame(appId: string) {
   const { data: userData } = await supabase.from('users').select('steam_id').eq('id', user.id).single()
   if (!userData?.steam_id) return { error: 'Vincule sua Steam ID' }
 
-  // Cria um objeto de jogo "falso" para processar
   const fakeGame: SteamGame = { appid: Number(appId), name: "Sincronização Manual", playtime_forever: 1 };
   const result = await processSingleGame(fakeGame, userData.steam_id);
 
-  await finalizeSync(result.coins, result.plats, 0); // O 0 não altera o total de jogos
+  await finalizeSync(result.coins, result.plats, 0);
   return { success: true, message: `Processado: +${result.coins} moedas e ${result.plats} platinas!` }
 }
 
