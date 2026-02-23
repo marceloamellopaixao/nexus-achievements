@@ -6,6 +6,8 @@ import { toast } from "react-toastify";
 import { createClient } from "@/utils/supabase/client";
 import { FaPlaystation, FaSteam, FaXbox } from "react-icons/fa";
 import { SiEpicgames } from "react-icons/si";
+import { BiSolidCoinStack } from "react-icons/bi";
+import { FiLoader } from "react-icons/fi";
 
 export default function IntegrationsPage() {
   const [steamId, setSteamId] = useState("");
@@ -97,7 +99,7 @@ export default function IntegrationsPage() {
     <div className="space-y-8 animate-in fade-in duration-500 max-w-5xl mx-auto pb-10">
 
       {/* CABEÇALHO */}
-      <div className="py-8 border-b border-border flex flex-col items-center text-center">
+      <div className="py-2 border-b border-border flex flex-col items-center text-center">
         <span className="text-5xl drop-shadow-[0_0_15px_rgba(59,130,246,0.3)] mb-4 block">🔗</span>
         <h2 className="text-4xl md:text-5xl font-black text-white tracking-tight">Centro de Integrações</h2>
         <p className="text-gray-400 mt-2 max-w-lg">
@@ -118,11 +120,14 @@ export default function IntegrationsPage() {
           <div className="flex-1 space-y-6 z-10 w-full">
             <div>
               <h3 className="text-2xl font-black text-white">Steam</h3>
-              <p className="text-sm text-gray-400 mt-2 leading-relaxed">
-                Vincule sua <strong>Steam ID64</strong> para importar automaticamente todos os seus jogos e conquistas.
-                Cada conquista desbloqueada será convertida em <span className="text-yellow-500 font-bold">🪙 Nexus Coins</span>.
+              <p className="text-sm text-gray-400 mt-2 max-w-xl leading-relaxed">
+                Vincule a sua <strong>Steam ID64</strong> para importar automaticamente todos os seus jogos e conquistas.
+                Cada conquista desbloqueada será convertida em 
+                <span className="text-yellow-500 font-bold inline-flex items-center gap-1 ml-1 align-text-bottom">
+                  <BiSolidCoinStack className="text-lg" /> Nexus Coins
+                </span>.
               </p>
-              <div className="mt-2 text-xs font-bold text-yellow-500/80 bg-yellow-500/10 inline-block px-3 py-1 rounded-md border border-yellow-500/20">
+              <div className="mt-3 text-xs font-bold text-yellow-500/80 bg-yellow-500/10 inline-block px-3 py-1.5 rounded-md border border-yellow-500/20 shadow-inner">
                 ⚠️ O seu perfil e os detalhes dos jogos na Steam precisam estar &quot;Públicos&quot;.
               </div>
             </div>
@@ -144,7 +149,7 @@ export default function IntegrationsPage() {
                   : 'bg-white text-black hover:bg-gray-200'
                   } disabled:opacity-50`}
               >
-                {loadingSave ? 'A processar...' : savedSteamId ? 'Atualizar ID' : 'Vincular Conta'}
+                {loadingSave ? 'Processando...' : savedSteamId ? 'Atualizar ID' : 'Vincular Conta'}
               </button>
             </form>
 
@@ -158,29 +163,35 @@ export default function IntegrationsPage() {
                   <button
                     onClick={handleSync}
                     disabled={loadingSync}
-                    className="w-full sm:w-auto px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-sm transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                    className="w-full sm:w-auto px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-sm transition-all shadow-[0_0_15px_rgba(37,99,235,0.4)] hover:shadow-[0_0_20px_rgba(37,99,235,0.6)] disabled:opacity-50 disabled:grayscale flex items-center justify-center gap-2 active:scale-95"
                   >
-                    <span className={`text-lg ${loadingSync ? 'animate-spin' : ''}`}>🔄</span>
-                    {loadingSync ? 'A Sincronizar...' : 'Sincronizar Todos os Jogos'}
+                    <span className={`text-lg ${loadingSync ? 'animate-spin' : ''}`}><FiLoader /></span>
+                    {loadingSync ? 'Sincronizando...' : 'Sincronizar Todos os Jogos'}
                   </button>
                 </div>
 
                 {/* BARRA DE PROGRESSO VISUAL */}
                 {loadingSync && (
-                  <div className="bg-background/80 p-4 rounded-xl border border-border">
-                    <div className="flex justify-between text-xs font-bold mb-2 text-gray-400">
-                      <span>{syncMessage}</span>
-                      <span>{Math.round(syncProgress)}%</span>
+                  <div className="bg-background/80 backdrop-blur-sm p-5 rounded-2xl border border-border shadow-inner mt-2 animate-in slide-in-from-top-2">
+                    <div className="flex justify-between text-xs font-bold mb-3 text-gray-400">
+                      <span className="truncate pr-4">{syncMessage}</span>
+                      <span className="text-blue-400 shrink-0">{Math.round(syncProgress)}%</span>
                     </div>
-                    <div className="w-full bg-surface rounded-full h-2.5 overflow-hidden">
+                    <div className="w-full bg-surface rounded-full h-3 overflow-hidden border border-white/5">
                       <div
-                        className="bg-linear-to-r from-blue-500 to-purple-500 h-2.5 rounded-full transition-all duration-300"
+                        className="bg-linear-to-r from-blue-600 via-blue-400 to-purple-500 h-full rounded-full transition-all duration-300 relative"
                         style={{ width: `${syncProgress}%` }}
-                      ></div>
+                      >
+                         <div className="absolute top-0 left-0 w-full h-full bg-white/20 animate-[shimmer_2s_infinite]"></div>
+                      </div>
                     </div>
-                    <div className="flex justify-between mt-3 text-sm font-black">
-                      <span className="text-yellow-500">🪙 +{syncStats.coins} Nexus Coins</span>
-                      <span className="text-blue-400">🏆 +{syncStats.plats} Platinas</span>
+                    <div className="flex justify-between mt-4 text-sm font-black border-t border-white/5 pt-3">
+                      <span className="text-yellow-500 flex items-center gap-1.5">
+                        <BiSolidCoinStack className="text-lg" /> +{syncStats.coins} <span className="hidden sm:inline">Nexus Coins</span>
+                      </span>
+                      <span className="text-blue-400 flex items-center gap-1.5">
+                        <span className="text-lg">🏆</span> +{syncStats.plats} <span className="hidden sm:inline">Platinas</span>
+                      </span>
                     </div>
                   </div>
                 )}
@@ -198,15 +209,15 @@ export default function IntegrationsPage() {
             <div key={index} className="bg-surface/30 border border-border rounded-3xl p-6 relative overflow-hidden group cursor-not-allowed">
               <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px] z-20 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                 <span className="text-3xl mb-2 drop-shadow-lg">🔒</span>
-                <span className="text-sm font-bold text-white uppercase tracking-wider bg-black/50 px-3 py-1 rounded-full">Em Breve</span>
+                <span className="text-sm font-bold text-white uppercase tracking-wider bg-black/50 px-3 py-1 rounded-full border border-white/10">Em Breve</span>
               </div>
 
-              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl mb-4 border ${integration.borderColor} bg-linear-to-br ${integration.color} opacity-50 grayscale group-hover:grayscale-0 transition-all`}>
+              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl mb-4 border ${integration.borderColor} bg-linear-to-br ${integration.color} opacity-50 grayscale group-hover:grayscale-0 transition-all shadow-inner`}>
                 {integration.icon}
               </div>
 
               <h4 className="text-lg font-bold text-gray-400 group-hover:text-white transition-colors">{integration.name}</h4>
-              <p className="text-xs text-gray-500 mt-2">Sincronização automática de troféus e perfil.</p>
+              <p className="text-xs text-gray-500 mt-2 leading-relaxed">Sincronização automática de troféus e expansão do seu perfil.</p>
             </div>
           ))}
         </div>
