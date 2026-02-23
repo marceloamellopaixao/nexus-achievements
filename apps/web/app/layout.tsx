@@ -8,14 +8,21 @@ import { DesktopNavLinks, MobileNavLinks } from "./components/NavLinks";
 import NotificationBell from "./components/NotificationBell";
 import HeaderTitle from "./components/HeaderTitle";
 import AnnouncementBanner from "./components/AnnouncementBanner";
-import OnlineUsers from "./components/OnlineUsers"; // IMPORTAÇÃO DO RADAR
+import OnlineUsers from "./components/OnlineUsers";
+import { RiAdminFill } from "react-icons/ri";
+import { CgProfile } from "react-icons/cg";
+import { FaShop } from "react-icons/fa6";
+import { IoChatbubbleEllipses, IoGameController, IoSettings } from "react-icons/io5";
+import { FaTrophy } from "react-icons/fa";
+import { TbWorld } from "react-icons/tb";
+import { BiSolidCoinStack } from "react-icons/bi";
+import CustomCursor from "./components/CustomCursor";
 
 export const metadata: Metadata = {
   title: 'Nexus Achievements | Sua Jornada Gamer',
   description: 'A plataforma definitiva para caçadores de conquistas da Steam.',
 };
 
-// Adicionado o 'id' na interface
 interface UserData {
   id: string;
   username: string;
@@ -32,11 +39,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   let totalUnreadDMs = 0;
 
   if (user) {
-    // IMPORTANTE: Adicionado o 'id' no select para o Radar funcionar
     const { data } = await supabase.from("users").select("id, username, avatar_url, nexus_coins, role").eq("id", user.id).maybeSingle();
     if (data) userData = data as UserData;
 
-    // BUSCA TOTAL DE MENSAGENS NÃO LIDAS NAS DMs
     const { count } = await supabase
       .from('chat_messages')
       .select('*', { count: 'exact', head: true })
@@ -49,38 +54,42 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   const { data: announcement } = await supabase.from('system_announcements').select('*').eq('is_active', true).maybeSingle();
 
-  // ALTERADO: De /social para /social e renomeado para "Comunidade"
   const navLinks = [
-    { href: "/social", icon: "🌍", label: "Comunidade", mobile: true },
-    { href: "/games", icon: "🎮", label: "Jogos", mobile: true },
-    { href: "/leaderboards", icon: "🏆", label: "Hall da Fama", mobile: true },
-    { href: "/chat", icon: "💬", label: totalUnreadDMs > 0 ? `Taverna (${totalUnreadDMs})` : "Taverna", mobile: true },
-    { href: userData?.username ? `/profile/${userData.username}` : "/login", icon: "👤", label: "Meu Perfil", mobile: true },
-    { href: "/shop", icon: "🛒", label: "Loja", mobile: true },
-    { href: "/integrations", icon: "⚙️", label: "Integrações", mobile: true },
+    { href: "/social", icon: <TbWorld />, label: "Comunidade", mobile: true },
+    { href: "/games", icon: <IoGameController />, label: "Jogos", mobile: true },
+    { href: "/leaderboards", icon: <FaTrophy />, label: "Hall da Fama", mobile: true },
+    { href: "/chat", icon: <IoChatbubbleEllipses />, label: totalUnreadDMs > 0 ? `Chat (${totalUnreadDMs})` : "Chat", mobile: true },
+    { href: userData?.username ? `/profile/${userData.username}` : "/login", icon: <CgProfile />, label: "Meu Perfil", mobile: true },
+    { href: "/shop", icon: <FaShop />, label: "Loja", mobile: true },
+    { href: "/integrations", icon: <IoSettings />, label: "Integrações", mobile: true },
   ];
 
   if (userData?.role === 'admin') {
-    navLinks.push({ href: "/admin", icon: "🛡️", label: "Painel Admin", mobile: true });
+    navLinks.push({ href: "/admin", icon: <RiAdminFill />, label: "Painel Admin", mobile: true });
   }
 
   return (
     <html lang="pt-BR" className="dark">
       <body className="antialiased flex h-screen overflow-hidden bg-background text-foreground">
+        {/* COMPONENTE DO CURSOR */}
+        <CustomCursor />
+        
+        {/* DESKTOP SIDEBAR (Esquerda) */}
+        <aside className="w-64 xl:w-72 border-r border-border/50 bg-surface/30 backdrop-blur-xl hidden lg:flex flex-col z-50 shrink-0">
 
-        {/* DESKTOP SIDEBAR (Esquerda - Menu de Navegação) */}
-        <aside className="w-64 xl:w-72 border-r border-border/50 bg-surface/30 backdrop-blur-xl hidden md:flex flex-col z-50 shrink-0">
-          <div className="h-20 flex items-center px-8 border-b border-border/50">
+          <div className="h-20 flex items-center px-8 border-b border-border/50 shrink-0">
             <Link href="/social" className="flex items-center gap-2 group text-2xl font-black text-transparent bg-clip-text bg-linear-to-r from-primary to-purple-500 italic tracking-tighter">
               NEXUS
             </Link>
           </div>
+
           <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto custom-scrollbar">
             <p className="px-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 mt-4">Menu Principal</p>
             <DesktopNavLinks links={navLinks} />
           </nav>
+
           {userData && (
-            <div className="p-4 border-t border-border/50 bg-background/20 m-4 rounded-2xl">
+            <div className="p-4 border-t border-border/50 bg-background/20 m-4 rounded-2xl shrink-0">
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-10 h-10 rounded-full bg-surface border border-primary overflow-hidden shrink-0 relative">
                   {userData.avatar_url ? (
@@ -120,7 +129,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 <>
                   <NotificationBell />
                   <div className="flex items-center gap-2 bg-yellow-500/10 px-3 py-1.5 rounded-full border border-yellow-500/30">
-                    <span className="text-yellow-500 text-sm">🪙</span>
+                    <span className="text-yellow-500 text-sm"><BiSolidCoinStack /></span>
                     <span className="text-sm font-black text-yellow-500">{userData.nexus_coins.toLocaleString()}</span>
                   </div>
                 </>
@@ -128,36 +137,34 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             </div>
           </header>
 
-          <main className="flex-1 overflow-y-auto bg-background/50 p-4 md:p-8 pb-24 md:pb-8 custom-scrollbar">
+          <main className="flex-1 overflow-y-auto bg-background/50 p-4 md:p-6 pb-20 md:pb-6 custom-scrollbar flex flex-col relative">
             <ToastContainer theme="dark" position="bottom-right" />
 
-            <div className="max-w-5xl mx-auto w-full">
-              {/* O seu conteúdo central fica todo aqui! Limpei a div do Radar daqui de dentro */}
+            <div className="max-w-5xl mx-auto w-full flex-1 h-full flex flex-col relative">
               {children}
             </div>
           </main>
 
+          {/* Alterado para lg:hidden para cobrir tablets e telas menores com o App Menu */}
           {userData && (
-            <nav className="md:hidden fixed bottom-0 inset-x-0 h-16 bg-surface/90 backdrop-blur-2xl border-t border-border/50 flex items-center justify-around z-50 pb-safe">
+            <nav className="lg:hidden fixed bottom-0 inset-x-0 h-16 bg-surface/90 backdrop-blur-2xl border-t border-border/50 flex items-center justify-around z-50 pb-safe">
               <MobileNavLinks links={navLinks} />
             </nav>
           )}
         </div>
 
-        {/* DESKTOP SIDEBAR (Direita - Radar de Caçadores Online) */}
+        {/* DESKTOP SIDEBAR DIREITA */}
         {userData && (
-          <aside className="w-64 border-l border-border/50 bg-surface/30 backdrop-blur-xl hidden lg:flex flex-col z-40 shrink-0">
-            <OnlineUsers
-              currentUser={{
-                user_id: userData.id,
-                username: userData.username,
-                avatar_url: userData.avatar_url
-              }}
-            />
-          </aside>
+          <OnlineUsers
+            currentUser={{
+              user_id: userData.id,
+              username: userData.username,
+              avatar_url: userData.avatar_url
+            }}
+          />
         )}
 
       </body>
-    </html>
+    </html >
   );
 }
