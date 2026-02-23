@@ -3,10 +3,11 @@ import ChatClient from "../ChatClient";
 import { notFound, redirect } from "next/navigation";
 import Image from "next/image";
 import { Metadata } from "next";
+import { FaUser } from "react-icons/fa";
 
 export const metadata: Metadata = {
   title: "Mensagem Direta | Nexus Achievements",
-  description: "Converse em privado com outros membros da comunidade do Nexus Achievements. Envie mensagens diretas para compartilhar dicas, conquistas e socializar de forma mais íntima enquanto explora o mundo dos games.",
+  description: "Converse em privado com outros membros da comunidade do Nexus Achievements.",
 }
 
 interface ChatUser {
@@ -40,7 +41,6 @@ export default async function DirectMessagePage({ params }: DmPageProps) {
     .single();
 
   if (!targetUser) notFound();
-
   if (targetUser.id === user.id) redirect('/chat');
 
   const sortedIds = [user.id, targetUser.id].sort();
@@ -55,7 +55,6 @@ export default async function DirectMessagePage({ params }: DmPageProps) {
 
   const initialMessages = ((messagesData as unknown as RawChatMessage[]) || []).map(m => {
     const userData = Array.isArray(m.users) ? m.users[0] : m.users;
-    
     return {
       id: m.id,
       content: m.content,
@@ -65,18 +64,11 @@ export default async function DirectMessagePage({ params }: DmPageProps) {
     };
   }).reverse();
 
-  // Ícone customizado
   const chatIcon = targetUser.avatar_url ? (
     <div className="relative w-8 h-8 shrink-0 overflow-hidden rounded-full border border-border">
-      <Image 
-        src={targetUser.avatar_url} 
-        alt={targetUser.username} 
-        fill 
-        className="object-cover" 
-        unoptimized 
-      />
+      <Image src={targetUser.avatar_url} alt={targetUser.username} fill className="object-cover" unoptimized />
     </div>
-  ) : '💬';
+  ) : <FaUser className="text-primary" />;
 
   return (
     <ChatClient 
