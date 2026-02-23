@@ -34,9 +34,12 @@ export default function AdminClientPage() {
 
     // Handlers
     async function handleDistribute() {
+        if(!coinAmount || Number(coinAmount) <= 0) return;
+        
         setLoading(true)
         const res = await distributeCoinsToAll(Number(coinAmount))
-        if (res.success) toast.success(res.success); setCoinAmount('')
+        if (res.success) toast.success(res.success); 
+        setCoinAmount('')
         setLoading(false)
     }
 
@@ -49,132 +52,171 @@ export default function AdminClientPage() {
     }
 
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
 
-            {/* FORMULÁRIO DE CRIAÇÃO */}
-            <div className="bg-surface/40 border border-border p-8 rounded-[2.5rem] shadow-2xl space-y-6">
-                <h2 className="text-xl font-black text-white flex items-center gap-3">
-                    <span>✨</span> Novo Item na Vitrine
-                </h2>
+            {/* COLUNA ESQUERDA: CRIAÇÃO DE ITENS (Ocupa 7 colunas) */}
+            <div className="xl:col-span-7 bg-surface/40 border border-border p-8 md:p-10 rounded-[3rem] shadow-2xl space-y-8 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 blur-[80px] rounded-full pointer-events-none"></div>
+                
+                <div>
+                    <h2 className="text-2xl font-black text-white flex items-center gap-3">
+                        <span className="bg-primary/20 text-primary p-3 rounded-2xl">✨</span> 
+                        Novo Item na Vitrine
+                    </h2>
+                    <p className="text-gray-400 text-sm mt-2 font-medium">Adicione cosméticos épicos para os caçadores gastarem as suas moedas.</p>
+                </div>
 
-                <form onSubmit={handleAddItem} className="space-y-4">
+                <form onSubmit={handleAddItem} className="space-y-6 relative z-10">
                     <div>
-                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Nome do Item</label>
+                        <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest ml-2 mb-2 block">Nome do Item</label>
                         <input
                             type="text" required placeholder="Ex: Galáxia Carmesim"
-                            className="w-full bg-background border border-border rounded-xl px-4 py-3 text-white focus:border-primary outline-none"
+                            className="w-full bg-background/50 border border-white/5 rounded-2xl px-5 py-4 text-white placeholder:text-gray-600 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
                             value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })}
                         />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                            <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Preço (Moedas)</label>
-                            <input
-                                type="number" required placeholder="500"
-                                className="w-full bg-background border border-border rounded-xl px-4 py-3 text-white focus:border-primary outline-none"
-                                value={formData.price} onChange={e => setFormData({ ...formData, price: e.target.value })}
-                            />
+                            <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest ml-2 mb-2 block">Preço (Moedas)</label>
+                            <div className="relative">
+                                <span className="absolute inset-y-0 left-0 pl-5 flex items-center text-yellow-500 text-lg">🪙</span>
+                                <input
+                                    type="number" required placeholder="500"
+                                    className="w-full bg-background/50 border border-white/5 rounded-2xl pl-12 pr-5 py-4 text-white placeholder:text-gray-600 focus:border-yellow-500 focus:ring-1 focus:ring-yellow-500 outline-none transition-all font-mono"
+                                    value={formData.price} onChange={e => setFormData({ ...formData, price: e.target.value })}
+                                />
+                            </div>
                         </div>
                         <div>
-                            <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Raridade</label>
+                            <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest ml-2 mb-2 block">Raridade</label>
                             <select
-                                className="w-full bg-background border border-border rounded-xl px-4 py-3 text-white focus:border-primary outline-none"
+                                className="w-full bg-background/50 border border-white/5 rounded-2xl px-5 py-4 text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all appearance-none"
                                 value={formData.rarity} onChange={e => setFormData({ ...formData, rarity: e.target.value })}
                             >
-                                <option value="comum">Comum</option>
-                                <option value="raro">Raro</option>
-                                <option value="epico">Épico</option>
-                                <option value="lendario">Lendário</option>
+                                <option value="comum">⚪ Comum</option>
+                                <option value="raro">🔵 Raro</option>
+                                <option value="epico">🟣 Épico</option>
+                                <option value="lendario">🟡 Lendário</option>
                             </select>
                         </div>
                     </div>
 
                     <div>
-                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Categoria</label>
+                        <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest ml-2 mb-2 block">Categoria</label>
                         <select
-                            className="w-full bg-background border border-border rounded-xl px-4 py-3 text-white focus:border-primary outline-none"
+                            className="w-full bg-background/50 border border-white/5 rounded-2xl px-5 py-4 text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all appearance-none"
                             value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })}
                         >
-                            <option value="Fundos Animados">Fundo Animado</option>
-                            <option value="Molduras de Avatar">Moldura de Avatar</option>
-                            <option value="Títulos Exclusivos">Título Exclusivo</option>
+                            <option value="Fundos Animados">🖼️ Fundo Animado</option>
+                            <option value="Molduras de Avatar">⭕ Moldura de Avatar</option>
+                            <option value="Títulos Exclusivos">🏷️ Título Exclusivo</option>
                         </select>
                     </div>
 
                     <div>
-                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Estilo CSS (Gradient/Border)</label>
+                        <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest ml-2 mb-2 flex items-center justify-between">
+                            <span>Estilo CSS (Gradient/Border)</span>
+                            <span className="text-[9px] text-primary/70 font-mono normal-case">background: linear-gradient(...)</span>
+                        </label>
                         <textarea
-                            required placeholder="linear-gradient(...)"
-                            className="w-full bg-background border border-border rounded-xl px-4 py-3 text-white focus:border-primary outline-none h-24 font-mono text-xs"
+                            required placeholder="linear-gradient(to right, #ff0000, #0000ff)"
+                            className="w-full bg-background/50 border border-white/5 rounded-2xl px-5 py-4 text-white placeholder:text-gray-600 focus:border-primary focus:ring-1 focus:ring-primary outline-none h-32 font-mono text-sm resize-none custom-scrollbar transition-all"
                             value={formData.style} onChange={e => setFormData({ ...formData, style: e.target.value })}
                         />
                     </div>
 
                     <button
                         type="submit" disabled={loading}
-                        className="w-full py-4 bg-primary hover:bg-blue-600 text-white font-black rounded-2xl transition-all shadow-lg active:scale-95 disabled:opacity-50"
+                        className="w-full py-5 bg-primary hover:bg-blue-500 text-white font-black text-sm uppercase tracking-widest rounded-2xl transition-all shadow-[0_0_20px_rgba(59,130,246,0.3)] hover:shadow-[0_0_30px_rgba(59,130,246,0.5)] active:scale-95 disabled:opacity-50 disabled:grayscale mt-4"
                     >
-                        Adicionar à Loja
+                        {loading ? 'A processar...' : 'Adicionar à Loja'}
                     </button>
                 </form>
             </div>
 
-            {/* 📢 BROADCAST & EVENTOS */}
-            <div className="bg-surface/40 border border-border p-8 rounded-[2.5rem] shadow-2xl space-y-6">
-                <h2 className="text-xl font-black text-white flex items-center gap-3"><span>📢</span> Broadcast Global</h2>
-                <form onSubmit={handleBroadcast} className="space-y-4">
-                    <textarea
-                        placeholder="Mensagem para todos os usuários (deixe vazio para remover)..."
-                        className="w-full bg-background border border-border rounded-2xl px-4 py-4 text-white outline-none h-28 italic"
-                        value={announcement.message} onChange={e => setAnnouncement({ ...announcement, message: e.target.value })}
-                    />
-                    <div className="flex gap-4">
-                        <select
-                            className="flex-1 bg-background border border-border rounded-xl px-4 py-2 text-white"
-                            value={announcement.type} onChange={e => setAnnouncement({ ...announcement, type: e.target.value })}
-                        >
-                            <option value="info">ℹ️ Informação</option>
-                            <option value="event">🔥 Evento Especial</option>
-                            <option value="warning">⚠️ Manutenção</option>
-                        </select>
-                        <button className="px-8 py-3 bg-white text-black font-black rounded-xl hover:scale-105 transition-all">Publicar</button>
-                    </div>
-                </form>
-            </div>
-
-            {/* 💰 BANCO CENTRAL */}
-            <div className="bg-surface/40 border border-border p-8 rounded-[2.5rem] shadow-2xl space-y-6">
-                <h2 className="text-xl font-black text-white flex items-center gap-3"><span>🏦</span> Banco Central do Nexus</h2>
-                <div className="p-6 bg-yellow-500/5 border border-yellow-500/20 rounded-3xl space-y-4">
-                    <p className="text-xs text-gray-400 font-medium italic text-center">Injete Nexus Coins na economia para celebrar marcos da comunidade.</p>
-                    <div className="flex gap-3">
-                        <input
-                            type="number" placeholder="Quantia de moedas"
-                            className="flex-1 bg-background border border-border rounded-xl px-4 py-3 text-white text-center font-mono"
-                            value={coinAmount} onChange={e => setCoinAmount(e.target.value)}
+            {/* COLUNA DIREITA: FERRAMENTAS DE GESTÃO (Ocupa 5 colunas) */}
+            <div className="xl:col-span-5 space-y-8">
+                
+                {/* 📢 BROADCAST & EVENTOS */}
+                <div className="bg-surface/40 border border-border p-8 rounded-[3rem] shadow-xl">
+                    <h2 className="text-xl font-black text-white flex items-center gap-3 mb-6">
+                        <span className="bg-blue-500/20 text-blue-400 p-2.5 rounded-xl">📢</span> 
+                        Broadcast Global
+                    </h2>
+                    <form onSubmit={handleBroadcast} className="space-y-4">
+                        <textarea
+                            placeholder="Mensagem para todos os usuários (deixe vazio para remover)..."
+                            className="w-full bg-background/50 border border-white/5 rounded-2xl px-5 py-4 text-white placeholder:text-gray-600 outline-none h-28 italic focus:border-blue-500 transition-all resize-none text-sm"
+                            value={announcement.message} onChange={e => setAnnouncement({ ...announcement, message: e.target.value })}
                         />
+                        <div className="flex flex-col sm:flex-row gap-3">
+                            <select
+                                className="flex-1 bg-background/50 border border-white/5 rounded-xl px-4 py-3 text-sm text-white focus:border-blue-500 outline-none appearance-none"
+                                value={announcement.type} onChange={e => setAnnouncement({ ...announcement, type: e.target.value })}
+                            >
+                                <option value="info">ℹ️ Informação</option>
+                                <option value="event">🔥 Evento Especial</option>
+                                <option value="warning">⚠️ Manutenção</option>
+                            </select>
+                            <button disabled={loading} className="px-8 py-3 bg-white text-black font-black text-sm rounded-xl hover:bg-gray-200 transition-all active:scale-95 disabled:opacity-50 whitespace-nowrap">
+                                Publicar
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                {/* 💰 BANCO CENTRAL */}
+                <div className="bg-surface/40 border border-border p-8 rounded-[3rem] shadow-xl relative overflow-hidden group">
+                    <div className="absolute -right-10 -bottom-10 text-9xl opacity-5 group-hover:opacity-10 transition-opacity rotate-12 pointer-events-none">🪙</div>
+                    <h2 className="text-xl font-black text-white flex items-center gap-3 mb-2 relative z-10">
+                        <span className="bg-yellow-500/20 text-yellow-500 p-2.5 rounded-xl">🏦</span> 
+                        Banco Central
+                    </h2>
+                    <p className="text-xs text-gray-400 font-medium leading-relaxed mb-6 relative z-10">
+                        Injete moedas diretamente na carteira de todos os jogadores para celebrar marcos.
+                    </p>
+                    
+                    <div className="flex flex-col gap-3 relative z-10">
+                        <div className="relative">
+                            <span className="absolute inset-y-0 left-0 pl-5 flex items-center text-yellow-500 font-bold">🪙</span>
+                            <input
+                                type="number" placeholder="Quantia de moedas"
+                                className="w-full bg-background/80 border border-yellow-500/20 rounded-2xl pl-12 pr-5 py-4 text-white font-mono focus:border-yellow-500 focus:ring-1 focus:ring-yellow-500 outline-none transition-all"
+                                value={coinAmount} onChange={e => setCoinAmount(e.target.value)}
+                            />
+                        </div>
                         <button
-                            onClick={handleDistribute} disabled={loading}
-                            className="px-6 bg-yellow-500 text-black font-black rounded-xl hover:bg-yellow-400 transition-all disabled:opacity-50"
+                            onClick={handleDistribute} disabled={loading || !coinAmount}
+                            className="w-full py-4 bg-linear-to-r from-yellow-600 to-yellow-500 text-black font-black text-sm uppercase tracking-widest rounded-2xl hover:from-yellow-500 hover:to-yellow-400 transition-all shadow-[0_0_15px_rgba(234,179,8,0.2)] active:scale-95 disabled:opacity-50 disabled:grayscale"
                         >
-                            Distribuir a Todos
+                            Distribuir Fortuna
                         </button>
                     </div>
                 </div>
-            </div>
 
-            {/* ZONA DE PERIGO & RESET (Lado Esquerdo Inferior) */}
-            <div className="bg-red-500/5 border border-red-500/20 p-8 rounded-[2.5rem] space-y-4">
-                <h3 className="text-red-500 font-black text-sm uppercase tracking-widest">Danger Zone</h3>
-                <button
-                    onClick={() => performGlobalReset()}
-                    className="w-full py-4 border-2 border-red-500/30 text-red-500 rounded-2xl font-black hover:bg-red-500 hover:text-white transition-all"
-                >
-                    RESET TOTAL DO SISTEMA
-                </button>
-            </div>
+                {/* ZONA DE PERIGO & RESET */}
+                <div className="bg-red-500/5 border border-red-500/20 p-8 rounded-[3rem] relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-red-600 to-red-400"></div>
+                    <h3 className="text-red-500 font-black text-sm flex items-center gap-2 mb-4">
+                        <span className="text-xl">⚠️</span> DANGER ZONE
+                    </h3>
+                    <p className="text-xs text-red-400/70 font-medium mb-6">
+                        Ações destrutivas não podem ser desfeitas. Prossiga com extrema cautela.
+                    </p>
+                    <button
+                        onClick={async () => {
+                            if(confirm("Tem certeza ABSOLUTA? Isso apagará dados vitais do sistema.")) {
+                                await performGlobalReset();
+                            }
+                        }}
+                        className="w-full py-4 bg-red-500/10 border border-red-500/30 text-red-500 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-red-500 hover:text-white hover:shadow-[0_0_20px_rgba(239,68,68,0.4)] transition-all active:scale-95"
+                    >
+                        Reset Total do Sistema
+                    </button>
+                </div>
 
+            </div>
         </div>
     )
 }
