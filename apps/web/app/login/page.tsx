@@ -4,6 +4,8 @@ import { createClient } from "@/utils/supabase/client";
 import { useState } from "react";
 import Link from "next/link";
 import Head from "next/head";
+import { FcGoogle } from "react-icons/fc";
+import { FaDiscord } from "react-icons/fa";
 
 export default function LoginPage() {
   const [loading, setLoading] = useState<string | null>(null);
@@ -45,7 +47,7 @@ export default function LoginPage() {
               disabled={loading !== null}
               className="w-full flex items-center justify-center gap-3 py-3.5 px-4 rounded-xl shadow-lg text-sm font-bold text-white bg-[#5865F2] hover:bg-[#4752C4] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#5865F2] disabled:opacity-50 transition-all group"
             >
-              <span className="text-xl group-hover:scale-110 transition-transform">👾</span>
+              <span className="text-xl group-hover:scale-110 transition-transform"><FaDiscord /></span>
               {loading === 'discord' ? 'A conectar...' : 'Continuar com Discord'}
             </button>
 
@@ -54,7 +56,7 @@ export default function LoginPage() {
               disabled={loading !== null}
               className="w-full flex items-center justify-center gap-3 py-3.5 px-4 rounded-xl shadow-lg text-sm font-bold text-gray-900 bg-white hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-white disabled:opacity-50 transition-all group"
             >
-              <span className="text-xl group-hover:scale-110 transition-transform">G</span>
+              <span className="text-xl group-hover:scale-110 transition-transform"><FcGoogle /></span>
               {loading === 'google' ? 'A conectar...' : 'Continuar com Google'}
             </button>
           </div>
