@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import AutoSync from "../components/AutoSync";
 import Trophy from "../components/Trophy";
-import { FaSteam } from "react-icons/fa";
+import { FaArrowRight, FaSteam } from "react-icons/fa";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -22,6 +22,7 @@ type GlobalActivity = {
 
 export default async function SocialPage({ searchParams }: SocialPageProps) {
   const { feed } = await searchParams;
+  const currentPath = `/social`;
   const activeFeed = feed === 'following' ? 'following' : 'global';
 
   const supabase = await createClient();
@@ -49,7 +50,7 @@ export default async function SocialPage({ searchParams }: SocialPageProps) {
 
   type ActivityUser = { username: string; avatar_url: string | null; };
   type GameData = { banner_url: string | null; cover_url: string | null; };
-  
+
   const groupedActivities: {
     key: string; user: ActivityUser; game_id: string | null; game_name: string; game: GameData | null; platform: string; date: string; achievements: GlobalActivity[]; hasPlatinum: boolean;
   }[] = [];
@@ -63,7 +64,7 @@ export default async function SocialPage({ searchParams }: SocialPageProps) {
     const groupKey = `${activity.user_id}-${activity.game_name}-${dateStr}`;
 
     let group = groupedActivities.find(g => g.key === groupKey);
-    
+
     if (!group) {
       group = {
         key: groupKey,
@@ -80,10 +81,10 @@ export default async function SocialPage({ searchParams }: SocialPageProps) {
     }
 
     if (activity.achievement_name.includes('PLATINOU')) {
-        group.hasPlatinum = true;
-        group.achievements.unshift(activity);
+      group.hasPlatinum = true;
+      group.achievements.unshift(activity);
     } else {
-        group.achievements.push(activity);
+      group.achievements.push(activity);
     }
   });
 
@@ -121,7 +122,7 @@ export default async function SocialPage({ searchParams }: SocialPageProps) {
           <div className="bg-surface/20 border border-border border-dashed rounded-3xl p-12 text-center">
             <span className="text-4xl opacity-50 mb-3 block">👥</span>
             <p className="text-gray-400 font-medium">O seu feed pessoal está vazio.</p>
-            <Link href="/leaderboards" className="mt-4 inline-block text-primary hover:text-blue-400 font-bold text-sm">Explorar Hall da Fama →</Link>
+            <Link href="/leaderboards" className="mt-4 inline-block text-primary hover:text-blue-400 font-bold text-sm">Explorar Hall da Fama <FaArrowRight /></Link>
           </div>
         ) : groupedActivities.length === 0 ? (
           <div className="bg-surface/20 border border-border border-dashed rounded-3xl p-12 text-center">
@@ -131,12 +132,11 @@ export default async function SocialPage({ searchParams }: SocialPageProps) {
         ) : (
           <div className="flex flex-col gap-8">
             {groupedActivities.map((group) => (
-              <div key={group.key} className={`relative flex flex-col rounded-3xl border transition-all duration-300 overflow-hidden shadow-lg ${
-                group.hasPlatinum 
-                ? 'bg-linear-to-b from-[#0f172a] to-[#0a0a0a] border-cyan-500/40 shadow-[0_0_30px_rgba(6,182,212,0.15)]' 
+              <div key={group.key} className={`relative flex flex-col rounded-3xl border transition-all duration-300 overflow-hidden shadow-lg ${group.hasPlatinum
+                ? 'bg-linear-to-b from-[#0f172a] to-[#0a0a0a] border-cyan-500/40 shadow-[0_0_30px_rgba(6,182,212,0.15)]'
                 : 'bg-[#12141a] border-white/5 hover:border-white/10'
-              }`}>
-                
+                }`}>
+
                 <div className="relative p-5 md:p-6 border-b border-white/5 flex items-center justify-between z-10 overflow-hidden min-h-30">
                   {group.game?.banner_url && (
                     <div className="absolute inset-0 z-0">
@@ -149,16 +149,20 @@ export default async function SocialPage({ searchParams }: SocialPageProps) {
                     <Link href={`/profile/${group.user.username}`} className="relative shrink-0">
                       <div className={`w-14 h-14 rounded-full overflow-hidden border-2 shadow-lg ${group.hasPlatinum ? 'border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.5)]' : 'border-border/80'}`}>
                         {group.user.avatar_url ? (
-                          <Image src={group.user.avatar_url} alt={group.user.username} fill className="object-cover" unoptimized />
+                          <Image src={group.user.avatar_url} alt={group.user.username} fill className="object-cover rounded-full" unoptimized />
                         ) : (
                           <div className="w-full h-full bg-surface flex items-center justify-center text-sm font-bold uppercase text-gray-400">{group.user.username.charAt(0)}</div>
                         )}
                       </div>
                     </Link>
-                    
+
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <Link href={`/profile/${group.user.username}`} className="font-bold text-white hover:text-primary transition-colors text-lg">
+                        <Link
+                          href={`/profile/${group.user.username}?back=${encodeURIComponent(currentPath)}`}
+                          key={group.game_id}
+                          className="font-bold text-white hover:text-primary transition-colors text-lg"
+                        >
                           {group.user.username}
                         </Link>
                         <span className="text-gray-400 text-xs hidden sm:inline uppercase tracking-widest font-bold">desbloqueou em</span>
@@ -169,11 +173,17 @@ export default async function SocialPage({ searchParams }: SocialPageProps) {
                         ) : (
                           <div className="w-8 h-8 bg-surface/40 rounded-sm border border-white/10"></div>
                         )}
-                        
+
                         {/* 2. FASTEAM DA REACT-ICONS APLICADO AQUI */}
                         <FaSteam className="text-gray-300 text-lg drop-shadow-sm shrink-0" />
-                        
-                        <span className="text-white font-black text-sm md:text-base tracking-wide drop-shadow-md truncate">{group.game_name}</span>
+
+                        <Link
+                          href={`/games/${group.game_id}?back=${encodeURIComponent(currentPath)}`}
+                          key={group.game_id}
+                          className="text-white font-black text-sm md:text-base tracking-wide drop-shadow-md truncate hover:text-primary transition-colors"
+                        >
+                          {group.game_name}
+                        </Link>
                         <span className="text-gray-500 text-xs mx-1 hidden sm:inline">•</span>
                         <span className="text-gray-400 text-xs font-bold capitalize hidden sm:inline">{timeAgo(group.date)}</span>
                       </div>
@@ -184,10 +194,10 @@ export default async function SocialPage({ searchParams }: SocialPageProps) {
                 <div className="p-5 md:p-6 pt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 z-10 relative">
                   {group.achievements.map(ach => {
                     const isPlat = ach.achievement_icon === 'platinum_ps5';
-                    
+
                     return (
                       <div key={ach.id} className={`flex items-center gap-4 p-3 rounded-2xl border transition-all hover:scale-[1.02] ${isPlat ? 'bg-cyan-950/40 border-cyan-500/40 shadow-inner' : 'bg-surface/40 border-white/5 hover:border-white/10'}`}>
-                        
+
                         <div className="shrink-0 relative w-12 h-12 flex items-center justify-center">
                           {isPlat ? (
                             <div className="w-full h-full flex items-center justify-center animate-pulse drop-shadow-[0_0_15px_rgba(6,182,212,0.8)]">
