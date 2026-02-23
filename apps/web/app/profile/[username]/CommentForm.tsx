@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { postComment, deleteComment } from './actions'
 import { toast } from 'react-toastify'
+import { FaPaperPlane, FaSpinner, FaTrashAlt } from "react-icons/fa";
 
 export function CommentInput({ profileId, currentPath }: { profileId: string, currentPath: string }) {
   const [content, setContent] = useState('')
@@ -19,25 +20,24 @@ export function CommentInput({ profileId, currentPath }: { profileId: string, cu
     if (res?.error) {
       toast.error(res.error, { theme: 'dark' })
     } else {
-      toast.success("Recado enviado com sucesso!", { theme: 'dark', icon: <span>💬</span> })
-      setContent('') // Limpa o campo após enviar
+      toast.success("Recado enviado com sucesso!", { theme: 'dark' })
+      setContent('') 
     }
     setLoading(false)
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mb-2">
+    <form onSubmit={handleSubmit} className="mb-2 w-full">
       <div className="relative">
         <textarea
           value={content}
           onChange={(e) => setContent(e.target.value)}
           placeholder="Deixe um recado para este caçador..."
-          className="w-full bg-background/50 border border-border rounded-2xl p-4 pr-4 pb-8 text-sm text-white font-medium focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary resize-none transition-all shadow-inner custom-scrollbar"
+          className="w-full bg-background/60 border border-white/10 rounded-2xl p-4 pr-4 pb-8 text-sm text-white font-medium focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary resize-none transition-all shadow-inner custom-scrollbar"
           rows={3}
           maxLength={MAX_CHARS}
           required
         ></textarea>
-        {/* Contador de Caracteres no canto inferior direito */}
         <div className={`absolute bottom-3 right-4 text-[10px] font-bold ${content.length >= MAX_CHARS ? 'text-red-400' : 'text-gray-500'}`}>
           {content.length}/{MAX_CHARS}
         </div>
@@ -47,9 +47,9 @@ export function CommentInput({ profileId, currentPath }: { profileId: string, cu
         <button
           type="submit"
           disabled={loading || !content.trim() || content.length > MAX_CHARS}
-          className="flex items-center gap-2 px-6 py-2.5 bg-primary/10 text-primary border border-primary/20 font-black text-xs md:text-sm rounded-xl hover:bg-primary hover:text-white transition-all disabled:opacity-50 hover:shadow-[0_0_15px_rgba(59,130,246,0.3)] active:scale-95"
+          className="flex items-center justify-center gap-2 w-full sm:w-auto px-6 py-3 bg-primary/10 text-primary border border-primary/20 font-black text-xs md:text-sm rounded-xl hover:bg-primary hover:text-white transition-all disabled:opacity-50 hover:shadow-[0_0_15px_rgba(59,130,246,0.3)] active:scale-95"
         >
-          {loading ? <span className="animate-spin text-lg">🔄</span> : <span className="text-lg">✉️</span>}
+          {loading ? <FaSpinner className="animate-spin text-lg" /> : <FaPaperPlane className="text-sm" />}
           {loading ? 'A enviar...' : 'Enviar Recado'}
         </button>
       </div>
@@ -63,7 +63,6 @@ export function DeleteCommentButton({ commentId, currentPath }: { commentId: str
   async function handleDelete() {
     if (!confirm("Deseja apagar este recado?")) return;
     setIsDeleting(true);
-    // Aqui chama a sua server action de delete
     await deleteComment(commentId, currentPath);
     setIsDeleting(false);
   }
@@ -72,15 +71,13 @@ export function DeleteCommentButton({ commentId, currentPath }: { commentId: str
     <button
       onClick={handleDelete}
       disabled={isDeleting}
-      className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all active:scale-90 disabled:opacity-50"
+      className="p-2.5 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all active:scale-90 disabled:opacity-50 bg-background/50 border border-transparent hover:border-red-500/20 shadow-sm"
       title="Apagar recado"
     >
       {isDeleting ? (
-        <span className="animate-spin block text-xs">🌀</span>
+        <FaSpinner className="animate-spin block text-sm" />
       ) : (
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-        </svg>
+        <FaTrashAlt className="text-sm" />
       )}
     </button>
   );
