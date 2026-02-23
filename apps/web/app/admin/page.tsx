@@ -46,19 +46,19 @@ export default async function AdminPage() {
 
       {/* ESTATÍSTICAS GAMIFICADAS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-surface/40 p-8 rounded-[2rem] border border-white/5 shadow-xl relative overflow-hidden group hover:border-primary/30 transition-colors">
+        <div className="bg-surface/40 p-8 rounded-4xl border border-white/5 shadow-xl relative overflow-hidden group hover:border-primary/30 transition-colors">
           <div className="absolute top-4 right-4 text-5xl opacity-10 group-hover:scale-110 group-hover:opacity-20 transition-all duration-500">👥</div>
           <p className="text-gray-500 text-[11px] font-black uppercase tracking-[0.2em] mb-2">População Total</p>
           <p className="text-4xl font-black text-white">{totalUsers} <span className="text-sm font-bold text-gray-500">Caçadores</span></p>
         </div>
 
-        <div className="bg-surface/40 p-8 rounded-[2rem] border border-white/5 shadow-xl relative overflow-hidden group hover:border-purple-500/30 transition-colors">
+        <div className="bg-surface/40 p-8 rounded-4xl border border-white/5 shadow-xl relative overflow-hidden group hover:border-purple-500/30 transition-colors">
           <div className="absolute top-4 right-4 text-5xl opacity-10 group-hover:scale-110 group-hover:opacity-20 transition-all duration-500">📚</div>
           <p className="text-gray-500 text-[11px] font-black uppercase tracking-[0.2em] mb-2">Biblioteca</p>
           <p className="text-4xl font-black text-white">{totalGuides} <span className="text-sm font-bold text-gray-500">Guias</span></p>
         </div>
 
-        <div className="bg-red-500/5 p-8 rounded-[2rem] border-2 border-red-500/20 shadow-[0_0_20px_rgba(239,68,68,0.05)] relative overflow-hidden">
+        <div className="bg-red-500/5 p-8 rounded-4xl border-2 border-red-500/20 shadow-[0_0_20px_rgba(239,68,68,0.05)] relative overflow-hidden">
           <div className="absolute top-4 right-4 text-5xl opacity-10">⚡</div>
           <p className="text-red-500/80 text-[11px] font-black uppercase tracking-[0.2em] mb-2 flex items-center gap-2">
             <span className="relative flex h-2.5 w-2.5">
