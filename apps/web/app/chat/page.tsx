@@ -1,13 +1,13 @@
 import { createClient } from "@/utils/supabase/server";
 import ChatClient from "./ChatClient";
 import { Metadata } from "next";
+import { FaGlobeAmericas } from "react-icons/fa";
 
 export const metadata: Metadata = {
   title: "Chat Global | Nexus Achievements",
-  description: "Participe do chat global do Nexus Achievements e converse com outros membros da comunidade em tempo real. Compartilhe dicas, conquistas e socialize enquanto explora o mundo dos games.",
+  description: "Participe do chat global do Nexus Achievements e converse com outros membros da comunidade em tempo real.",
 }
 
-// Interfaces para tipagem estrita dos dados brutos do Supabase
 interface ChatUser {
   username: string;
   avatar_url: string | null;
@@ -34,7 +34,6 @@ export default async function ChatPage() {
 
   const initialMessages = ((messagesData as unknown as RawChatMessage[]) || []).map(m => {
     const userData = Array.isArray(m.users) ? m.users[0] : m.users;
-    
     return {
       id: m.id,
       content: m.content,
@@ -49,6 +48,7 @@ export default async function ChatPage() {
       initialMessages={initialMessages} 
       currentUserId={user?.id} 
       channelId="global" 
+      icon={<FaGlobeAmericas className="text-primary" />}
     />
   );
 }
