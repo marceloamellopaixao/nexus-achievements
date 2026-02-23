@@ -16,6 +16,7 @@ interface LeaderboardProps {
 
 export default async function LeaderboardPage({ searchParams }: LeaderboardProps) {
   const { sort } = await searchParams;
+  const currentPath = `/leaderboards`;
   const sortBy = sort === 'platinums' ? 'total_platinums' : 'nexus_coins';
   
   const supabase = await createClient();
@@ -104,7 +105,7 @@ export default async function LeaderboardPage({ searchParams }: LeaderboardProps
                    </div>
                    
                    {/* Avatar com Moldura */}
-                   <Link href={`/profile/${p.username}`} className="block">
+                   <Link href={`/profile/${p.username}?back=${encodeURIComponent(currentPath)}`} className="block">
                      <div 
                         className={`rounded-full p-1.5 md:p-2 ${style.glow} ${!customBorder ? style.ring : ''}`}
                         style={customBorder ? { background: customBorder } : {}}
