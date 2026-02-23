@@ -127,7 +127,7 @@ export async function processSingleGame(game: SteamGame, steamId: string) {
   console.log(`===========================================`);
 
   try {
-    const res = await fetch(`http://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v0001/?appid=${appId}&key=${STEAM_KEY}&steamid=${steamId}`)
+    const res = await fetch(`http://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v0001/?appid=${appId}&key=${STEAM_KEY}&steamid=${steamId}&l=brazilian`)
     const data = await res.json()
     if (!data?.playerstats?.success) return { coins: 0, plats: 0 }
 
@@ -208,7 +208,9 @@ export async function processSingleGame(game: SteamGame, steamId: string) {
 
     if (unlockedCount > previousUnlocked) {
       const schemaMap = new Map<string, { displayName: string, icon: string }>()
-      const schemaRes = await fetch(`http://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?key=${STEAM_KEY}&appid=${appId}`)
+      // Busca o esquema (nomes e ícones) traduzido
+      const schemaRes = await fetch(`http://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?key=${STEAM_KEY}&appid=${appId}&l=brazilian`)
+      
       if (schemaRes.ok) {
         const schemaData = await schemaRes.json()
         const schemaAchs: SteamSchemaAchievement[] = schemaData?.game?.availableGameStats?.achievements || []
@@ -216,7 +218,9 @@ export async function processSingleGame(game: SteamGame, steamId: string) {
       }
 
       const percentagesMap = new Map<string, number>()
-      const percentRes = await fetch(`http://api.steampowered.com/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v0002/?gameid=${appId}`)
+      // Busca as porcentagens globais (opcionalmente l=brazilian para manter padrão)
+      const percentRes = await fetch(`http://api.steampowered.com/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v0002/?gameid=${appId}&l=brazilian`)
+      
       if (percentRes.ok) {
         const percentData = await percentRes.json()
         const percentList: SteamGlobalPercentage[] = percentData?.achievementpercentages?.achievements || []
