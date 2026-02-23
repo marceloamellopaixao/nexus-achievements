@@ -7,6 +7,7 @@ import { GuideVoteButton, GuideCommentForm, DeleteGuideButton } from "./GuideInt
 import GameCardImage from "@/app/components/GameCardImage";
 import Trophy from "@/app/components/Trophy";
 import { Metadata } from "next";
+import ClientBackButton from "@/app/components/ClientBackButton";
 
 export const metadata: Metadata = {
   title: "Detalhes do Jogo | Nexus Achievements",
@@ -15,7 +16,7 @@ export const metadata: Metadata = {
 
 interface GamePageProps {
   params: Promise<{ gameId: string }>;
-  searchParams: Promise<{ tab?: string, guideId?: string }>;
+  searchParams: Promise<{ tab?: string, guideId?: string, back?: string }>;
 }
 
 // Interfaces de Tipagem
@@ -48,8 +49,22 @@ const renderGuideContent = (text: string) => {
 
 export default async function GamePage(props: GamePageProps) {
   const { gameId } = await props.params;
-  const { tab, guideId } = await props.searchParams;
+  const { tab, guideId, back } = await props.searchParams;
   const activeTab = tab === 'guides' ? 'guides' : 'overview';
+
+  // 1. URL de retorno padrão (com proteção)
+  const backUrl = back ? back : '/games';
+  const backQueryString = back ? `&back=${encodeURIComponent(back)}` : '';
+
+  // 2. Lógica Dinâmica do Título do Botão
+  let backTitle = "Voltar à Biblioteca";
+  if (backUrl.includes('/profile')) {
+    backTitle = "Voltar ao Perfil";
+  } else if (backUrl.includes('/leaderboards')) {
+    backTitle = "Voltar ao Ranking";
+  } else if (backUrl.includes('/social')) {
+    backTitle = "Voltar à Comunidade";
+  }
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -66,10 +81,8 @@ export default async function GamePage(props: GamePageProps) {
   let updatedCover = game.cover_url;
   let needsDbUpdate = false;
 
-  // Se o jogo não tiver Banner ou Cover, buscamos na API e guardamos para sempre
   if ((!game.banner_url || !game.cover_url) && SGDB_KEY) {
     try {
-      // 1. Busca o Banner (Heroes)
       if (!game.banner_url) {
         const heroRes = await fetch(`https://www.steamgriddb.com/api/v2/heroes/steam/${appId}`, { headers: { Authorization: `Bearer ${SGDB_KEY}` } });
         const heroData = await heroRes.json();
@@ -79,7 +92,6 @@ export default async function GamePage(props: GamePageProps) {
         }
       }
 
-      // 2. Busca a Capa (Grids)
       if (!game.cover_url) {
         const gridRes = await fetch(`https://www.steamgriddb.com/api/v2/grids/steam/${appId}`, { headers: { Authorization: `Bearer ${SGDB_KEY}` } });
         const gridData = await gridRes.json();
@@ -89,18 +101,16 @@ export default async function GamePage(props: GamePageProps) {
         }
       }
 
-      // 3. Salva no Banco de Dados para não buscar novamente na próxima visita!
       if (needsDbUpdate) {
-        await supabase.from('games').update({ 
-          banner_url: updatedBanner, 
-          cover_url: updatedCover 
+        await supabase.from('games').update({
+          banner_url: updatedBanner,
+          cover_url: updatedCover
         }).eq('id', gameId);
       }
     } catch (e) {
       console.error("Erro ao fazer cache do SteamGridDB:", e);
     }
   }
-  // ---------------------------------------------------
 
   const { data: communityRaw } = await supabase.from("user_games").select(`user_id, is_platinum, unlocked_achievements, total_achievements, playtime_minutes, last_synced_at, users ( username, avatar_url )`).eq("game_id", gameId);
   const communityData = (communityRaw as unknown as CommunityUser[]) || [];
@@ -188,7 +198,8 @@ export default async function GamePage(props: GamePageProps) {
   return (
     <div className="min-h-screen pb-20 animate-in fade-in duration-500">
       <div className="-mx-4 md:-mx-8 -mt-4 md:-mt-8 h-80 md:h-125 relative overflow-hidden border-b border-border/50 shadow-2xl rounded-b-4xl bg-background">
-        {/* USAMOS O BANNER ATUALIZADO (Cache ou Novo) */}
+        <ClientBackButton href={backUrl} title={backTitle} />
+
         <GameCardImage src={updatedBanner} title={game.title} isBanner={true} />
         <div className="absolute inset-0 bg-linear-to-t from-background via-background/40 to-transparent z-10" />
       </div>
@@ -196,7 +207,6 @@ export default async function GamePage(props: GamePageProps) {
       <div className="max-w-6xl mx-auto -mt-32 md:-mt-48 relative z-20 px-4 md:px-0">
         <div className="flex flex-col md:flex-row gap-6 md:gap-10 items-start md:items-end">
           <div className="w-32 md:w-64 aspect-3/4 rounded-2xl md:rounded-3xl border-4 md:border-[6px] border-background bg-surface overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.5)] relative shrink-0 group z-30">
-            {/* USAMOS A CAPA ATUALIZADA (Cache ou Novo) */}
             <GameCardImage src={updatedCover} title={game.title} />
           </div>
 
@@ -244,13 +254,13 @@ export default async function GamePage(props: GamePageProps) {
           </div>
         </div>
 
-        {/* ABAS E CONTEÚDO */}
+        {/* ABAS COM PROTEÇÃO DE MEMÓRIA (backQueryString) */}
         <div className="flex gap-2 md:gap-4 mt-12 mb-10 border-b border-border/50 pb-px">
-          <Link href={`/games/${gameId}?tab=overview`} scroll={false} className={`pb-4 px-2 text-sm md:text-base font-black transition-all tracking-wider relative ${activeTab === 'overview' ? 'text-primary' : 'text-gray-500 hover:text-gray-300'}`}>
+          <Link href={`/games/${gameId}?tab=overview${backQueryString}`} scroll={false} className={`pb-4 px-2 text-sm md:text-base font-black transition-all tracking-wider relative ${activeTab === 'overview' ? 'text-primary' : 'text-gray-500 hover:text-gray-300'}`}>
             VISÃO GERAL
             {activeTab === 'overview' && <span className="absolute bottom-0 left-0 w-full h-1 bg-primary rounded-t-full shadow-[0_0_10px_rgba(59,130,246,0.8)]"></span>}
           </Link>
-          <Link href={`/games/${gameId}?tab=guides`} scroll={false} className={`pb-4 px-2 text-sm md:text-base font-black transition-all tracking-wider flex items-center gap-2 relative ${activeTab === 'guides' ? 'text-primary' : 'text-gray-500 hover:text-gray-300'}`}>
+          <Link href={`/games/${gameId}?tab=guides${backQueryString}`} scroll={false} className={`pb-4 px-2 text-sm md:text-base font-black transition-all tracking-wider flex items-center gap-2 relative ${activeTab === 'guides' ? 'text-primary' : 'text-gray-500 hover:text-gray-300'}`}>
             GUIAS DA COMUNIDADE
             {activeTab === 'guides' && <span className="absolute bottom-0 left-0 w-full h-1 bg-primary rounded-t-full shadow-[0_0_10px_rgba(59,130,246,0.8)]"></span>}
           </Link>
@@ -270,8 +280,7 @@ export default async function GamePage(props: GamePageProps) {
                 {achievementsDetails.map((ach) => {
                   const isUnlocked = playerUnlockedMap[ach.name];
                   const rarity = getTrophyType(ach.name);
-                  
-                  // PLANO B PARA A CONQUISTA: Se ela não tiver ícone, mostramos a capa do jogo
+
                   const baseIconUrl = isUnlocked ? ach.icon : (ach.icongray || ach.icon);
                   const finalIconUrl = baseIconUrl || updatedCover || 'https://via.placeholder.com/64/1a1a1a/ffffff?text=X';
 
@@ -306,9 +315,12 @@ export default async function GamePage(props: GamePageProps) {
               <div className="bg-surface/30 border border-border rounded-4xl p-6 md:p-10 shadow-2xl relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-full h-2 bg-linear-to-r from-primary via-purple-500 to-primary"></div>
                 <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
-                  <Link href={`/games/${gameId}?tab=guides`} className="inline-flex items-center gap-2 text-gray-400 hover:text-white font-bold text-sm transition-colors bg-background/50 px-4 py-2 rounded-xl border border-border">
-                    ← Voltar à Biblioteca de Guias
-                  </Link>
+                  {/* 🔥 BOTÃO VOLTAR DO GUIA COM CLASSE RELATIVA E MEMÓRIA PRESERVADA */}
+                  <ClientBackButton
+                    href={`/games/${gameId}?tab=guides${backQueryString}`}
+                    title="Voltar aos Guias"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-background/40 backdrop-blur-md border border-white/10 text-gray-300 hover:text-white hover:bg-white/10 rounded-xl font-bold text-sm transition-all shadow-lg active:scale-95"
+                  />
 
                   {user?.id === selectedGuide.author_id && (
                     <DeleteGuideButton guideId={selectedGuide.id} gameId={gameId} />
@@ -362,7 +374,7 @@ export default async function GamePage(props: GamePageProps) {
                     </div>
                   ) : (
                     guides.map(guide => (
-                      <Link href={`/games/${gameId}?tab=guides&guideId=${guide.id}`} key={guide.id} className="bg-surface/40 backdrop-blur-sm border border-border p-6 rounded-3xl hover:border-primary/50 hover:bg-surface/80 transition-all duration-300 group flex flex-col h-full shadow-md hover:shadow-xl hover:-translate-y-1">
+                      <Link href={`/games/${gameId}?tab=guides&guideId=${guide.id}${backQueryString}`} key={guide.id} className="bg-surface/40 backdrop-blur-sm border border-border p-6 rounded-3xl hover:border-primary/50 hover:bg-surface/80 transition-all duration-300 group flex flex-col h-full shadow-md hover:shadow-xl hover:-translate-y-1">
                         <div className="flex-1">
                           <h3 className="text-xl font-black text-white mb-3 group-hover:text-primary transition-colors line-clamp-2 leading-tight">{guide.title}</h3>
                           <p className="text-sm text-gray-400 line-clamp-3 leading-relaxed mb-6">{guide.content.replace(/!\[.*?\]\(.*?\)/g, '🖼️ [Imagem Anexa] ')}</p>
