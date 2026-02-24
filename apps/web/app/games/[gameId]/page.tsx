@@ -278,7 +278,7 @@ export default async function GamePage(props: GamePageProps) {
                     <div className="flex-1 min-w-0">
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-1">
                         <h3 className="text-xs md:text-sm font-black uppercase tracking-widest text-white truncate">
-                          {isPlat ? <span className="text-cyan-400"><Trophy type="platinum" className="w-6 h-6" /> Platina Conquistada</span> : percentage > 0 ? "⚔️ Jornada em curso" : "🎯 Iniciar Caçada"}
+                          {isPlat ? <span className="text-cyan-400 flex items-center"><Trophy type="platinum" className="w-6 h-6" /> Platina Conquistada</span> : percentage > 0 ? "⚔️ Jornada em curso" : "🎯 Iniciar Caçada"}
                         </h3>
                         <span className={`text-sm md:text-base font-black shrink-0 ${isPlat ? 'text-cyan-400' : 'text-gray-300'}`}>
                           {unlocked} <span className="text-gray-500 font-medium">/ {total}</span> <span className="text-[10px] md:text-xs text-gray-400 font-bold bg-black/40 px-2 py-0.5 rounded-md ml-1">{percentage}%</span>
