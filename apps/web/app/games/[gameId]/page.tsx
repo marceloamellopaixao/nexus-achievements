@@ -8,6 +8,7 @@ import GameCardImage from "@/app/components/GameCardImage";
 import Trophy from "@/app/components/Trophy";
 import { Metadata } from "next";
 import ClientBackButton from "@/app/components/ClientBackButton";
+import CustomizationButton from "./CustomizationButton";
 
 // Ícones Modernos
 import { FaArrowLeft, FaArrowRight, FaUsers, FaTrophy, FaChartLine, FaCheckCircle, FaBookOpen, FaThumbsUp } from "react-icons/fa";
@@ -53,11 +54,9 @@ export default async function GamePage(props: GamePageProps) {
   const { tab, guideId, back, page } = await props.searchParams;
   const activeTab = tab === 'guides' ? 'guides' : 'overview';
 
-  // 1. Paginação de Conquistas (Apenas para a aba Overview)
   const currentPage = Number(page) || 1;
   const ACHIEVEMENTS_PER_PAGE = 30;
 
-  // 2. URL de retorno
   const backUrl = back ? back : '/games';
   const backQueryString = back ? `&back=${encodeURIComponent(back)}` : '';
 
@@ -69,6 +68,12 @@ export default async function GamePage(props: GamePageProps) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
+  let isAdmin = false;
+  if (user) {
+    const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
+    isAdmin = userData?.role === 'admin';
+  }
+
   const { data: game, error } = await supabase.from("games").select("*").eq("id", gameId).single();
   if (error || !game) notFound();
 
@@ -76,14 +81,27 @@ export default async function GamePage(props: GamePageProps) {
   const STEAM_KEY = process.env.STEAM_API_KEY;
   const SGDB_KEY = process.env.STEAMGRIDDB_API_KEY;
 
-  // Cache SteamGridDB
   let updatedBanner = game.banner_url;
   let updatedCover = game.cover_url;
-  let needsDbUpdate = false;
 
-  if ((!game.banner_url || !game.cover_url) && SGDB_KEY) {
+  // Busca personalizações do usuário (Se logado)
+  if (user) {
+    const { data: customData } = await supabase
+      .from('user_game_customization')
+      .select('custom_banner_url, custom_cover_url')
+      .eq('user_id', user.id)
+      .eq('game_id', gameId)
+      .maybeSingle();
+
+    if (customData?.custom_banner_url) updatedBanner = customData.custom_banner_url;
+    if (customData?.custom_cover_url) updatedCover = customData.custom_cover_url;
+  }
+
+  // --- 🚀 MOTOR DE CACHE STEAMGRIDDB (Só atua se não houver NENHUMA imagem definida e o user não tiver personalizado) ---
+  let needsDbUpdate = false;
+  if ((!game.banner_url || !game.cover_url) && SGDB_KEY && (!updatedBanner || !updatedCover)) {
     try {
-      if (!game.banner_url) {
+      if (!game.banner_url && !updatedBanner) {
         const heroRes = await fetch(`https://www.steamgriddb.com/api/v2/heroes/steam/${appId}`, { headers: { Authorization: `Bearer ${SGDB_KEY}` } });
         const heroData = await heroRes.json();
         if (heroData.success && heroData.data.length > 0) {
@@ -91,7 +109,7 @@ export default async function GamePage(props: GamePageProps) {
           needsDbUpdate = true;
         }
       }
-      if (!game.cover_url) {
+      if (!game.cover_url && !updatedCover) {
         const gridRes = await fetch(`https://www.steamgriddb.com/api/v2/grids/steam/${appId}`, { headers: { Authorization: `Bearer ${SGDB_KEY}` } });
         const gridData = await gridRes.json();
         if (gridData.success && gridData.data.length > 0) {
@@ -163,7 +181,6 @@ export default async function GamePage(props: GamePageProps) {
     return "bronze";
   };
 
-  // --- Lógica de Paginação na Memória (Aba Overview) ---
   const totalAchievementsItems = achievementsDetails.length;
   const totalAchievementPages = Math.ceil(totalAchievementsItems / ACHIEVEMENTS_PER_PAGE);
   const startIndex = (currentPage - 1) * ACHIEVEMENTS_PER_PAGE;
@@ -180,7 +197,6 @@ export default async function GamePage(props: GamePageProps) {
     return `/games/${gameId}?${sp.toString()}`;
   };
 
-  // Guias
   let guides: GameGuide[] = [];
   let selectedGuideComments: GuideComment[] = [];
   let hasVoted = false;
@@ -211,23 +227,40 @@ export default async function GamePage(props: GamePageProps) {
 
       <ClientBackButton href={backUrl} title={backTitle} />
 
-      {/* BANNER ESTILO STEAM: Foco total na largura e altura fixa controlada */}
-      <div className="-mx-4 md:-mx-8 -mt-4 md:-mt-8 h-56 sm:h-64 md:h-80 lg:h-100 w-full relative overflow-hidden border-b border-white/5 shadow-2xl rounded-b-4xl bg-background">
+      <div className="-mx-4 md:-mx-8 -mt-4 md:-mt-8 h-56 sm:h-64 md:h-80 lg:h-100 w-full relative overflow-hidden border-b border-white/5 shadow-2xl rounded-b-4xl bg-background group">
         <GameCardImage src={updatedBanner} title={game.title} isBanner={true} />
-        {/* Degradê Duplo para legibilidade perfeita: Escuro à esquerda e escuro em baixo */}
         <div className="absolute inset-0 bg-linear-to-t from-background via-background/40 to-transparent z-10 pointer-events-none" />
         <div className="absolute inset-0 bg-linear-to-r from-background/90 via-background/20 to-transparent z-10 pointer-events-none" />
+
+        {/* BOTÃO PARA ALTERAR O BANNER */}
+        {user && (
+          <CustomizationButton
+            gameId={gameId}
+            type="banner"
+            isAdmin={isAdmin}
+            className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 opacity-0 group-hover:opacity-100" // Deixar no meio do banner para facilitar o clique, já que é mais largo
+          />
+        )}
       </div>
 
-      {/* CARTÃO E INFOS DO JOGO (Margem negativa sobe um pouco para sobrepor o banner) */}
       <div className="max-w-6xl mx-auto -mt-20 sm:-mt-24 md:-mt-32 relative z-20 px-4 md:px-0">
         <div className="flex flex-col md:flex-row gap-6 md:gap-10 items-start md:items-end">
           <div className="w-32 md:w-64 aspect-3/4 rounded-2xl md:rounded-4xl border-4 md:border-[6px] border-background bg-surface overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.5)] relative shrink-0 group z-30">
             <GameCardImage src={updatedCover} title={game.title} />
+
+            {/* BOTÃO PARA ALTERAR A CAPA */}
+            {user && (
+              <CustomizationButton
+                gameId={gameId}
+                type="cover"
+                isAdmin={isAdmin}
+                className="absolute top-4 right-3 opacity-0 group-hover:opacity-100"
+              />
+            )}
           </div>
 
           <div className="flex-1 w-full pb-2 md:pb-6 min-w-0">
-            <h1 className="text-3xl md:text-6xl font-black text-white tracking-tighter drop-shadow-2xl leading-none truncate max-w-full">{game.title}</h1>
+            <h1 className="text-3xl md:text-4xl font-black text-white tracking-tighter drop-shadow-2xl leading-none truncate max-w-full">{game.title}</h1>
             <p className="text-primary font-bold tracking-widest uppercase text-[10px] md:text-xs mt-3 md:mt-4 bg-primary/10 inline-block px-3 py-1.5 rounded-lg border border-primary/20">{game.developer || "Steam"}</p>
 
             {userProgress && (
@@ -245,8 +278,7 @@ export default async function GamePage(props: GamePageProps) {
                     <div className="flex-1 min-w-0">
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-1">
                         <h3 className="text-xs md:text-sm font-black uppercase tracking-widest text-white truncate">
-                          {isPlat ? <span className="text-cyan-400 flex items-center gap-1">
-                            <Trophy type="platinum" className="w-6 h-6" /> Platina Conquistada</span> : percentage > 0 ? "⚔️ Jornada em curso" : "🎯 Iniciar Caçada"}
+                          {isPlat ? <span className="text-cyan-400"><Trophy type="platinum" className="w-6 h-6" /> Platina Conquistada</span> : percentage > 0 ? "⚔️ Jornada em curso" : "🎯 Iniciar Caçada"}
                         </h3>
                         <span className={`text-sm md:text-base font-black shrink-0 ${isPlat ? 'text-cyan-400' : 'text-gray-300'}`}>
                           {unlocked} <span className="text-gray-500 font-medium">/ {total}</span> <span className="text-[10px] md:text-xs text-gray-400 font-bold bg-black/40 px-2 py-0.5 rounded-md ml-1">{percentage}%</span>
@@ -284,7 +316,7 @@ export default async function GamePage(props: GamePageProps) {
         </div>
 
         {/* ==============================================
-            CONTEÚDO DA ABA: VISÃO GERAL (Com Paginação)
+            CONTEÚDO DA ABA: VISÃO GERAL
             ============================================== */}
         {activeTab === 'overview' && (
           <div className="space-y-8 md:space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -327,7 +359,7 @@ export default async function GamePage(props: GamePageProps) {
                             <div className="w-full h-full rounded-xl overflow-hidden border border-white/10 relative bg-background shadow-md">
                               <Image src={finalIconUrl} alt={ach.displayName} fill className="object-cover" unoptimized />
                             </div>
-                            <div className="absolute -bottom-1 -right-1 w-5 h-6 md:w-6 drop-shadow-[0_2px_5px_rgba(0,0,0,0.8)] z-10">
+                            <div className="absolute -bottom-1 -right-1 w-5 h-5 md:w-6 md:h-6 drop-shadow-[0_2px_5px_rgba(0,0,0,0.8)] z-10">
                               <Trophy type={rarity} className="w-full h-full" />
                             </div>
                           </div>
@@ -343,7 +375,6 @@ export default async function GamePage(props: GamePageProps) {
                     })}
                   </div>
 
-                  {/* CONTROLOS DE PAGINAÇÃO DE CONQUISTAS */}
                   {totalAchievementPages > 1 && (
                     <div className="flex items-center justify-between border-t border-white/5 pt-6 mt-8 pb-4 gap-2">
                       <Link href={hasPrevPage ? buildUrl(currentPage - 1) : '#'} scroll={false} className={`flex items-center justify-center gap-2 px-4 py-2.5 sm:px-6 sm:py-3 rounded-xl font-black text-xs sm:text-sm transition-all ${hasPrevPage ? 'bg-surface border border-white/10 text-white hover:bg-primary hover:border-primary shadow-sm' : 'bg-surface/30 border border-transparent text-gray-600 cursor-not-allowed pointer-events-none'}`}>
