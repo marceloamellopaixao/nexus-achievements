@@ -8,6 +8,15 @@ export const metadata: Metadata = {
   description: "Acesse o painel de administração do Nexus Achievements para gerenciar usuários, guias e monitorar o estado do sistema.",
 }
 
+// 1. Definimos a tipagem para as denúncias
+export interface ReportData {
+  id: string;
+  reported_username: string;
+  reason: string;
+  created_at: string;
+  reporter: { username: string } | null;
+}
+
 export default async function AdminPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -20,6 +29,24 @@ export default async function AdminPage() {
   // Estatísticas Rápidas
   const { count: totalUsers } = await supabase.from('users').select('*', { count: 'exact', head: true });
   const { count: totalGuides } = await supabase.from('game_guides').select('*', { count: 'exact', head: true });
+
+  // 2. Removemos o 'any[]' e usamos a nova interface 'ReportData[]'
+  let pendingReports: ReportData[] = [];
+  try {
+    const { data: reports } = await supabase
+      .from('user_reports')
+      .select('id, reported_username, reason, created_at, reporter:users!reporter_id(username)')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false });
+    
+    if (reports) {
+      // Formata os dados para garantir que respeitam a interface
+      pendingReports = reports.map(r => ({
+        ...r,
+        reporter: Array.isArray(r.reporter) ? r.reporter[0] : r.reporter
+      })) as ReportData[];
+    }
+  } catch (e) { console.error("Tabela user_reports não encontrada.", e) }
 
   return (
     <div className="max-w-7xl mx-auto py-10 px-4 space-y-12 animate-in fade-in duration-700">
@@ -49,13 +76,13 @@ export default async function AdminPage() {
         <div className="bg-surface/40 p-8 rounded-4xl border border-white/5 shadow-xl relative overflow-hidden group hover:border-primary/30 transition-colors">
           <div className="absolute top-4 right-4 text-5xl opacity-10 group-hover:scale-110 group-hover:opacity-20 transition-all duration-500">👥</div>
           <p className="text-gray-500 text-[11px] font-black uppercase tracking-[0.2em] mb-2">População Total</p>
-          <p className="text-4xl font-black text-white">{totalUsers} <span className="text-sm font-bold text-gray-500">Caçadores</span></p>
+          <p className="text-4xl font-black text-white">{totalUsers || 0} <span className="text-sm font-bold text-gray-500">Caçadores</span></p>
         </div>
 
         <div className="bg-surface/40 p-8 rounded-4xl border border-white/5 shadow-xl relative overflow-hidden group hover:border-purple-500/30 transition-colors">
           <div className="absolute top-4 right-4 text-5xl opacity-10 group-hover:scale-110 group-hover:opacity-20 transition-all duration-500">📚</div>
           <p className="text-gray-500 text-[11px] font-black uppercase tracking-[0.2em] mb-2">Biblioteca</p>
-          <p className="text-4xl font-black text-white">{totalGuides} <span className="text-sm font-bold text-gray-500">Guias</span></p>
+          <p className="text-4xl font-black text-white">{totalGuides || 0} <span className="text-sm font-bold text-gray-500">Guias</span></p>
         </div>
 
         <div className="bg-red-500/5 p-8 rounded-4xl border-2 border-red-500/20 shadow-[0_0_20px_rgba(239,68,68,0.05)] relative overflow-hidden">
@@ -71,8 +98,8 @@ export default async function AdminPage() {
         </div>
       </div>
 
-      {/* CHAMA O COMPONENTE CLIENTE */}
-      <AdminClientPage />
+      {/* CHAMA O COMPONENTE CLIENTE COM OS DADOS */}
+      <AdminClientPage initialReports={pendingReports} />
 
     </div>
   );

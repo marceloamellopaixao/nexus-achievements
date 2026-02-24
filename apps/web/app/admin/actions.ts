@@ -16,8 +16,6 @@ export async function distributeCoinsToAll(amount: number) {
     if (!(await checkAdmin()) || amount <= 0) return { error: 'Não autorizado ou valor inválido.' }
 
     const supabase = await createClient()
-
-    // Incrementa as moedas de todos os usuários de uma vez
     const { error } = await supabase.rpc('distribute_coins_global', { amount_to_add: amount })
 
     if (error) return { error: 'Erro na distribuição.' }
@@ -30,8 +28,6 @@ export async function setGlobalAnnouncement(message: string, type: string) {
     if (!(await checkAdmin())) return { error: 'Acesso negado.' }
 
     const supabase = await createClient()
-
-    // Desativa anúncios antigos e insere o novo
     await supabase.from('system_announcements').update({ is_active: false }).eq('is_active', true)
 
     if (message.trim() !== "") {
@@ -43,15 +39,9 @@ export async function setGlobalAnnouncement(message: string, type: string) {
     return { success: 'Status do Nexus atualizado!' }
 }
 
-interface ShopItemFormData {
-    name: string;
-    price: string;
-    category: string;
-    rarity: string;
-    style: string;
-}
+interface ShopItemFormData { name: string; price: string; category: string; rarity: string; style: string; }
 
-// 1. ADICIONAR ITEM NA LOJA
+// 3. ADICIONAR ITEM NA LOJA
 export async function addShopItem(formData: ShopItemFormData) {
     if (!(await checkAdmin())) return { error: 'Acesso negado.' }
 
@@ -71,72 +61,48 @@ export async function addShopItem(formData: ShopItemFormData) {
     return { success: 'Item adicionado à vitrine!' }
 }
 
-// 2. RESET GLOBAL DE DADOS (O que você pediu)
+// 4. RESET GLOBAL DE DADOS
 export async function performGlobalReset() {
     if (!(await checkAdmin())) return { error: 'Acesso negado.' }
-
     const supabase = await createClient()
-
-    // Executa os truncates
-    await supabase.rpc('danger_zone_reset') // Criaremos esta função SQL abaixo
-
+    await supabase.rpc('danger_zone_reset') 
     revalidatePath('/')
     return { success: 'O Nexus foi resetado com sucesso!' }
 }
 
-// ==========================================
-// RESET GLOBAL & DIRECIONADO
-// ==========================================
+// 5. RESET GLOBAL & DIRECIONADO
 export async function performTargetedReset(targetUsernameOrId: string, options: { games: boolean, social: boolean, inventory: boolean, stats: boolean }) {
     if (!(await checkAdmin())) return { error: 'Acesso negado.' }
     if (!targetUsernameOrId) return { error: 'Forneça um ID, Username ou Email válido.' }
 
     const supabase = await createClient()
-
-    // Limpa espaços acidentais no início ou no fim
     const target = targetUsernameOrId.trim();
-
     let userId = target;
-
-    // Regex para validar se o texto é exatamente um UUID
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(target);
 
     if (!isUUID) {
-        // Se não for UUID, procura pelo Username OU pelo Email
-        const { data: user, error: userError } = await supabase
-            .from('users')
-            .select('id')
-            .or(`username.ilike.${target},email.ilike.${target}`)
-            .maybeSingle();
-
-        if (userError) {
-            console.error("Erro na busca do utilizador:", userError);
-            return { error: 'Erro de conexão ao procurar o caçador.' }
-        }
-        if (!user) {
-            return { error: `O caçador '${target}' não existe na base de dados.` }
-        }
+        const { data: user, error: userError } = await supabase.from('users').select('id').or(`username.ilike.${target},email.ilike.${target}`).maybeSingle();
+        if (userError || !user) return { error: `Caçador não encontrado no sistema.` }
         userId = user.id;
-    } else {
-        // Se foi enviado um UUID, apenas confirmamos se ele existe no banco
-        const { data: user } = await supabase.from('users').select('id').eq('id', target).maybeSingle();
-        if (!user) return { error: `Nenhum caçador encontrado com o ID fornecido.` }
     }
 
-    // 2. Executa a função RPC cirúrgica
     const { error } = await supabase.rpc('target_user_reset', {
-        target_user_id: userId,
-        reset_games: options.games,
-        reset_social: options.social,
-        reset_inventory: options.inventory,
-        reset_stats: options.stats
+        target_user_id: userId, reset_games: options.games, reset_social: options.social, reset_inventory: options.inventory, reset_stats: options.stats
     });
 
-    if (error) {
-        console.error("Erro fatal no reset:", error);
-        return { error: `Falha ao limpar o alvo: ${error.message}` }
-    }
-
+    if (error) return { error: `Falha ao limpar o alvo: ${error.message}` }
     revalidatePath('/', 'layout')
     return { success: `A mente e o progresso do alvo foram limpos com sucesso.` }
+}
+
+// 6. ATUALIZAR STATUS DE DENÚNCIA
+export async function updateReportStatus(reportId: string, newStatus: 'resolved' | 'dismissed') {
+    if (!(await checkAdmin())) return { error: 'Acesso negado.' }
+    const supabase = await createClient()
+    
+    const { error } = await supabase.from('user_reports').update({ status: newStatus }).eq('id', reportId);
+    if (error) return { error: 'Falha ao atualizar denúncia.' }
+    
+    revalidatePath('/admin')
+    return { success: newStatus === 'resolved' ? 'Denúncia resolvida!' : 'Denúncia descartada.' }
 }
