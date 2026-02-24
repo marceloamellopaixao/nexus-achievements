@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { equipCosmetic } from './actions'
 import { toast } from 'react-toastify'
+import { FaTrash, FaCheck, FaSpinner, FaTimes, FaStar } from 'react-icons/fa'
 
 type Props = {
   itemId: string;
@@ -18,15 +19,15 @@ export default function EquipButton({ itemId, category, isEquipped }: Props) {
   const handleEquip = async () => {
     setLoading(true)
 
-    // Se já estiver equipado, manda 'none' para desequipar
     const actionId = isEquipped ? 'none' : itemId
     const result = await equipCosmetic(actionId, category)
 
     if (result?.error) {
       toast.error(result.error, { theme: 'dark' })
     } else {
-      toast.success(isEquipped ? '🗑️ Cosmético removido!' : '✨ Cosmético equipado com sucesso!', {
-        theme: 'dark'
+      toast.success(isEquipped ? 'Cosmético removido!' : 'Cosmético equipado com sucesso!', {
+        theme: 'dark',
+        icon: isEquipped ? <FaTrash className="text-red-500" /> : <FaCheck className="text-green-500" />
       })
       router.refresh()
     }
@@ -44,17 +45,11 @@ export default function EquipButton({ itemId, category, isEquipped }: Props) {
         }`}
     >
       {loading ? (
-        <>
-          <span className="animate-spin text-base">🔄</span> Aguarde...
-        </>
+        <><FaSpinner className="animate-spin text-base" /> Aguarde...</>
       ) : isEquipped ? (
-        <>
-          <span className="text-base">❌</span> Remover
-        </>
+        <><FaTimes className="text-base" /> Remover</>
       ) : (
-        <>
-          <span className="text-base">✨</span> Equipar
-        </>
+        <><FaStar className="text-base" /> Equipar</>
       )}
     </button>
   )
