@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { addShopItem, distributeCoinsToAll, performGlobalReset, setGlobalAnnouncement } from './actions'
+import { addShopItem, distributeCoinsToAll, performTargetedReset, setGlobalAnnouncement } from './actions'
 import { toast } from 'react-toastify'
 
 export default function AdminClientPage() {
@@ -18,6 +18,15 @@ export default function AdminClientPage() {
         style: ''
     })
 
+    // Estados da Nova Ferramenta de Reset
+    const [targetUser, setTargetUser] = useState('')
+    const [resetOptions, setResetOptions] = useState({
+        games: false,
+        social: false,
+        inventory: false,
+        stats: false
+    })
+
     async function handleAddItem(e: React.FormEvent) {
         e.preventDefault()
         setLoading(true)
@@ -32,7 +41,6 @@ export default function AdminClientPage() {
         setLoading(false)
     }
 
-    // Handlers
     async function handleDistribute() {
         if(!coinAmount || Number(coinAmount) <= 0) return;
         
@@ -49,6 +57,37 @@ export default function AdminClientPage() {
         const res = await setGlobalAnnouncement(announcement.message, announcement.type)
         if (res.success) toast.success(res.success)
         setLoading(false)
+    }
+
+    async function handleTargetedReset() {
+        if (!targetUser) {
+            toast.error("O alvo não pode estar vazio.");
+            return;
+        }
+
+        const hasSelectedOption = Object.values(resetOptions).some(v => v === true);
+        if (!hasSelectedOption) {
+            toast.warning("Selecione pelo menos um módulo para resetar.");
+            return;
+        }
+
+        if(confirm(`Tem certeza que deseja apagar os dados do utilizador: ${targetUser}? Esta ação é IRREVERSÍVEL.`)) {
+            setLoading(true)
+            const res = await performTargetedReset(targetUser, resetOptions);
+            
+            if (res.success) {
+                toast.success(res.success);
+                setTargetUser('');
+                setResetOptions({ games: false, social: false, inventory: false, stats: false });
+            } else {
+                toast.error(res.error);
+            }
+            setLoading(false)
+        }
+    }
+
+    const toggleOption = (key: keyof typeof resetOptions) => {
+        setResetOptions(prev => ({ ...prev, [key]: !prev[key] }))
     }
 
     return (
@@ -195,25 +234,61 @@ export default function AdminClientPage() {
                     </div>
                 </div>
 
-                {/* ZONA DE PERIGO & RESET */}
-                <div className="bg-red-500/5 border border-red-500/20 p-8 rounded-[3rem] relative overflow-hidden">
+                {/* ❌ NOVO: PROTOCOLO DE LIMPEZA SELETIVO */}
+                <div className="bg-red-500/5 border border-red-500/20 p-8 rounded-[3rem] relative overflow-hidden shadow-xl">
                     <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-red-600 to-red-400"></div>
-                    <h3 className="text-red-500 font-black text-sm flex items-center gap-2 mb-4">
-                        <span className="text-xl">⚠️</span> DANGER ZONE
+                    
+                    <h3 className="text-red-500 font-black text-lg flex items-center gap-3 mb-2">
+                        <span className="text-2xl">⚠️</span> Protocolo de Punição
                     </h3>
-                    <p className="text-xs text-red-400/70 font-medium mb-6">
-                        Ações destrutivas não podem ser desfeitas. Prossiga com extrema cautela.
+                    <p className="text-[11px] text-red-400/70 font-medium uppercase tracking-widest mb-6">
+                        Apague dados seletivos de um caçador infractor ou corrompido.
                     </p>
-                    <button
-                        onClick={async () => {
-                            if(confirm("Tem certeza ABSOLUTA? Isso apagará dados vitais do sistema.")) {
-                                await performGlobalReset();
-                            }
-                        }}
-                        className="w-full py-4 bg-red-500/10 border border-red-500/30 text-red-500 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-red-500 hover:text-white hover:shadow-[0_0_20px_rgba(239,68,68,0.4)] transition-all active:scale-95"
-                    >
-                        Reset Total do Sistema
-                    </button>
+
+                    <div className="space-y-5 relative z-10">
+                        <div>
+                            <input
+                                type="text" placeholder="Username ou ID do alvo..."
+                                className="w-full bg-black/40 border border-red-500/30 rounded-xl px-5 py-3.5 text-white placeholder:text-red-900/50 focus:border-red-500 focus:ring-1 focus:ring-red-500 outline-none transition-all text-sm font-bold"
+                                value={targetUser} onChange={e => setTargetUser(e.target.value)}
+                            />
+                        </div>
+
+                        {/* Checkboxes de Seletividade */}
+                        <div className="grid grid-cols-2 gap-3">
+                            <button 
+                                onClick={() => toggleOption('games')}
+                                className={`flex items-center justify-center gap-2 p-3 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all ${resetOptions.games ? 'bg-red-500/20 border-red-500 text-red-400' : 'bg-black/30 border-white/5 text-gray-500 hover:border-white/20'}`}
+                            >
+                                🎮 Progresso
+                            </button>
+                            <button 
+                                onClick={() => toggleOption('social')}
+                                className={`flex items-center justify-center gap-2 p-3 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all ${resetOptions.social ? 'bg-red-500/20 border-red-500 text-red-400' : 'bg-black/30 border-white/5 text-gray-500 hover:border-white/20'}`}
+                            >
+                                💬 Social / Feed
+                            </button>
+                            <button 
+                                onClick={() => toggleOption('inventory')}
+                                className={`flex items-center justify-center gap-2 p-3 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all ${resetOptions.inventory ? 'bg-red-500/20 border-red-500 text-red-400' : 'bg-black/30 border-white/5 text-gray-500 hover:border-white/20'}`}
+                            >
+                                🎒 Inventário
+                            </button>
+                            <button 
+                                onClick={() => toggleOption('stats')}
+                                className={`flex items-center justify-center gap-2 p-3 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all ${resetOptions.stats ? 'bg-red-500/20 border-red-500 text-red-400' : 'bg-black/30 border-white/5 text-gray-500 hover:border-white/20'}`}
+                            >
+                                📊 Stats / Nível
+                            </button>
+                        </div>
+
+                        <button
+                            onClick={handleTargetedReset} disabled={loading || !targetUser}
+                            className="w-full py-4 mt-2 bg-red-500/10 border border-red-500/30 text-red-500 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-red-500 hover:text-white hover:shadow-[0_0_20px_rgba(239,68,68,0.4)] transition-all active:scale-95 disabled:opacity-50 disabled:grayscale"
+                        >
+                            Executar Limpeza
+                        </button>
+                    </div>
                 </div>
 
             </div>
