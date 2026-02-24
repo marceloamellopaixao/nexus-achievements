@@ -10,22 +10,9 @@ export const metadata: Metadata = {
   description: "Converse em privado com outros membros da comunidade do Nexus Achievements.",
 }
 
-interface ChatUser {
-  username: string;
-  avatar_url: string | null;
-}
-
-interface RawChatMessage {
-  id: string;
-  content: string;
-  created_at: string;
-  user_id: string;
-  users: ChatUser | ChatUser[] | null;
-}
-
-interface DmPageProps {
-  params: Promise<{ username: string }>;
-}
+interface ChatUser { username: string; avatar_url: string | null; }
+interface RawChatMessage { id: string; content: string; created_at: string; user_id: string; users: ChatUser | ChatUser[] | null; }
+interface DmPageProps { params: Promise<{ username: string }>; }
 
 export default async function DirectMessagePage({ params }: DmPageProps) {
   const { username } = await params;
@@ -34,41 +21,31 @@ export default async function DirectMessagePage({ params }: DmPageProps) {
 
   if (!user) redirect('/login');
 
-  const { data: targetUser } = await supabase
-    .from('users')
-    .select('id, username, avatar_url')
-    .eq('username', username)
-    .single();
+  const { data: targetUser } = await supabase.from('users').select('id, username, avatar_url').eq('username', username).single();
 
   if (!targetUser) notFound();
   if (targetUser.id === user.id) redirect('/chat');
 
+  // Verifica permissões
+  const { data: followData } = await supabase.from('user_follows').select('follower_id').eq('follower_id', user.id).eq('following_id', targetUser.id).maybeSingle();
+  const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
+  const isAdmin = userData?.role === 'admin';
+
   const sortedIds = [user.id, targetUser.id].sort();
   const channelId = `dm_${sortedIds[0]}_${sortedIds[1]}`;
 
-  const { data: messagesData } = await supabase
-    .from('chat_messages')
-    .select('id, content, created_at, user_id, users(username, avatar_url)')
-    .eq('channel', channelId)
-    .order('created_at', { ascending: false })
-    .limit(50);
+  const { data: messagesData } = await supabase.from('chat_messages').select('id, content, created_at, user_id, users(username, avatar_url)').eq('channel', channelId).order('created_at', { ascending: false }).limit(50);
 
   const initialMessages = ((messagesData as unknown as RawChatMessage[]) || []).map(m => {
     const userData = Array.isArray(m.users) ? m.users[0] : m.users;
-    return {
-      id: m.id,
-      content: m.content,
-      created_at: m.created_at,
-      user_id: m.user_id,
-      users: userData || null 
-    };
+    return { id: m.id, content: m.content, created_at: m.created_at, user_id: m.user_id, users: userData || null };
   }).reverse();
 
   const chatIcon = targetUser.avatar_url ? (
-    <div className="relative w-8 h-8 shrink-0 overflow-hidden rounded-full border border-border">
+    <div key="chat-icon" className="relative w-8 h-8 shrink-0 overflow-hidden rounded-full border border-border">
       <Image src={targetUser.avatar_url} alt={targetUser.username} fill className="object-cover" unoptimized />
     </div>
-  ) : <FaUser className="text-primary" />;
+  ) : <FaUser key="chat-icon" className="text-primary" />;
 
   return (
     <ChatClient 
@@ -78,6 +55,10 @@ export default async function DirectMessagePage({ params }: DmPageProps) {
       chatTitle={targetUser.username}
       chatSubtitle="Mensagem Direta Privada"
       icon={chatIcon}
+      isPrivate={true}
+      isFollowingTarget={!!followData}
+      targetUserId={targetUser.id}
+      isAdmin={isAdmin}
     />
   );
 }

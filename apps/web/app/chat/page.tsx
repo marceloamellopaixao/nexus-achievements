@@ -8,22 +8,19 @@ export const metadata: Metadata = {
   description: "Participe do chat global do Nexus Achievements e converse com outros membros da comunidade em tempo real.",
 }
 
-interface ChatUser {
-  username: string;
-  avatar_url: string | null;
-}
-
-interface RawChatMessage {
-  id: string;
-  content: string;
-  created_at: string;
-  user_id: string;
-  users: ChatUser | ChatUser[] | null;
-}
+interface ChatUser { username: string; avatar_url: string | null; }
+interface RawChatMessage { id: string; content: string; created_at: string; user_id: string; users: ChatUser | ChatUser[] | null; }
 
 export default async function ChatPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
+
+  // Verifica se é Admin
+  let isAdmin = false;
+  if (user) {
+    const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
+    isAdmin = userData?.role === 'admin';
+  }
 
   const { data: messagesData } = await supabase
     .from('chat_messages')
@@ -34,13 +31,7 @@ export default async function ChatPage() {
 
   const initialMessages = ((messagesData as unknown as RawChatMessage[]) || []).map(m => {
     const userData = Array.isArray(m.users) ? m.users[0] : m.users;
-    return {
-      id: m.id,
-      content: m.content,
-      created_at: m.created_at,
-      user_id: m.user_id,
-      users: userData || null
-    };
+    return { id: m.id, content: m.content, created_at: m.created_at, user_id: m.user_id, users: userData || null };
   }).reverse();
 
   return (
@@ -49,6 +40,7 @@ export default async function ChatPage() {
       currentUserId={user?.id} 
       channelId="global" 
       icon={<FaGlobeAmericas className="text-primary" />}
+      isAdmin={isAdmin}
     />
   );
 }
