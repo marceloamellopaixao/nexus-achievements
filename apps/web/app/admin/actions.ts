@@ -83,3 +83,60 @@ export async function performGlobalReset() {
     revalidatePath('/')
     return { success: 'O Nexus foi resetado com sucesso!' }
 }
+
+// ==========================================
+// RESET GLOBAL & DIRECIONADO
+// ==========================================
+export async function performTargetedReset(targetUsernameOrId: string, options: { games: boolean, social: boolean, inventory: boolean, stats: boolean }) {
+    if (!(await checkAdmin())) return { error: 'Acesso negado.' }
+    if (!targetUsernameOrId) return { error: 'Forneça um ID, Username ou Email válido.' }
+
+    const supabase = await createClient()
+
+    // Limpa espaços acidentais no início ou no fim
+    const target = targetUsernameOrId.trim();
+
+    let userId = target;
+
+    // Regex para validar se o texto é exatamente um UUID
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(target);
+
+    if (!isUUID) {
+        // Se não for UUID, procura pelo Username OU pelo Email
+        const { data: user, error: userError } = await supabase
+            .from('users')
+            .select('id')
+            .or(`username.ilike.${target},email.ilike.${target}`)
+            .maybeSingle();
+
+        if (userError) {
+            console.error("Erro na busca do utilizador:", userError);
+            return { error: 'Erro de conexão ao procurar o caçador.' }
+        }
+        if (!user) {
+            return { error: `O caçador '${target}' não existe na base de dados.` }
+        }
+        userId = user.id;
+    } else {
+        // Se foi enviado um UUID, apenas confirmamos se ele existe no banco
+        const { data: user } = await supabase.from('users').select('id').eq('id', target).maybeSingle();
+        if (!user) return { error: `Nenhum caçador encontrado com o ID fornecido.` }
+    }
+
+    // 2. Executa a função RPC cirúrgica
+    const { error } = await supabase.rpc('target_user_reset', {
+        target_user_id: userId,
+        reset_games: options.games,
+        reset_social: options.social,
+        reset_inventory: options.inventory,
+        reset_stats: options.stats
+    });
+
+    if (error) {
+        console.error("Erro fatal no reset:", error);
+        return { error: `Falha ao limpar o alvo: ${error.message}` }
+    }
+
+    revalidatePath('/', 'layout')
+    return { success: `A mente e o progresso do alvo foram limpos com sucesso.` }
+}
