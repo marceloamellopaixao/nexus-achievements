@@ -105,10 +105,19 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
 
       <ClientBackButton href={backUrl} title={backTitle} />
 
-      {/* BANNER */}
-      <div className="-mx-4 md:-mx-8 -mt-4 md:-mt-8 h-56 md:h-72 lg:h-80 relative overflow-hidden border-b border-border/50 shadow-2xl rounded-b-4xl transition-all duration-700 z-0" style={{ background: styles.background || '#18181b' }}>
-        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-20 mix-blend-overlay"></div>
-        <div className="absolute inset-0 bg-linear-to-t from-background via-background/60 to-transparent" />
+      {/* BANNER COM IMAGEM PERSONALIZADA */}
+      <div className="-mx-4 md:-mx-8 -mt-4 md:-mt-8 h-56 md:h-72 lg:h-80 relative overflow-hidden border-b border-white/5 shadow-2xl rounded-b-4xl transition-all duration-700 z-0 bg-background">
+
+        {/* Se tiver Fundo Personalizado (Banner Upload) */}
+        {profile.profile_banner_url && (
+          <Image src={profile.profile_banner_url} alt="Banner" fill className="object-cover opacity-70 mix-blend-lighten" unoptimized />
+        )}
+
+        {/* Camada de Cor da Loja (Sobrepõe à imagem com transparência se existir) */}
+        <div className="absolute inset-0" style={styles.background ? { background: styles.background, opacity: profile.profile_banner_url ? 0.6 : 1 } : { background: '#18181b', opacity: profile.profile_banner_url ? 0.8 : 1 }}></div>
+
+        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-20 mix-blend-overlay pointer-events-none"></div>
+        <div className="absolute inset-0 bg-linear-to-t from-background via-background/60 to-transparent pointer-events-none" />
       </div>
 
       {/* NOVO CARTÃO PRINCIPAL - w-full e min-w-0 forçam o cartão a respeitar a tela */}
@@ -130,20 +139,20 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
 
           {/* CABEÇALHO DO PERFIL */}
           <div className="pt-16 md:pt-20 pb-6 md:pb-8 flex flex-col items-center text-center border-b border-white/5 gap-3 w-full min-w-0">
-            
+
             {/* Título Responsivo - max-w-full impede que o nome estique tudo */}
             <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-3 w-full min-w-0 px-2">
               <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight truncate max-w-full drop-shadow-md">
                 {profile.username}
               </h1>
-              
+
               <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                 <span className="text-[10px] md:text-xs font-black bg-primary/20 text-primary border border-primary/50 px-2.5 py-1 rounded-lg uppercase tracking-wider">
                   Lvl {profile.global_level || 1}
                 </span>
-                
+
                 <span className="hidden sm:block w-px h-4 bg-white/20"></span>
-                
+
                 {styles.titleStyle && styles.titleName ? (
                   <span className="inline-block px-3 py-1.5 rounded-lg border border-white/20 text-[10px] sm:text-xs font-black shadow-lg text-white truncate max-w-30 sm:max-w-full" style={{ background: styles.titleStyle }}>
                     {styles.titleName}
@@ -156,7 +165,7 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
 
             {/* Biografia Limitada para não estourar a tela com palavras longas */}
             <div className="relative w-full max-w-lg mx-auto mt-2 px-2">
-              <FaCommentDots className="absolute top-4 left-5 sm:left-4 text-white/10 text-xl sm:text-2xl" />
+              <FaCommentDots className="absolute top-5 left-6 text-white/10 text-xl sm:text-2xl" />
               <p className="text-gray-300 leading-relaxed text-xs sm:text-sm bg-background/40 p-4 sm:p-5 pl-10 sm:pl-12 rounded-2xl border border-white/5 shadow-inner italic text-center sm:text-left wrap-break-words w-full">
                 &quot;{profile.bio || "Este caçador prefere manter o mistério."}&quot;
               </p>
@@ -191,17 +200,17 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
               )}
               <div className="flex items-center justify-center gap-2 sm:gap-4 bg-background/60 px-3 py-3.5 rounded-xl border border-white/5 w-full">
                 <Link href={`/profile/${profile.username}/network?tab=followers`} className="flex-1 min-w-0 flex flex-col items-center hover:text-primary transition-colors">
-                  <strong className="text-white text-base md:text-lg block mb-0.5 truncate">{followersCount || 0}</strong> 
+                  <strong className="text-white text-base md:text-lg block mb-0.5 truncate">{followersCount || 0}</strong>
                   <span className="text-[10px] sm:text-xs text-gray-400 font-bold uppercase tracking-wider truncate max-w-full">Seguidores</span>
                 </Link>
                 <div className="w-px h-8 bg-white/10 shrink-0"></div>
                 <Link href={`/profile/${profile.username}/network?tab=following`} className="flex-1 min-w-0 flex flex-col items-center hover:text-primary transition-colors">
-                  <strong className="text-white text-base md:text-lg block mb-0.5 truncate">{followingCount || 0}</strong> 
+                  <strong className="text-white text-base md:text-lg block mb-0.5 truncate">{followingCount || 0}</strong>
                   <span className="text-[10px] sm:text-xs text-gray-400 font-bold uppercase tracking-wider truncate max-w-full">Seguindo</span>
                 </Link>
               </div>
               <div className="flex items-center justify-center gap-2 bg-background/60 px-4 py-3.5 rounded-xl border border-white/5 w-full">
-                <FaCalendarAlt className="text-sm shrink-0 text-gray-400" /> 
+                <FaCalendarAlt className="text-sm shrink-0 text-gray-400" />
                 <span className="text-[10px] sm:text-xs text-gray-400 font-bold uppercase tracking-wider truncate">
                   {joinDate}
                 </span>
@@ -252,7 +261,7 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
 
       {/* SECÇÃO INFERIOR */}
       <div className="max-w-5xl mx-auto px-4 md:px-0 mt-8 md:mt-10 grid grid-cols-1 xl:grid-cols-2 gap-2 md:gap-4 items-start">
-        
+
         {/* ESTANTE */}
         <div className="xl:col-span-2 space-y-4 w-full min-w-0">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-white/10 pb-3 gap-2">
@@ -297,7 +306,7 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
               <FaCommentDots className="text-primary shrink-0" /> <span className="truncate">Mural</span>
             </h2>
           </div>
-          
+
           <div className="bg-surface/30 backdrop-blur-xl border border-white/10 rounded-3xl p-4 flex flex-col shadow-2xl relative w-full max-h-125 md:max-h-150 mb-18 md:mb-6">
             <div className="shrink-0 w-full z-10">
               {authUser ? (
@@ -308,14 +317,14 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
                 </div>
               )}
             </div>
-            
+
             {/* O pb-6 (padding-bottom) garante que a caixa não encobre a última mensagem */}
             <div className="flex-1 min-h-0 overflow-y-auto pr-1 md:pr-2 custom-scrollbar relative z-0 w-full">
               <MuralList initialComments={comments} profileId={profile.id} authUserId={authUser?.id} isOwner={isOwner} currentPath={currentPath} />
             </div>
           </div>
         </div>
-        
+
       </div>
     </div>
   );
