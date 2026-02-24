@@ -2,7 +2,7 @@ import { createClient } from "@/utils/supabase/server";
 import Link from "next/link";
 import GameSearch from "./GameSearch";
 import GameCardImage from "../components/GameCardImage";
-import { FaSteam, FaPlaystation, FaXbox, FaArrowRight, FaArrowLeft } from "react-icons/fa";
+import { FaSteam, FaPlaystation, FaXbox, FaArrowRight, FaArrowLeft, FaGamepad, FaTrophy, FaGhost } from "react-icons/fa";
 import { SiEpicgames } from "react-icons/si";
 import { Metadata } from "next";
 
@@ -36,7 +36,7 @@ export default async function GamesLibraryPage({ searchParams }: GamesLibraryPro
   const supabase = await createClient();
 
   // ====================================================================
-  // 🎯 BUSCA DINÂMICA DE CATEGORIAS (Vindo da sua própria API/Database)
+  // 🎯 BUSCA DINÂMICA DE CATEGORIAS
   // ====================================================================
   const { data: catData } = await supabase
     .from('games')
@@ -95,12 +95,12 @@ export default async function GamesLibraryPage({ searchParams }: GamesLibraryPro
   const currentFullUrl = buildUrl({});
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 pb-10">
+    <div className="space-y-8 animate-in fade-in duration-500 pb-10 px-2 md:px-0">
 
       {/* CABEÇALHO */}
-      <div className="pt-8 pb-6 border-b border-white/5">
-        <h1 className="text-4xl md:text-5xl font-black text-white tracking-tight drop-shadow-md flex items-center gap-3">
-          <span>🎮</span> Biblioteca
+      <div className="pt-6 md:pt-8 pb-6 border-b border-white/5">
+        <h1 className="text-3xl md:text-5xl font-black text-white tracking-tight drop-shadow-md flex items-center gap-3">
+          <FaGamepad className="text-primary text-4xl md:text-5xl" /> Biblioteca
         </h1>
         <p className="text-gray-400 mt-2 text-sm md:text-base">
           O catálogo completo do Nexus. Mostrando <strong className="text-primary">{totalItems}</strong> jogos.
@@ -108,28 +108,28 @@ export default async function GamesLibraryPage({ searchParams }: GamesLibraryPro
       </div>
 
       {/* GRID DE LAYOUT (Filtros à Esquerda, Jogos à Direita) */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 md:gap-8 items-start">
 
         {/* =========================================
             SIDEBAR DE FILTROS (ESQUERDA)
             ========================================= */}
-        <aside className="lg:col-span-1 space-y-6 lg:sticky lg:top-8">
+        <aside className="lg:col-span-1 space-y-4 md:space-y-6 lg:sticky lg:top-8">
 
-          <div className="bg-surface/30 p-5 rounded-3xl border border-white/5 shadow-inner">
-            <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest mb-4">Pesquisa</h3>
+          <div className="bg-surface/30 p-4 md:p-5 rounded-2xl md:rounded-3xl border border-white/5 shadow-inner">
+            <h3 className="text-xs md:text-sm font-black text-gray-400 uppercase tracking-widest mb-3 md:mb-4">Pesquisa</h3>
             <GameSearch />
           </div>
 
-          <div className="bg-surface/30 p-5 rounded-3xl border border-white/5 shadow-inner">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest">Plataforma</h3>
+          <div className="bg-surface/30 p-4 md:p-5 rounded-2xl md:rounded-3xl border border-white/5 shadow-inner">
+            <div className="flex items-center justify-between mb-3 md:mb-4">
+              <h3 className="text-xs md:text-sm font-black text-gray-400 uppercase tracking-widest">Plataforma</h3>
             </div>
             <div className="space-y-2">
               {PLATFORMS.map((plat) => (
                 <Link
                   key={plat.id}
-                  href={`/games?platform=${plat.id}`} // Mudar de plataforma zera os outros filtros
-                  className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm transition-all ${currentPlatform === plat.id
+                  href={`/games?platform=${plat.id}`}
+                  className={`flex items-center gap-3 px-4 py-2.5 md:py-3 rounded-xl font-bold text-sm transition-all ${currentPlatform === plat.id
                     ? 'bg-primary/20 border border-primary/50 text-primary shadow-inner'
                     : 'bg-background/50 border border-transparent text-gray-400 hover:text-white hover:bg-white/5'
                     }`}
@@ -141,24 +141,24 @@ export default async function GamesLibraryPage({ searchParams }: GamesLibraryPro
             </div>
           </div>
 
-          <div className="bg-surface/30 p-5 rounded-3xl border border-white/5 shadow-inner">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest">Ordenar Por</h3>
+          <div className="bg-surface/30 p-4 md:p-5 rounded-2xl md:rounded-3xl border border-white/5 shadow-inner">
+            <div className="flex items-center justify-between mb-3 md:mb-4">
+              <h3 className="text-xs md:text-sm font-black text-gray-400 uppercase tracking-widest">Ordenar Por</h3>
             </div>
             <div className="flex flex-col gap-2">
-              <Link href={buildUrl({ sort: 'name', page: '1' })} className={`px-4 py-3 rounded-xl font-bold text-sm transition-all ${sortBy === 'name' ? 'bg-primary/20 border border-primary/50 text-primary shadow-inner' : 'bg-background/50 border border-transparent text-gray-400 hover:text-white hover:bg-white/5'}`}>
+              <Link href={buildUrl({ sort: 'name', page: '1' })} className={`px-4 py-2.5 md:py-3 rounded-xl font-bold text-sm transition-all ${sortBy === 'name' ? 'bg-primary/20 border border-primary/50 text-primary shadow-inner' : 'bg-background/50 border border-transparent text-gray-400 hover:text-white hover:bg-white/5'}`}>
                 A-Z (Ordem Alfabética)
               </Link>
-              <Link href={buildUrl({ sort: 'achievements', page: '1' })} className={`px-4 py-3 rounded-xl font-bold text-sm flex items-center gap-2 transition-all ${sortBy === 'achievements' ? 'bg-primary/20 border border-primary/50 text-primary shadow-inner' : 'bg-background/50 border border-transparent text-gray-400 hover:text-white hover:bg-white/5'}`}>
-                🏆 Mais Conquistas
+              <Link href={buildUrl({ sort: 'achievements', page: '1' })} className={`px-4 py-2.5 md:py-3 rounded-xl font-bold text-sm flex items-center gap-2 transition-all ${sortBy === 'achievements' ? 'bg-primary/20 border border-primary/50 text-primary shadow-inner' : 'bg-background/50 border border-transparent text-gray-400 hover:text-white hover:bg-white/5'}`}>
+                <FaTrophy className={sortBy === 'achievements' ? 'text-primary' : 'text-gray-500'} /> Mais Conquistas
               </Link>
             </div>
           </div>
 
           {uniqueCategories.length > 0 && (
-            <div className="bg-surface/30 p-5 rounded-3xl border border-white/5 shadow-inner">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest">Gêneros</h3>
+            <div className="bg-surface/30 p-4 md:p-5 rounded-2xl md:rounded-3xl border border-white/5 shadow-inner">
+              <div className="flex items-center justify-between mb-3 md:mb-4">
+                <h3 className="text-xs md:text-sm font-black text-gray-400 uppercase tracking-widest">Gêneros</h3>
                 {currentCategory && (
                   <Link href={buildUrl({ category: null, page: '1' })} className="text-[10px] bg-red-500/20 text-red-400 px-2 py-1 rounded border border-red-500/30 hover:bg-red-500/30 transition-colors uppercase font-bold">
                     Limpar
@@ -166,7 +166,7 @@ export default async function GamesLibraryPage({ searchParams }: GamesLibraryPro
                 )}
               </div>
 
-              <div className="flex flex-wrap gap-2 max-h-64 overflow-y-auto custom-scrollbar pr-2">
+              <div className="flex flex-wrap gap-2 max-h-48 md:max-h-64 overflow-y-auto custom-scrollbar pr-2">
                 <Link
                   href={buildUrl({ category: null, page: '1' })}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${!currentCategory ? 'bg-blue-500/20 border-blue-500/50 text-blue-400' : 'border-transparent bg-background/50 text-gray-500 hover:bg-white/10 hover:text-white'}`}
@@ -196,22 +196,25 @@ export default async function GamesLibraryPage({ searchParams }: GamesLibraryPro
             ========================================= */}
         <main className="lg:col-span-3">
           {games && games.length > 0 ? (
-            <div className="space-y-10">
-              {/* CONTROLOS DE PAGINAÇÃO */}
+            <div className="space-y-6 md:space-y-10">
+              
+              {/* CONTROLOS DE PAGINAÇÃO (TOPO) - Agora 100% responsivos */}
               {totalPages > 1 && (
-                <div className="flex items-center justify-between border-b border-white/5 pb-8 mb-8">
-                  <Link href={hasPrevPage ? buildUrl({ page: (currentPage - 1).toString() }) : '#'} className={`px-6 py-3 rounded-xl font-black text-sm transition-all ${hasPrevPage ? 'bg-surface border border-white/10 text-white hover:bg-primary hover:border-primary' : 'bg-surface/50 text-gray-600 cursor-not-allowed pointer-events-none'}`}>
-                    <FaArrowLeft className="mr-2 inline" /> Anterior
+                <div className="flex items-center justify-between border-b border-white/5 pb-4 mb-4 md:pb-8 md:mb-8 gap-2">
+                  <Link href={hasPrevPage ? buildUrl({ page: (currentPage - 1).toString() }) : '#'} className={`flex items-center justify-center gap-2 px-4 py-2.5 sm:px-6 sm:py-3 rounded-xl font-black text-xs sm:text-sm transition-all ${hasPrevPage ? 'bg-surface border border-white/10 text-white hover:bg-primary hover:border-primary' : 'bg-surface/50 text-gray-600 cursor-not-allowed pointer-events-none'}`}>
+                    <FaArrowLeft /> <span className="hidden sm:inline">Anterior</span>
                   </Link>
-                  <span className="text-gray-400 font-bold text-sm px-4 py-2 bg-surface/50 border border-white/10 rounded-xl uppercase">
-                    Página {currentPage} de {totalPages}
+                  <span className="text-gray-400 font-bold text-xs sm:text-sm px-3 py-2 sm:px-4 sm:py-2.5 bg-surface/50 border border-white/10 rounded-xl uppercase text-center shrink-0">
+                    <span className="hidden sm:inline">Página </span>{currentPage} <span className="hidden sm:inline">de {totalPages}</span>
+                    <span className="sm:hidden">/ {totalPages}</span>
                   </span>
-                  <Link href={hasNextPage ? buildUrl({ page: (currentPage + 1).toString() }) : '#'} className={`px-6 py-3 rounded-xl font-black text-sm transition-all ${hasNextPage ? 'bg-surface border border-white/10 text-white hover:bg-primary hover:border-primary' : 'bg-surface/50 text-gray-600 cursor-not-allowed pointer-events-none'}`}>
-                    Próxima <FaArrowRight className="ml-2 inline" />
+                  <Link href={hasNextPage ? buildUrl({ page: (currentPage + 1).toString() }) : '#'} className={`flex items-center justify-center gap-2 px-4 py-2.5 sm:px-6 sm:py-3 rounded-xl font-black text-xs sm:text-sm transition-all ${hasNextPage ? 'bg-surface border border-white/10 text-white hover:bg-primary hover:border-primary' : 'bg-surface/50 text-gray-600 cursor-not-allowed pointer-events-none'}`}>
+                    <span className="hidden sm:inline">Próxima</span> <FaArrowRight />
                   </Link>
                 </div>
               )}
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-6">
                 {games.map((game) => (
                   <Link
                     href={`/games/${game.id}?back=${encodeURIComponent(currentFullUrl)}`}
@@ -223,12 +226,12 @@ export default async function GamesLibraryPage({ searchParams }: GamesLibraryPro
                     </div>
                     <div className="absolute inset-x-0 bottom-0 h-2/3 bg-linear-to-t from-background via-background/60 to-transparent z-10 pointer-events-none"></div>
                     <div className="absolute inset-x-0 bottom-0 p-3 md:p-4 z-20 flex flex-col justify-end">
-                      <h3 className="font-black text-white text-sm md:text-base line-clamp-2 drop-shadow-md leading-tight group-hover:text-primary transition-colors">
+                      <h3 className="font-black text-white text-xs md:text-sm line-clamp-2 drop-shadow-md leading-tight group-hover:text-primary transition-colors">
                         {game.title}
                       </h3>
-                      <div className="mt-2 flex items-center gap-1.5">
-                        <span className="bg-background/80 backdrop-blur-md border border-white/10 px-2 py-1 rounded-md text-[10px] font-black text-yellow-500 uppercase tracking-widest shadow-inner">
-                          🏆 {game.total_achievements}
+                      <div className="mt-1.5 md:mt-2 flex items-center gap-1.5">
+                        <span className="flex items-center gap-1.5 bg-background/80 backdrop-blur-md border border-white/10 px-2 py-1 rounded-md text-[9px] md:text-[10px] font-black text-yellow-500 uppercase tracking-widest shadow-inner">
+                          <FaTrophy className="text-[10px]" /> {game.total_achievements}
                         </span>
                       </div>
                     </div>
@@ -236,30 +239,31 @@ export default async function GamesLibraryPage({ searchParams }: GamesLibraryPro
                 ))}
               </div>
 
-              {/* CONTROLOS DE PAGINAÇÃO */}
+              {/* CONTROLOS DE PAGINAÇÃO (FUNDO) */}
               {totalPages > 1 && (
-                <div className="flex items-center justify-between border-t border-white/5 pt-8 mt-8">
-                  <Link href={hasPrevPage ? buildUrl({ page: (currentPage - 1).toString() }) : '#'} className={`px-6 py-3 rounded-xl font-black text-sm transition-all ${hasPrevPage ? 'bg-surface border border-white/10 text-white hover:bg-primary hover:border-primary' : 'bg-surface/50 text-gray-600 cursor-not-allowed pointer-events-none'}`}>
-                    <FaArrowLeft className="mr-2 inline" /> Anterior
+                <div className="flex items-center justify-between border-t border-white/5 pt-6 mt-6 md:pt-8 md:mt-8 pb-6 mb-6 md:pb-0 md:mb-0 gap-2">
+                  <Link href={hasPrevPage ? buildUrl({ page: (currentPage - 1).toString() }) : '#'} className={`flex items-center justify-center gap-2 px-4 py-2.5 sm:px-6 sm:py-3 rounded-xl font-black text-xs sm:text-sm transition-all ${hasPrevPage ? 'bg-surface border border-white/10 text-white hover:bg-primary hover:border-primary' : 'bg-surface/50 text-gray-600 cursor-not-allowed pointer-events-none'}`}>
+                    <FaArrowLeft /> <span className="hidden sm:inline">Anterior</span>
                   </Link>
-                  <span className="text-gray-400 font-bold text-sm px-4 py-2 bg-surface/50 border border-white/10 rounded-xl uppercase">
-                    Página {currentPage} de {totalPages}
+                  <span className="text-gray-400 font-bold text-xs sm:text-sm px-3 py-2 sm:px-4 sm:py-2.5 bg-surface/50 border border-white/10 rounded-xl uppercase text-center shrink-0">
+                    <span className="hidden sm:inline">Página </span>{currentPage} <span className="hidden sm:inline">de {totalPages}</span>
+                    <span className="sm:hidden">/ {totalPages}</span>
                   </span>
-                  <Link href={hasNextPage ? buildUrl({ page: (currentPage + 1).toString() }) : '#'} className={`px-6 py-3 rounded-xl font-black text-sm transition-all ${hasNextPage ? 'bg-surface border border-white/10 text-white hover:bg-primary hover:border-primary' : 'bg-surface/50 text-gray-600 cursor-not-allowed pointer-events-none'}`}>
-                    Próxima <FaArrowRight className="ml-2 inline" />
+                  <Link href={hasNextPage ? buildUrl({ page: (currentPage + 1).toString() }) : '#'} className={`flex items-center justify-center gap-2 px-4 py-2.5 sm:px-6 sm:py-3 rounded-xl font-black text-xs sm:text-sm transition-all ${hasNextPage ? 'bg-surface border border-white/10 text-white hover:bg-primary hover:border-primary' : 'bg-surface/50 text-gray-600 cursor-not-allowed pointer-events-none'}`}>
+                    <span className="hidden sm:inline">Próxima</span> <FaArrowRight />
                   </Link>
                 </div>
               )}
             </div>
           ) : (
-            /* Empty State */
-            <div className="py-32 text-center flex flex-col items-center justify-center bg-surface/20 rounded-[3rem] border border-dashed border-white/10 shadow-inner h-full min-h-125">
-              <span className="text-7xl mb-6 opacity-50 grayscale filter drop-shadow-md">👻</span>
-              <h3 className="text-2xl font-black text-white tracking-tight">Nenhum jogo encontrado</h3>
-              <p className="text-sm mt-3 text-gray-400 max-w-md font-medium leading-relaxed">
-                Nenhum resultado para os filtros selecionados.
+            /* Empty State Modernizado */
+            <div className="py-20 md:py-32 text-center flex flex-col items-center justify-center bg-surface/20 rounded-3xl md:rounded-[3rem] border border-dashed border-white/10 shadow-inner h-full min-h-75 md:min-h-125">
+              <FaGhost className="text-5xl md:text-7xl mb-4 md:mb-6 text-white/10 drop-shadow-md" />
+              <h3 className="text-xl md:text-2xl font-black text-white tracking-tight">Nenhum jogo encontrado</h3>
+              <p className="text-xs md:text-sm mt-2 md:mt-3 text-gray-400 max-w-xs md:max-w-md font-medium leading-relaxed px-4">
+                Nenhum resultado corresponde aos filtros selecionados.
               </p>
-              <Link href="/games" className="mt-6 px-6 py-3 bg-surface border border-white/10 text-white font-bold rounded-xl hover:bg-white/5 transition-all">
+              <Link href="/games" className="mt-6 px-5 md:px-6 py-2.5 md:py-3 bg-surface border border-white/10 text-white font-bold text-sm rounded-xl hover:bg-white/5 transition-all">
                 Limpar Todos os Filtros
               </Link>
             </div>
