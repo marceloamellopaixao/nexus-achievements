@@ -10,9 +10,9 @@ import { Metadata } from "next";
 import ClientBackButton from "@/app/components/ClientBackButton";
 import CustomizationButton from "./CustomizationButton";
 
-import { FaArrowLeft, FaArrowRight, FaUsers, FaTrophy, FaChartLine, FaCheckCircle, FaBookOpen, FaThumbsUp } from "react-icons/fa";
+import { FaArrowLeft, FaArrowRight, FaUsers, FaTrophy, FaChartLine, FaCheckCircle, FaBookOpen, FaThumbsUp, FaCrown, FaMedal } from "react-icons/fa";
 import { FaCommentDots } from "react-icons/fa6";
-import TextFormatter from "@/app/components/TextFormatter"; // 🔥 Importado
+import TextFormatter from "@/app/components/TextFormatter";
 
 export const metadata: Metadata = {
   title: "Detalhes do Jogo | Nexus Achievements",
@@ -26,7 +26,19 @@ interface GamePageProps {
 
 type SteamSchemaAchievement = { name: string; defaultvalue: number; displayName: string; hidden: number; description?: string; icon: string; icongray: string; };
 type SteamPlayerAchievement = { apiname: string; achieved: number; unlocktime?: number; };
-type CommunityUser = { user_id: string; is_platinum: boolean; unlocked_achievements: number; total_achievements: number; playtime_minutes: number; last_synced_at: string; users: { username: string; avatar_url: string | null; } | null; };
+
+// 🔥 ADICIONADO: platinum_unlocked_at na tipagem
+type CommunityUser = { 
+  user_id: string; 
+  is_platinum: boolean; 
+  unlocked_achievements: number; 
+  total_achievements: number; 
+  playtime_minutes: number; 
+  last_synced_at: string; 
+  platinum_unlocked_at?: string | null; 
+  users: { username: string; avatar_url: string | null; } | null; 
+};
+
 interface SteamPercentage { name: string; percent: number; }
 interface GuideAuthor { username: string; avatar_url: string | null; title: string | null; }
 interface GameGuide { id: string; author_id: string; title: string; content: string; upvotes: number; created_at: string; users: GuideAuthor | null; }
@@ -94,12 +106,26 @@ export default async function GamePage(props: GamePageProps) {
     } catch (e) { console.error("Erro Cache SGDB", e); }
   }
 
-  const { data: communityRaw } = await supabase.from("user_games").select(`user_id, is_platinum, unlocked_achievements, total_achievements, playtime_minutes, last_synced_at, users ( username, avatar_url )`).eq("game_id", gameId);
+  // 🔥 ADICIONADO: Buscando a platinum_unlocked_at no banco
+  const { data: communityRaw } = await supabase.from("user_games").select(`user_id, is_platinum, unlocked_achievements, total_achievements, playtime_minutes, last_synced_at, platinum_unlocked_at, users ( username, avatar_url )`).eq("game_id", gameId);
   const communityData = (communityRaw as unknown as CommunityUser[]) || [];
   const userProgress = communityData.find(p => p.user_id === user?.id) || null;
 
+  // LÓGICA DO PÓDIO: Ordenação mantida pela Data de Sincronização (A Corrida Justa do Nexus)
+  const platinumWinners = [...communityData]
+    .filter(p => p.is_platinum)
+    .sort((a, b) => new Date(a.last_synced_at).getTime() - new Date(b.last_synced_at).getTime());
+
+  const top10Platinums = platinumWinners.slice(0, 10);
+  const podiumWinners = [
+    top10Platinums[1] || null, // 2º Lugar
+    top10Platinums[0] || null, // 1º Lugar
+    top10Platinums[2] || null  // 3º Lugar
+  ];
+  const runnerUps = top10Platinums.slice(3); // 4º ao 10º
+
   const totalPlayers = communityData.length;
-  const totalPlatinums = communityData.filter(p => p.is_platinum).length;
+  const totalPlatinums = platinumWinners.length;
   const completionRate = totalPlayers > 0 ? Math.round((totalPlatinums / totalPlayers) * 100) : 0;
 
   const total = userProgress?.total_achievements || game.total_achievements || 0;
@@ -193,6 +219,66 @@ export default async function GamePage(props: GamePageProps) {
     }
   }
 
+  const renderPodiumSlot = (winner: CommunityUser | null, position: number) => {
+    const isFirst = position === 1;
+    const isSecond = position === 2;
+    const isThird = position === 3;
+
+    const height = isFirst ? 'h-32 md:h-40' : isSecond ? 'h-24 md:h-32' : 'h-20 md:h-24';
+    const bgGradient = isFirst ? 'from-yellow-400 to-yellow-600' : isSecond ? 'from-gray-300 to-gray-500' : 'from-amber-600 to-amber-800';
+    const textColor = isFirst ? 'text-yellow-400' : isSecond ? 'text-gray-300' : 'text-amber-600';
+    const avatarBorder = isFirst ? 'border-yellow-400 shadow-[0_0_20px_rgba(250,204,21,0.5)]' : isSecond ? 'border-gray-300' : 'border-amber-600';
+    const avatarSize = isFirst ? 'w-16 h-16 md:w-20 md:h-20' : isSecond ? 'w-12 h-12 md:w-16 md:h-16' : 'w-10 h-10 md:w-14 md:h-14';
+
+    const userData = winner?.users;
+    const username = Array.isArray(userData) ? userData[0]?.username : userData?.username;
+    const avatarUrl = Array.isArray(userData) ? userData[0]?.avatar_url : userData?.avatar_url;
+
+    // 🔥 DATA DE EXIBIÇÃO: Dá preferência à Data da Steam. Se não houver, usa a data do Nexus.
+    let displayDate = "";
+    if (winner) {
+      const dateToUse = winner.platinum_unlocked_at ? winner.platinum_unlocked_at : winner.last_synced_at;
+      displayDate = new Date(dateToUse).toLocaleDateString('pt-BR');
+    }
+
+    return (
+      <div className={`flex flex-col items-center justify-end w-24 md:w-32 ${isFirst ? 'z-20' : 'z-10'}`}>
+        {winner ? (
+          <Link href={`/profile/${username}`} className="flex flex-col items-center group mb-3">
+            {isFirst && <FaCrown className="text-yellow-400 text-3xl md:text-4xl mb-2 drop-shadow-[0_0_15px_rgba(250,204,21,0.8)] animate-pulse" />}
+            {isSecond && <FaMedal className="text-gray-300 text-2xl mb-2 drop-shadow-md" />}
+            {isThird && <FaMedal className="text-amber-600 text-xl mb-2 drop-shadow-md" />}
+            
+            <div className={`relative rounded-full border-4 overflow-hidden mb-2 transition-transform duration-300 group-hover:scale-110 bg-background ${avatarSize} ${avatarBorder}`}>
+              {avatarUrl ? (
+                <Image src={avatarUrl} fill className="object-cover" alt="Avatar" unoptimized />
+              ) : (
+                <div className="w-full h-full bg-surface flex items-center justify-center font-black text-white text-xl">
+                  {username?.charAt(0)}
+                </div>
+              )}
+            </div>
+            <span className={`text-xs md:text-sm font-black truncate w-full text-center group-hover:text-white transition-colors ${textColor}`}>{username}</span>
+            <span className="text-[8px] md:text-[9px] text-gray-400 uppercase tracking-widest mt-0.5" title="Data da Platina na Steam">
+              {displayDate}
+            </span>
+          </Link>
+        ) : (
+          <div className="flex flex-col items-center opacity-30 mb-3 grayscale">
+             <div className={`rounded-full border-4 border-dashed border-white/20 mb-2 flex items-center justify-center bg-surface/30 ${avatarSize}`}>
+                <span className="text-gray-500 text-[10px] font-bold uppercase tracking-widest">Livre</span>
+             </div>
+          </div>
+        )}
+        
+        <div className={`w-full rounded-t-xl bg-linear-to-b ${bgGradient} shadow-inner flex items-start justify-center pt-3 relative overflow-hidden ${height}`}>
+          <div className="absolute inset-0 bg-white/10 mix-blend-overlay w-1/3"></div>
+          <span className="font-black text-black/40 text-2xl md:text-4xl drop-shadow-sm">{position}</span>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen pb-32 animate-in fade-in duration-500 relative">
 
@@ -203,12 +289,10 @@ export default async function GamePage(props: GamePageProps) {
         <div className="absolute inset-0 bg-linear-to-t from-background via-background/40 to-transparent z-10 pointer-events-none" />
         <div className="absolute inset-0 bg-linear-to-r from-background/90 via-background/20 to-transparent z-10 pointer-events-none" />
 
-        {/* APENAS ADMIN */}
         {isAdmin && (
           <CustomizationButton
             gameId={gameId}
             type="banner"
-            // 🔥 Removidos os paddings e margins daqui para o overlay funcionar perfeito
           />
         )}
       </div>
@@ -219,12 +303,10 @@ export default async function GamePage(props: GamePageProps) {
           <div className="w-32 md:w-64 aspect-3/4 rounded-2xl md:rounded-4xl border-4 md:border-[6px] border-background bg-surface overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.5)] relative shrink-0 group z-30 isolate transform-gpu">
             <GameCardImage src={updatedCover} title={game.title} />
 
-            {/* APENAS ADMIN */}
             {isAdmin && (
               <CustomizationButton
                 gameId={gameId}
                 type="cover"
-                // 🔥 Removidos os paddings e margins daqui para o overlay funcionar perfeito
               />
             )}
           </div>
@@ -273,7 +355,6 @@ export default async function GamePage(props: GamePageProps) {
           </div>
         </div>
 
-        {/* ABAS */}
         <div className="flex gap-2 md:gap-4 mt-8 md:mt-12 mb-8 md:mb-10 border-b border-white/10 pb-px">
           <Link href={`/games/${gameId}?tab=overview${backQueryString}`} scroll={false} className={`pb-4 px-2 text-xs md:text-sm font-black transition-all tracking-widest relative ${activeTab === 'overview' ? 'text-primary' : 'text-gray-500 hover:text-gray-300'}`}>
             VISÃO GERAL
@@ -303,7 +384,60 @@ export default async function GamePage(props: GamePageProps) {
               </div>
             </div>
 
-            <div className="space-y-6">
+            <div className="bg-surface/30 border border-white/5 rounded-4xl p-6 md:p-8 shadow-inner relative overflow-hidden mt-8">
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-md h-32 bg-yellow-500/10 blur-[100px] pointer-events-none"></div>
+              
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-4 mb-8 relative z-10">
+                <h2 className="text-xl md:text-2xl font-black text-white flex items-center gap-3">
+                  <FaCrown className="text-yellow-400 text-2xl md:text-3xl" /> Hall da Fama
+                  <span className="text-gray-500 text-[10px] md:text-xs font-bold uppercase tracking-widest ml-2 hidden sm:inline border border-white/10 px-2 py-1 rounded-md bg-background">Os Primeiros a Platinar</span>
+                </h2>
+              </div>
+
+              <div className="flex items-end justify-center gap-2 sm:gap-6 relative z-10 pt-4">
+                {renderPodiumSlot(podiumWinners[0] ?? null, 2)}
+                {renderPodiumSlot(podiumWinners[1] ?? null, 1)}
+                {renderPodiumSlot(podiumWinners[2] ?? null, 3)}
+              </div>
+
+              {runnerUps.length > 0 && (
+                <div className="mt-12 bg-background/50 border border-white/5 rounded-2xl p-4 md:p-5 relative z-10">
+                  <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 border-b border-white/5 pb-2">Outros Conquistadores Lendários</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {runnerUps.map((runner, index) => {
+                      const uname = Array.isArray(runner.users) ? runner.users[0]?.username : runner.users?.username;
+                      const avatar = Array.isArray(runner.users) ? runner.users[0]?.avatar_url : runner.users?.avatar_url;
+                      
+                      // 🔥 DATA DA STEAM NOS "OUTROS CONQUISTADORES"
+                      const dateToUse = runner.platinum_unlocked_at ? runner.platinum_unlocked_at : runner.last_synced_at;
+                      
+                      return (
+                        <Link key={runner.user_id} href={`/profile/${uname}`} className="flex items-center gap-3 bg-surface/50 p-2.5 rounded-xl border border-white/5 hover:border-primary/50 transition-colors group">
+                          <span className="text-gray-500 font-black w-5 text-center text-xs group-hover:text-primary transition-colors">#{index + 4}</span>
+                          <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-background border border-white/10 overflow-hidden relative shrink-0">
+                            {avatar ? <Image src={avatar} fill className="object-cover" alt="" unoptimized /> : <span className="w-full h-full flex items-center justify-center text-[10px] font-black">{uname?.charAt(0)}</span>}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs md:text-sm font-bold text-white truncate group-hover:text-primary transition-colors">{uname}</p>
+                            <p className="text-[9px] text-gray-500 tracking-widest uppercase" title="Data da Platina na Steam">
+                              {new Date(dateToUse).toLocaleDateString('pt-BR')}
+                            </p>
+                          </div>
+                        </Link>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+              
+              {totalPlatinums === 0 && (
+                <p className="text-center text-gray-500 font-bold text-sm mt-8 pb-4 relative z-10">
+                  Ninguém platinou este jogo ainda. A coroa está à sua espera!
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-6 pt-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <h2 className="text-xl md:text-2xl font-black text-white flex items-center gap-3">
                   <FaTrophy className="text-primary text-2xl md:text-3xl" /> Conquistas <span className="text-gray-500 text-base font-bold">({totalAchievementsItems})</span>
@@ -373,7 +507,6 @@ export default async function GamePage(props: GamePageProps) {
               <div className="bg-surface/40 backdrop-blur-xl border border-white/5 rounded-4xl p-5 sm:p-6 md:p-10 shadow-2xl relative w-full min-w-0">
                 <div className="absolute top-0 left-0 w-full h-1.5 bg-linear-to-r from-primary via-purple-500 to-primary"></div>
                 
-                {/* 🔥 CORREÇÃO: Botão "Voltar" livre e alinhado perfeitamente! */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 md:mb-8 mt-2">
                   <Link 
                     href={`/games/${gameId}?tab=guides${backQueryString}`}
@@ -398,7 +531,6 @@ export default async function GamePage(props: GamePageProps) {
                 </div>
                 
                 <div className="text-sm md:text-base text-gray-300 leading-relaxed whitespace-pre-wrap wrap-break-word w-full overflow-hidden">
-                  {/* 🔥 APLICADO: Motor Universal de Spoilers e Imagens */}
                   <TextFormatter content={selectedGuide.content} />
                 </div>
                 
@@ -425,7 +557,6 @@ export default async function GamePage(props: GamePageProps) {
                             <span className="text-[8px] md:text-[10px] font-bold text-gray-500 uppercase tracking-widest shrink-0">{new Date(comment.created_at).toLocaleDateString('pt-BR')}</span>
                           </div>
                           <p className="text-xs md:text-sm text-gray-300 leading-relaxed wrap-break-word">
-                            {/* 🔥 APLICADO: Motor Universal de Spoilers nos Comentários */}
                             <TextFormatter content={comment.content} />
                           </p>
                         </div>
@@ -459,7 +590,6 @@ export default async function GamePage(props: GamePageProps) {
                         <div className="flex-1 w-full min-w-0">
                           <h3 className="text-lg md:text-xl font-black text-white mb-2 md:mb-3 group-hover:text-primary transition-colors line-clamp-2 leading-tight wrap-break-word">{guide.title}</h3>
                           <p className="text-xs md:text-sm text-gray-400 line-clamp-3 leading-relaxed mb-4 md:mb-6 wrap-break-word">
-                            {/* 🔥 APLICADO: Filtro para ocultar spoilers da lista principal de guias */}
                             {guide.content.replace(/!\[.*?\]\(.*?\)/g, '[Imagem Anexa] ').replace(/\|\|(.*?)\|\|/g, '[Spoiler Oculto] ')}
                           </p>                       
                         </div>
