@@ -19,6 +19,7 @@ export default function EquipButton({ itemId, category, isEquipped }: Props) {
   const handleEquip = async () => {
     setLoading(true)
 
+    // Se já estiver equipado, manda 'none' para desequipar
     const actionId = isEquipped ? 'none' : itemId
     const result = await equipCosmetic(actionId, category)
 
@@ -27,7 +28,7 @@ export default function EquipButton({ itemId, category, isEquipped }: Props) {
     } else {
       toast.success(isEquipped ? 'Cosmético removido!' : 'Cosmético equipado com sucesso!', {
         theme: 'dark',
-        icon: isEquipped ? <FaTrash className="text-red-500" /> : <FaCheck className="text-green-500" />
+        icon: isEquipped ? <FaTrash className="text-red-500" /> : <FaStar className="text-yellow-500" />
       })
       router.refresh()
     }
@@ -45,11 +46,17 @@ export default function EquipButton({ itemId, category, isEquipped }: Props) {
         }`}
     >
       {loading ? (
-        <><FaSpinner className="animate-spin text-base" /> Aguarde...</>
+        <>
+          <FaSpinner className="animate-spin text-base" /> Aguarde...
+        </>
       ) : isEquipped ? (
-        <><FaTimes className="text-base" /> Remover</>
+        <>
+          <FaTimes className="text-base" /> Remover
+        </>
       ) : (
-        <><FaStar className="text-base" /> Equipar</>
+        <>
+          <FaCheck className="text-base" /> Equipar
+        </>
       )}
     </button>
   )
