@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react'
 import { createGuide, uploadGuideImage } from './actions'
 import { toast } from 'react-toastify'
+import { FaPen, FaTimes, FaImage, FaBook, FaSpinner } from 'react-icons/fa'
 
 export default function GuideForm({ gameId }: { gameId: string }) {
   const [isOpen, setIsOpen] = useState(false)
@@ -21,7 +22,7 @@ export default function GuideForm({ gameId }: { gameId: string }) {
     if (res.error) {
       toast.error(res.error, { theme: 'dark' })
     } else {
-      toast.success('Guia publicado com sucesso!', { theme: 'dark', icon: <span>📚</span> })
+      toast.success('Guia publicado com sucesso!', { theme: 'dark', icon: <FaBook className="text-blue-500" /> })
       setTitle('')
       setContent('')
       setIsOpen(false)
@@ -33,7 +34,6 @@ export default function GuideForm({ gameId }: { gameId: string }) {
     const file = e.target.files?.[0]
     if (!file) return
 
-    // Limite de tamanho (Ex: 5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast.error('A imagem é muito grande. O limite é 5MB.', { theme: 'dark' })
       return
@@ -48,14 +48,13 @@ export default function GuideForm({ gameId }: { gameId: string }) {
     if (res.error) {
       toast.error(res.error, { theme: 'dark' })
     } else if (res.url) {
-      // Insere a imagem no formato Markdown onde o cursor estiver (ou no final do texto)
       const imageTag = `\n![Imagem](${res.url})\n`
       setContent(prev => prev + imageTag)
       toast.success('Imagem inserida no guia!', { theme: 'dark' })
     }
     
     setUploadingImg(false)
-    if (fileInputRef.current) fileInputRef.current.value = '' // Limpa o input
+    if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   if (!isOpen) {
@@ -64,7 +63,7 @@ export default function GuideForm({ gameId }: { gameId: string }) {
         onClick={() => setIsOpen(true)}
         className="w-full py-4 border-2 border-dashed border-border rounded-2xl text-gray-400 font-bold hover:text-white hover:border-primary hover:bg-primary/5 transition-all flex items-center justify-center gap-2"
       >
-        <span>✍️</span> Escrever um Guia de Platina
+        <FaPen /> Escrever um Guia de Platina
       </button>
     )
   }
@@ -73,7 +72,9 @@ export default function GuideForm({ gameId }: { gameId: string }) {
     <form onSubmit={handleSubmit} className="bg-surface border border-border p-6 rounded-2xl animate-in fade-in zoom-in-95 duration-200 shadow-xl">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-xl font-bold text-white">Novo Guia</h3>
-        <button type="button" onClick={() => setIsOpen(false)} className="text-gray-500 hover:text-white">✕</button>
+        <button type="button" onClick={() => setIsOpen(false)} className="text-gray-500 hover:text-white transition-colors">
+          <FaTimes />
+        </button>
       </div>
       
       <div className="space-y-4">
@@ -90,15 +91,15 @@ export default function GuideForm({ gameId }: { gameId: string }) {
           <div className="flex items-center justify-between mb-1">
             <label className="block text-xs font-bold text-gray-400 uppercase">Passo a Passo (Dicas)</label>
             
-            {/* O BOTÃO DE UPLOAD FICA AQUI */}
             <input type="file" accept="image/*" hidden ref={fileInputRef} onChange={handleImageUpload} />
             <button 
               type="button" 
               onClick={() => fileInputRef.current?.click()}
               disabled={uploadingImg}
-              className="text-xs font-bold bg-primary/20 text-primary px-3 py-1 rounded-lg hover:bg-primary hover:text-white transition-colors disabled:opacity-50 flex items-center gap-1"
+              className="text-xs font-bold bg-primary/20 text-primary px-3 py-1.5 rounded-lg hover:bg-primary hover:text-white transition-colors disabled:opacity-50 flex items-center gap-1.5"
             >
-              {uploadingImg ? 'A carregar...' : '🖼️ Inserir Imagem'}
+              {uploadingImg ? <FaSpinner className="animate-spin" /> : <FaImage />} 
+              {uploadingImg ? 'A carregar...' : 'Inserir Imagem'}
             </button>
           </div>
           
@@ -114,7 +115,8 @@ export default function GuideForm({ gameId }: { gameId: string }) {
           <button type="button" onClick={() => setIsOpen(false)} className="px-6 py-2 rounded-xl text-sm font-bold text-gray-400 hover:text-white transition-colors">
             Cancelar
           </button>
-          <button type="submit" disabled={loading || uploadingImg} className="px-6 py-2 bg-primary text-white rounded-xl text-sm font-bold hover:bg-primary/80 transition-colors disabled:opacity-50">
+          <button type="submit" disabled={loading || uploadingImg} className="px-6 py-2 bg-primary text-white rounded-xl text-sm font-bold hover:bg-primary/80 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+            {loading ? <FaSpinner className="animate-spin" /> : null}
             {loading ? 'A publicar...' : 'Publicar Guia'}
           </button>
         </div>
