@@ -94,14 +94,11 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
     }
   }
 
-  // 🔥 Substituímos o 'any[]' pelo tipo ShowcaseGame[] que criámos
   let showcaseGames: ShowcaseGame[] = [];
   const userProgressMap: Record<string, { unlocked: number, is_platinum: boolean, playtime_minutes: number }> = {};
 
   if (profile.showcase_games && profile.showcase_games.length > 0) {
     const { data: gamesData } = await supabase.from("games").select("id, title, cover_url, total_achievements").in("id", profile.showcase_games);
-    
-    // Cast garantindo que o filter devolve o tipo correto
     if (gamesData) showcaseGames = profile.showcase_games.map((id: string) => gamesData.find(g => g.id === id)).filter(Boolean) as ShowcaseGame[];
 
     const { data: progressData } = await supabase
@@ -117,6 +114,31 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
         playtime_minutes: p.playtime_minutes
       };
     });
+
+    // 🔥 A MÁGICA DO ALGORITMO: Ordenar a Estante (Platinados > Progresso > Vazios)
+    showcaseGames.sort((a, b) => {
+      const pA = userProgressMap[a.id];
+      const pB = userProgressMap[b.id];
+      
+      const aPlat = pA?.is_platinum || false;
+      const bPlat = pB?.is_platinum || false;
+      const aUnl = pA?.unlocked || 0;
+      const bUnl = pB?.unlocked || 0;
+
+      // 1º Regra: Platinados primeiro
+      if (aPlat && !bPlat) return -1;
+      if (!aPlat && bPlat) return 1;
+      
+      // 2º Regra: Em progresso vs Zerados
+      if (aUnl > 0 && bUnl === 0) return -1;
+      if (aUnl === 0 && bUnl > 0) return 1;
+      
+      // 3º Regra: Quem tem mais conquistas ganha
+      if (bUnl !== aUnl) return bUnl - aUnl;
+      
+      // 4º Regra: Ordem alfabética
+      return a.title.localeCompare(b.title);
+    });
   }
 
   const joinDate = new Date(profile.created_at).toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' });
@@ -126,7 +148,6 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
 
       <ClientBackButton href={backUrl} title={backTitle} />
 
-      {/* BANNER COM IMAGEM PERSONALIZADA */}
       <div className="-mx-4 md:-mx-8 -mt-4 md:-mt-8 h-56 md:h-72 lg:h-80 relative overflow-hidden border-b border-white/5 shadow-2xl rounded-b-4xl transition-all duration-700 z-0 bg-background">
         {profile.profile_banner_url && (
           <Image src={profile.profile_banner_url} alt="Banner" fill className="object-cover opacity-70 mix-blend-lighten" unoptimized />
@@ -136,7 +157,6 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
         <div className="absolute inset-0 bg-linear-to-t from-background via-background/60 to-transparent pointer-events-none" />
       </div>
 
-      {/* NOVO CARTÃO PRINCIPAL */}
       <div className="max-w-5xl mx-auto -mt-24 md:-mt-32 relative z-10 px-2 sm:px-4 md:px-0">
         <div className="bg-surface/80 backdrop-blur-2xl border border-white/10 rounded-4xl p-4 sm:p-6 md:p-10 shadow-2xl relative w-full min-w-0">
 
@@ -261,7 +281,6 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
         </div>
       </div>
 
-      {/* ESTANTE E MURAL */}
       <div className="max-w-5xl mx-auto px-4 md:px-0 mt-8 md:mt-10 grid grid-cols-1 xl:grid-cols-2 gap-2 md:gap-4 items-start">
         <div className="xl:col-span-2 space-y-4 w-full min-w-0">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-white/10 pb-3 gap-2">
