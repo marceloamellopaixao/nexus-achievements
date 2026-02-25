@@ -47,7 +47,7 @@ export default function GameCardImage({ src, title, isBanner = false }: GameCard
       alt={title}
       fill
       className="object-cover group-hover:scale-105 transition-transform duration-500"
-      sizes={isBanner ? "100vw" : "(max-width: 768px) 50vw, (max-width: 1200px) 25vw, 16vw"}
+      sizes={isBanner ? "100vw" : "(max-width: 768px) 50vw, (max-width: 1300px) 25vw, 16vw"}
       onError={() => setError(true)}
       unoptimized
     />
