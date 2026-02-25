@@ -35,16 +35,13 @@ export async function uploadGuideImage(formData: FormData) {
   const file = formData.get('image') as File
   if (!file) return { error: 'Nenhuma imagem enviada.' }
 
-  // Gera um nome único para a imagem
   const fileExt = file.name.split('.').pop()
   const fileName = `${user.id}-${Math.random().toString(36).substring(2)}.${fileExt}`
 
   try {
-    // 1. CONVERSÃO SEGURA: Transforma o File nativo num Buffer que o Node.js/Supabase entende perfeitamente
     const arrayBuffer = await file.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
 
-    // 2. Envia o Buffer especificando o tipo exato da imagem
     const { error } = await supabase.storage.from('guides').upload(fileName, buffer, {
       contentType: file.type,
       upsert: false
@@ -55,7 +52,6 @@ export async function uploadGuideImage(formData: FormData) {
       return { error: 'O bucket não foi encontrado ou o acesso foi negado.' }
     }
 
-    // Pega a URL pública
     const { data } = supabase.storage.from('guides').getPublicUrl(fileName)
 
     return { url: data.publicUrl }
@@ -70,7 +66,6 @@ export async function toggleGuideVote(guideId: string, gameId: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Tens de iniciar sessão para curtir.' }
 
-  // 1. Verifica se já votou
   const { data: existing } = await supabase
     .from('guide_votes')
     .select('*')
@@ -79,29 +74,16 @@ export async function toggleGuideVote(guideId: string, gameId: string) {
     .maybeSingle()
 
   if (existing) {
-    // Tira o voto
     await supabase.from('guide_votes').delete().eq('guide_id', guideId).eq('user_id', user.id)
   } else {
-    // Dá o voto
     await supabase.from('guide_votes').insert({ guide_id: guideId, user_id: user.id })
   }
 
-  // 2. Conta os votos totais reais imediatamente após a ação
-  const { count } = await supabase
-    .from('guide_votes')
-    .select('*', { count: 'exact', head: true })
-    .eq('guide_id', guideId)
+  const { count } = await supabase.from('guide_votes').select('*', { count: 'exact', head: true }).eq('guide_id', guideId)
 
-  // 3. Atualiza na tabela principal do guia
-  await supabase
-    .from('game_guides')
-    .update({ upvotes: count || 0 })
-    .eq('id', guideId)
+  await supabase.from('game_guides').update({ upvotes: count || 0 }).eq('id', guideId)
 
-  // 4. Força a revalidação da página específica do guia para limpar o cache
   revalidatePath(`/games/${gameId}`)
-
-  // Retornamos a contagem real para o frontend não se perder
   return { success: true, newCount: count || 0, isVoted: !existing }
 }
 
@@ -128,7 +110,7 @@ export async function deleteGuide(guideId: string, gameId: string) {
 
   if (!user) return { error: 'Não autorizado.' }
 
-  // Tenta apagar apenas se for o dono e pede o retorno do dado apagado
+  // Tenta apagar o guia no banco de dados e retorna o conteúdo que foi apagado
   const { data, error } = await supabase
     .from('game_guides')
     .delete()
@@ -145,6 +127,94 @@ export async function deleteGuide(guideId: string, gameId: string) {
     return { error: 'Sem permissão para apagar este guia no banco de dados.' }
   }
 
+  const deletedGuide = data[0]
+  const regex = /!\[.*?\]\((.*?)\)/g
+  let match
+  const filesToDelete: string[] = []
+
+  while ((match = regex.exec(deletedGuide.content)) !== null) {
+    const url = match[1]
+    
+    if (url) {
+      const urlParts = url.split('/guides/')
+      if (urlParts.length > 1 && urlParts[1]) {
+        const fileName = urlParts[1].split('?')[0]
+        
+        if (fileName) {
+          filesToDelete.push(fileName)
+        }
+      }
+    }
+  }
+
+  if (filesToDelete.length > 0) {
+    await supabase.storage.from('guides').remove(filesToDelete)
+  }
+
   revalidatePath(`/games/${gameId}`, 'page')
   return { success: true }
+}
+
+export async function uploadGameCustomization(gameId: string, type: 'banner' | 'cover', formData: FormData | null, imageUrl: string | null = null) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) return { error: 'Acesso negado.' }
+
+  // Garante que só o admin pode alterar imagens de jogos
+  const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single()
+  if (userData?.role !== 'admin') return { error: 'Apenas administradores podem atualizar as capas oficiais.' }
+
+  let finalUrl = imageUrl;
+
+  // Se não foi enviado um link direto, processamos o ficheiro físico
+  if (!finalUrl && formData) {
+    const file = formData.get('image') as File
+    if (!file) return { error: 'Nenhuma imagem fornecida.' }
+
+    const fileExt = file.name.split('.').pop()
+    const fileName = `${gameId}-${type}-${Math.random().toString(36).substring(2)}.${fileExt}`
+
+    try {
+      const arrayBuffer = await file.arrayBuffer()
+      const buffer = Buffer.from(arrayBuffer)
+
+      const { error: uploadError } = await supabase.storage.from('game_assets').upload(fileName, buffer, {
+        contentType: file.type,
+        upsert: false
+      })
+
+      if (uploadError) return { error: 'Falha ao fazer upload da imagem no Storage.' }
+
+      const { data: publicData } = supabase.storage.from('game_assets').getPublicUrl(fileName)
+      finalUrl = publicData.publicUrl
+    } catch (err) {
+      console.error("Erro no processamento:", err)
+      return { error: 'Erro inesperado ao processar arquivo.' }
+    }
+  }
+
+  // Abortamos se por algum motivo não houver URL
+  if (!finalUrl) return { error: 'Nenhuma imagem ou link válido fornecido.' }
+
+  // 🧹 LIMPEZA: Buscar a URL antiga para apagar se for do nosso Storage
+  const { data: gameData } = await supabase.from('games').select('banner_url, cover_url').eq('id', gameId).single()
+  const oldUrl = type === 'banner' ? gameData?.banner_url : gameData?.cover_url
+
+  // Verifica se a imagem antiga estava no nosso bucket 'game_assets'
+  if (oldUrl && oldUrl.includes('/game_assets/')) {
+    const oldFileName = oldUrl.split('/game_assets/').pop()?.split('?')[0]
+    if (oldFileName) {
+      await supabase.storage.from('game_assets').remove([oldFileName])
+    }
+  }
+
+  // Atualiza diretamente na tabela global de games
+  const updateData = type === 'banner' ? { banner_url: finalUrl } : { cover_url: finalUrl }
+  const { error } = await supabase.from('games').update(updateData).eq('id', gameId)
+
+  if (error) return { error: 'Erro ao salvar a arte no banco de dados.' }
+
+  revalidatePath(`/games/${gameId}`)
+  return { success: 'Artes oficiais do jogo atualizadas com sucesso!' }
 }
