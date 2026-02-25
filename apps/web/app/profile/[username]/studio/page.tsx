@@ -6,11 +6,10 @@ import EquipButton from "./EquipButton";
 import ProfileForm from "./ProfileForm";
 import ShowcaseEditor from "./ShowcaseEditor";
 import { Metadata } from "next";
-import { FaLock, FaPalette, FaTrophy, FaBoxOpen, FaUserAlt } from "react-icons/fa";
 
 export const metadata: Metadata = {
   title: "Estúdio de Personalização | Nexus Achievements",
-  description: "Personalize o seu perfil do Nexus Achievements com fundos animados, molduras de avatar e títulos exclusivos.",
+  description: "Personalize o seu perfil do Nexus Achievements com fundos animados, molduras de avatar e títulos exclusivos. Exiba os seus jogos favoritos na vitrine e destaque a sua identidade única como caçador de troféus.",
 }
 
 type ShopItem = {
@@ -23,8 +22,32 @@ type ShopItem = {
   tag_style?: string | null;
 };
 
-interface InventoryResult { item_id: string; shop_items: ShopItem | null; }
-interface StudioPageProps { params: Promise<{ username: string }>; }
+interface InventoryResult {
+  item_id: string;
+  shop_items: ShopItem | null;
+}
+
+interface StudioPageProps {
+  params: Promise<{ username: string }>;
+}
+
+// 🔥 ADICIONADO: playtime_minutes e total_achievements para a carta 3D
+interface RawUserGame {
+  is_platinum: boolean;
+  unlocked_achievements: number;
+  playtime_minutes: number;
+  games: { id: string; title: string; cover_url: string | null; total_achievements: number } | { id: string; title: string; cover_url: string | null; total_achievements: number }[] | null;
+}
+
+interface MappedGame {
+  id: string;
+  title: string;
+  cover_url: string | null;
+  is_platinum: boolean;
+  unlocked_achievements: number;
+  total_achievements: number;
+  playtime_minutes: number;
+}
 
 export default async function StudioPage({ params }: StudioPageProps) {
   const { username } = await params;
@@ -32,8 +55,8 @@ export default async function StudioPage({ params }: StudioPageProps) {
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) return (
-    <div className="flex flex-col items-center justify-center min-h-88 space-y-4 text-center">
-      <FaLock className="text-6xl mb-2 drop-shadow-md text-gray-500" />
+    <div className="flex flex-col items-center justify-center min-h-88 space-y-4">
+      <span className="text-6xl mb-2 drop-shadow-md">🔒</span>
       <h2 className="text-2xl font-black text-white">Acesso Restrito</h2>
       <p className="text-gray-400 font-bold text-center">Inicie sessão no Nexus para aceder ao seu Estúdio.</p>
     </div>
@@ -47,15 +70,52 @@ export default async function StudioPage({ params }: StudioPageProps) {
 
   if (userData?.username !== username) return notFound();
 
-  const { data: myGamesRaw } = await supabase.from("user_games").select("games (id, title, cover_url)").eq("user_id", user.id);
-  const myGames = (myGamesRaw?.map(g => g.games).filter(Boolean) as unknown as { id: string, title: string, cover_url: string }[]) || [];
+  // 🔥 1. Busca os jogos com TODOS os dados para o verso da carta
+  const { data: myGamesRaw } = await supabase
+    .from("user_games")
+    .select("is_platinum, unlocked_achievements, playtime_minutes, games (id, title, cover_url, total_achievements)")
+    .eq("user_id", user.id);
 
+  const myGamesRawTyped = myGamesRaw as unknown as RawUserGame[];
+
+  const myGamesMapped: MappedGame[] = (myGamesRawTyped || []).map(g => {
+    const game = Array.isArray(g.games) ? g.games[0] : g.games;
+    if (!game) return null;
+    return {
+      id: game.id,
+      title: game.title,
+      cover_url: game.cover_url,
+      is_platinum: g.is_platinum,
+      unlocked_achievements: g.unlocked_achievements,
+      total_achievements: game.total_achievements || 0,
+      playtime_minutes: g.playtime_minutes || 0
+    };
+  }).filter((g): g is MappedGame => g !== null);
+
+  // 2. ORDENAÇÃO GERAL DA SUA BIBLIOTECA (Platinados > Progresso > Zerados)
+  myGamesMapped.sort((a, b) => {
+    if (a.is_platinum && !b.is_platinum) return -1;
+    if (!a.is_platinum && b.is_platinum) return 1;
+    
+    if (a.unlocked_achievements > 0 && b.unlocked_achievements === 0) return -1;
+    if (a.unlocked_achievements === 0 && b.unlocked_achievements > 0) return 1;
+    
+    if (b.unlocked_achievements !== a.unlocked_achievements) return b.unlocked_achievements - a.unlocked_achievements;
+    
+    return a.title.localeCompare(b.title);
+  });
+
+  const myGames = myGamesMapped;
+
+  // 3. BUSCA E FILTRA O INVENTÁRIO
   const { data: inventoryData } = await supabase
     .from("user_inventory")
     .select(`item_id, shop_items (id, name, category, rarity_type, gradient, border_style, tag_style)`)
     .eq("user_id", user.id);
 
-  const allOwnedItems = (inventoryData as unknown as InventoryResult[] | null)?.map(inv => inv.shop_items).filter((item): item is ShopItem => item !== null) || [];
+  const allOwnedItems = (inventoryData as unknown as InventoryResult[] | null)
+    ?.map(inv => inv.shop_items)
+    .filter((item): item is ShopItem => item !== null) || [];
 
   const cosmeticItems = allOwnedItems.filter(item => item.category !== "Expansões");
   const expansionItems = allOwnedItems.filter(item => item.category === "Expansões");
@@ -73,10 +133,11 @@ export default async function StudioPage({ params }: StudioPageProps) {
   return (
     <div className="space-y-12 animate-in fade-in duration-500 pb-20 max-w-5xl mx-auto px-4 md:px-0">
 
+      {/* HEADER REFINADO */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pt-8 border-b border-white/5 pb-8">
         <div className="flex items-center gap-5">
-          <div className="w-16 h-16 bg-linear-to-br from-primary/20 to-purple-500/10 rounded-2xl flex items-center justify-center text-2xl border border-primary/20 shadow-lg shrink-0 text-primary">
-            <FaPalette />
+          <div className="w-16 h-16 bg-linear-to-br from-primary/20 to-purple-500/10 rounded-2xl flex items-center justify-center text-3xl border border-primary/20 shadow-lg shrink-0">
+            🎨
           </div>
           <div>
             <h1 className="text-4xl font-black text-white tracking-tighter italic">Personalização</h1>
@@ -88,15 +149,17 @@ export default async function StudioPage({ params }: StudioPageProps) {
         </Link>
       </div>
 
+      {/* MELHORIAS DE CONTA (EXPANSÕES) */}
       {expansionItems.length > 0 && (
         <section className="bg-green-500/5 border border-green-500/10 rounded-3xl p-6">
           <h3 className="text-xs font-black text-green-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span> Melhorias de Conta Ativas
+            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+            Melhorias de Conta Ativas
           </h3>
           <div className="flex flex-wrap gap-3">
             {expansionItems.map(item => (
               <div key={item.id} className="bg-background/40 border border-green-500/20 px-4 py-3 rounded-2xl flex items-center gap-3">
-                <FaTrophy className="text-xl text-green-500 drop-shadow-[0_0_8px_rgba(34,197,94,0.5)]" />
+                <span className="text-2xl drop-shadow-[0_0_8px_rgba(34,197,94,0.5)]">🏆</span>
                 <div>
                   <p className="text-xs font-black text-white">{item.name}</p>
                   <p className="text-[10px] text-gray-500 font-bold uppercase">Upgrade Permanente</p>
@@ -107,9 +170,10 @@ export default async function StudioPage({ params }: StudioPageProps) {
         </section>
       )}
 
-      <section className="bg-surface/40 backdrop-blur-md border border-border rounded-3xl p-4 sm:p-6 md:p-8 shadow-xl">
-        <h2 className="text-xl md:text-2xl font-black text-white mb-6 flex items-center gap-3">
-          <FaUserAlt className="text-primary" /> Identidade do Caçador
+      {/* SEÇÃO 1: PERFIL */}
+      <section className="bg-surface/40 backdrop-blur-md border border-border rounded-3xl p-6 md:p-8 shadow-xl">
+        <h2 className="text-2xl font-black text-white mb-6 flex items-center gap-3">
+          <span className="text-3xl">👤</span> Identidade do Caçador
         </h2>
         <ProfileForm 
           initialUsername={userData?.username || ''} 
@@ -122,27 +186,33 @@ export default async function StudioPage({ params }: StudioPageProps) {
         />
       </section>
 
+      {/* SEÇÃO 2: ESTANTE DE JOGOS */}
       <section className="bg-surface/40 backdrop-blur-md border border-border rounded-3xl p-6 md:p-8 shadow-xl">
         <h2 className="text-2xl font-black text-white mb-2 flex items-center gap-3">
-          <FaTrophy className="text-yellow-500" /> Vitrine de Ouro
+          <span className="text-3xl">🏆</span> Vitrine de Ouro
         </h2>
         <p className="text-sm text-gray-400 mb-8">Escolha os jogos que deseja exibir no topo do seu perfil.</p>
-        <ShowcaseEditor availableGames={myGames} initialShowcase={initialShowcase} limit={userData?.showcase_limit || 5} />
+        <ShowcaseEditor
+          availableGames={myGames}
+          initialShowcase={initialShowcase}
+          limit={userData?.showcase_limit || 5}
+        />
       </section>
 
+      {/* SEÇÃO 3: INVENTÁRIO VISUAL */}
       <section className="space-y-8">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl md:text-2xl font-black text-white flex items-center gap-3">
+          <h2 className="text-2xl font-black text-white flex items-center gap-3">
             Inventário <span className="text-gray-500 text-lg font-medium">({cosmeticItems.length})</span>
           </h2>
-          <Link href="/shop" className="text-xs md:text-sm font-black text-primary hover:text-blue-400 transition-colors uppercase tracking-widest">
+          <Link href="/shop" className="text-sm font-black text-primary hover:text-blue-400 transition-colors uppercase tracking-widest">
             + Adquirir Mais na Loja
           </Link>
         </div>
 
         {cosmeticItems.length === 0 ? (
-          <div className="bg-surface/30 border border-border border-dashed rounded-3xl p-16 text-center shadow-inner flex flex-col items-center justify-center text-gray-600">
-            <FaBoxOpen className="text-6xl mb-4" />
+          <div className="bg-surface/30 border border-border border-dashed rounded-3xl p-16 text-center shadow-inner">
+            <span className="text-6xl mb-4 block">🕸️</span>
             <h3 className="text-xl font-black text-white mb-2">Inventário Vazio</h3>
             <p className="text-gray-400 text-sm">Visite a loja para destacar o seu perfil!</p>
           </div>
@@ -162,13 +232,13 @@ export default async function StudioPage({ params }: StudioPageProps) {
                       <div className="relative w-20 h-20 flex items-center justify-center z-10 transition-transform group-hover:rotate-12">
                         <div className="absolute inset-0 rounded-full p-1" style={{ background: item.border_style }}>
                           <div className="w-full h-full rounded-full bg-background flex items-center justify-center">
-                            <FaUserAlt className="text-2xl text-gray-500 group-hover:text-white transition-colors" />
+                            <span className="text-2xl grayscale group-hover:grayscale-0 transition-all">👤</span>
                           </div>
                         </div>
                       </div>
                     )}
 
-                    {item.category === "Títulos" && item.tag_style && (
+                    {item.category === "Título" && item.tag_style && (
                       <div className="relative z-10 px-4 py-2 rounded-xl border border-white/10 text-xs font-black shadow-2xl text-white" style={{ background: item.tag_style }}>
                         {item.name}
                       </div>
