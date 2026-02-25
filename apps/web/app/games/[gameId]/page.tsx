@@ -12,6 +12,7 @@ import CustomizationButton from "./CustomizationButton";
 
 import { FaArrowLeft, FaArrowRight, FaUsers, FaTrophy, FaChartLine, FaCheckCircle, FaBookOpen, FaThumbsUp } from "react-icons/fa";
 import { FaCommentDots } from "react-icons/fa6";
+import TextFormatter from "@/app/components/TextFormatter"; // 🔥 Importado
 
 export const metadata: Metadata = {
   title: "Detalhes do Jogo | Nexus Achievements",
@@ -32,21 +33,6 @@ interface GameGuide { id: string; author_id: string; title: string; content: str
 interface GuideComment { id: string; content: string; created_at: string; users: { username: string; avatar_url: string | null; } | null; }
 interface RawGuideData { id: string; game_id: string; author_id: string; title: string; content: string; upvotes: number; created_at: string; users: GuideAuthor | GuideAuthor[]; }
 interface RawCommentData { id: string; content: string; created_at: string; users: { username: string; avatar_url: string | null } | { username: string; avatar_url: string | null }[]; }
-
-const renderGuideContent = (text: string) => {
-  const parts = text.split(/(!\[.*?\]\(.*?\))/g);
-  return parts.map((part, index) => {
-    const match = part.match(/!\[(.*?)\]\((.*?)\)/);
-    if (match) {
-      return (
-        <div key={index} className="relative w-full aspect-video my-6">
-          <Image src={match[2] as string} alt={match[1] || 'Imagem do guia'} fill className="rounded-2xl border border-white/5 shadow-2xl object-contain bg-black/50" unoptimized />
-        </div>
-      );
-    }
-    return <span key={index}>{part}</span>;
-  });
-};
 
 export default async function GamePage(props: GamePageProps) {
   const { gameId } = await props.params;
@@ -83,7 +69,6 @@ export default async function GamePage(props: GamePageProps) {
   let updatedBanner = game.banner_url;
   let updatedCover = game.cover_url;
 
-  // Cache SteamGridDB
   let needsDbUpdate = false;
   if ((!game.banner_url || !game.cover_url) && SGDB_KEY) {
     try {
@@ -223,7 +208,7 @@ export default async function GamePage(props: GamePageProps) {
           <CustomizationButton
             gameId={gameId}
             type="banner"
-            className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 opacity-0 group-hover:opacity-100"
+            // 🔥 Removidos os paddings e margins daqui para o overlay funcionar perfeito
           />
         )}
       </div>
@@ -239,7 +224,7 @@ export default async function GamePage(props: GamePageProps) {
               <CustomizationButton
                 gameId={gameId}
                 type="cover"
-                className="absolute top-4 right-3 opacity-0 group-hover:opacity-100"
+                // 🔥 Removidos os paddings e margins daqui para o overlay funcionar perfeito
               />
             )}
           </div>
@@ -387,15 +372,20 @@ export default async function GamePage(props: GamePageProps) {
             {guideId && selectedGuide ? (
               <div className="bg-surface/40 backdrop-blur-xl border border-white/5 rounded-4xl p-5 sm:p-6 md:p-10 shadow-2xl relative w-full min-w-0">
                 <div className="absolute top-0 left-0 w-full h-1.5 bg-linear-to-r from-primary via-purple-500 to-primary"></div>
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 md:mb-8">
-                  <ClientBackButton
+                
+                {/* 🔥 CORREÇÃO: Botão "Voltar" livre e alinhado perfeitamente! */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 md:mb-8 mt-2">
+                  <Link 
                     href={`/games/${gameId}?tab=guides${backQueryString}`}
-                    title="Voltar aos Guias"
-                  />
+                    className="flex items-center gap-2 px-4 py-2.5 bg-background border border-white/10 rounded-xl font-bold text-xs md:text-sm text-gray-400 hover:text-white hover:bg-white/5 hover:border-white/20 transition-all shadow-sm w-fit"
+                  >
+                    <FaArrowLeft className="text-primary" /> Voltar aos Guias
+                  </Link>
                   {user?.id === selectedGuide.author_id && (
                     <DeleteGuideButton guideId={selectedGuide.id} gameId={gameId} />
                   )}
                 </div>
+
                 <h2 className="text-2xl md:text-4xl lg:text-5xl font-black text-white mb-5 md:mb-6 leading-tight drop-shadow-lg wrap-break-word w-full">{selectedGuide.title}</h2>
                 <div className="flex items-center gap-3 md:gap-4 mb-6 md:mb-8 pb-6 md:pb-8 border-b border-white/5 w-full min-w-0">
                   <div className="w-12 h-12 md:w-14 md:h-14 rounded-full overflow-hidden bg-background border border-white/10 relative shrink-0">
@@ -406,13 +396,17 @@ export default async function GamePage(props: GamePageProps) {
                     <p className="text-[10px] md:text-xs text-gray-500 mt-1 font-bold tracking-widest uppercase truncate">{new Date(selectedGuide.created_at).toLocaleDateString('pt-BR')}</p>
                   </div>
                 </div>
+                
                 <div className="text-sm md:text-base text-gray-300 leading-relaxed whitespace-pre-wrap wrap-break-word w-full overflow-hidden">
-                  {renderGuideContent(selectedGuide.content)}
+                  {/* 🔥 APLICADO: Motor Universal de Spoilers e Imagens */}
+                  <TextFormatter content={selectedGuide.content} />
                 </div>
+                
                 <div className="mt-10 md:mt-12 pt-6 md:pt-8 border-t border-white/5 flex flex-col items-center gap-3 md:gap-4 w-full">
                   <p className="text-[10px] md:text-xs font-black text-gray-500 uppercase tracking-widest text-center">Este guia ajudou-o na jornada?</p>
                   <GuideVoteButton guideId={selectedGuide.id} gameId={gameId} initialVotes={selectedGuide.upvotes} hasVoted={hasVoted} />
                 </div>
+                
                 <div className="mt-12 md:mt-16 bg-background/50 border border-white/5 p-4 sm:p-6 md:p-8 rounded-3xl w-full min-w-0">
                   <h3 className="text-lg md:text-xl font-black text-white flex items-center gap-2 md:gap-3 mb-4 md:mb-6">
                     <FaCommentDots className="text-primary" /> Comentários
@@ -430,7 +424,10 @@ export default async function GamePage(props: GamePageProps) {
                             <Link href={`/profile/${comment.users?.username}`} className="font-bold text-white text-xs md:text-sm hover:text-primary transition-colors truncate">{comment.users?.username}</Link>
                             <span className="text-[8px] md:text-[10px] font-bold text-gray-500 uppercase tracking-widest shrink-0">{new Date(comment.created_at).toLocaleDateString('pt-BR')}</span>
                           </div>
-                          <p className="text-xs md:text-sm text-gray-300 leading-relaxed wrap-break-word">{comment.content}</p>
+                          <p className="text-xs md:text-sm text-gray-300 leading-relaxed wrap-break-word">
+                            {/* 🔥 APLICADO: Motor Universal de Spoilers nos Comentários */}
+                            <TextFormatter content={comment.content} />
+                          </p>
                         </div>
                       </div>
                     ))}
@@ -461,7 +458,10 @@ export default async function GamePage(props: GamePageProps) {
                       <Link href={`/games/${gameId}?tab=guides&guideId=${guide.id}${backQueryString}`} key={guide.id} className="bg-surface/40 backdrop-blur-sm border border-white/5 p-5 md:p-6 rounded-3xl hover:border-primary/50 hover:bg-surface/80 transition-all duration-300 group flex flex-col h-full shadow-md hover:shadow-xl hover:-translate-y-1 w-full min-w-0">
                         <div className="flex-1 w-full min-w-0">
                           <h3 className="text-lg md:text-xl font-black text-white mb-2 md:mb-3 group-hover:text-primary transition-colors line-clamp-2 leading-tight wrap-break-word">{guide.title}</h3>
-                          <p className="text-xs md:text-sm text-gray-400 line-clamp-3 leading-relaxed mb-4 md:mb-6 wrap-break-word">{guide.content.replace(/!\[.*?\]\(.*?\)/g, '🖼️ [Imagem Anexa] ')}</p>
+                          <p className="text-xs md:text-sm text-gray-400 line-clamp-3 leading-relaxed mb-4 md:mb-6 wrap-break-word">
+                            {/* 🔥 APLICADO: Filtro para ocultar spoilers da lista principal de guias */}
+                            {guide.content.replace(/!\[.*?\]\(.*?\)/g, '[Imagem Anexa] ').replace(/\|\|(.*?)\|\|/g, '[Spoiler Oculto] ')}
+                          </p>                       
                         </div>
                         <div className="flex items-center justify-between pt-4 md:pt-5 border-t border-white/5 w-full min-w-0 gap-2">
                           <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
