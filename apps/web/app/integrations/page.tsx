@@ -143,13 +143,21 @@ export default function IntegrationsPage() {
   const handleSaveSteam = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoadingSave(true);
-    const result = await saveSteamId(steamId);
-    if (result.error) toast.error(result.error, { theme: 'dark' });
-    else { 
+    
+    const result = await saveSteamId(steamId) as { error?: string; success?: string; username?: string };
+    
+    if (result.error) {
+      toast.error(result.error, { theme: 'dark' });
+    } else if (result.success) { 
       toast.success(result.success, { theme: 'dark' }); 
       setSavedSteamId(steamId);
-      if (result.username) setSteamUsername(result.username);
+      
+      // Agora o TypeScript sabe que username pode existir e permite a leitura segura
+      if (result.username) {
+        setSteamUsername(result.username);
+      }
     }
+    
     setLoadingSave(false);
   };
 
