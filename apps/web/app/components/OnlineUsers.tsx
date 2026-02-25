@@ -4,9 +4,9 @@ import { useEffect, useState, useMemo } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import Image from 'next/image'
 import Link from 'next/link'
-import { 
-  RiArrowLeftSLine, 
-  RiArrowRightSLine, 
+import {
+  RiArrowLeftSLine,
+  RiArrowRightSLine,
   RiSearchLine,
   RiUserAddLine,
   RiUserFollowFill,
@@ -15,6 +15,7 @@ import {
 } from 'react-icons/ri'
 import { FaUserCircle } from 'react-icons/fa'
 import { toast } from 'react-toastify'
+import { processQuestEvent } from '../actions/questEngine'
 
 type BaseUser = {
   user_id: string;
@@ -33,7 +34,7 @@ export default function OnlineUsers({ currentUser }: { currentUser: BaseUser }) 
   const [allUsers, setAllUsers] = useState<BaseUser[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [isOpen, setIsOpen] = useState(true)
-  
+
   // Estados de UI
   const [loadingData, setLoadingData] = useState(true)
   const [loadingActionId, setLoadingActionId] = useState<string | null>(null)
@@ -45,12 +46,12 @@ export default function OnlineUsers({ currentUser }: { currentUser: BaseUser }) 
   useEffect(() => {
     const fetchData = async () => {
       setLoadingData(true)
-      
+
       const [usersRes, followsRes] = await Promise.all([
         supabase.from('users').select('id, username, avatar_url').neq('id', currentUser.user_id).limit(100),
         supabase.from('user_follows').select('following_id').eq('follower_id', currentUser.user_id)
       ]);
-      
+
       if (usersRes.data) {
         const formattedUsers: BaseUser[] = usersRes.data.map(u => ({
           user_id: u.id,
@@ -65,10 +66,10 @@ export default function OnlineUsers({ currentUser }: { currentUser: BaseUser }) 
         followsRes.data.forEach(f => followsSet.add(f.following_id));
         setFollowingIds(followsSet);
       }
-      
+
       setLoadingData(false)
     };
-    
+
     fetchData();
   }, [currentUser.user_id, supabase]);
 
@@ -84,12 +85,12 @@ export default function OnlineUsers({ currentUser }: { currentUser: BaseUser }) 
       .on('presence', { event: 'sync' }, () => {
         const state = channel.presenceState()
         const activeIds = new Set<string>()
-        
+
         for (const id in state) {
           const userPresence = state[id]?.[0] as unknown as BaseUser
           if (userPresence && userPresence.user_id !== currentUser.user_id) {
             activeIds.add(userPresence.user_id)
-            
+
             // Adiciona dinamicamente se a pessoa não estava na lista inicial
             setAllUsers(prev => {
               if (!prev.find(u => u.user_id === userPresence.user_id)) {
@@ -137,6 +138,8 @@ export default function OnlineUsers({ currentUser }: { currentUser: BaseUser }) 
       const { error } = await supabase.from('user_follows')
         .insert({ follower_id: currentUser.user_id, following_id: targetId });
 
+      await processQuestEvent('FOLLOW_USER');
+      
       if (!error) {
         setFollowingIds(prev => {
           const next = new Set(prev);
@@ -174,7 +177,7 @@ export default function OnlineUsers({ currentUser }: { currentUser: BaseUser }) 
 
   return (
     <aside className={`${isOpen ? 'w-64 md:w-75' : 'w-20'} border-l border-white/5 bg-surface/30 backdrop-blur-xl hidden lg:flex flex-col z-40 shrink-0 transition-all duration-300 ease-in-out`}>
-      
+
       {/* HEADER DO RADAR */}
       <div className={`flex items-center ${isOpen ? 'justify-between' : 'justify-center'} p-4 mt-2 shrink-0`}>
         {isOpen && (
@@ -186,8 +189,8 @@ export default function OnlineUsers({ currentUser }: { currentUser: BaseUser }) 
             Radar Nexus
           </h3>
         )}
-        
-        <button 
+
+        <button
           onClick={() => {
             setIsOpen(!isOpen);
             if (isOpen) setSearchQuery('');
@@ -230,13 +233,13 @@ export default function OnlineUsers({ currentUser }: { currentUser: BaseUser }) 
 
       {/* LISTA DE USUÁRIOS */}
       <div className="flex-1 space-y-1.5 overflow-y-auto custom-scrollbar px-3 pb-6 min-h-0 relative">
-        
+
         {/* Loading inicial */}
         {loadingData ? (
-           <div className="flex flex-col items-center justify-center py-10 opacity-50">
-              <RiLoader4Line className="animate-spin text-2xl mb-2 text-primary" />
-              {isOpen && <p className="text-[10px] font-bold uppercase tracking-widest text-primary">A rastrear...</p>}
-           </div>
+          <div className="flex flex-col items-center justify-center py-10 opacity-50">
+            <RiLoader4Line className="animate-spin text-2xl mb-2 text-primary" />
+            {isOpen && <p className="text-[10px] font-bold uppercase tracking-widest text-primary">A rastrear...</p>}
+          </div>
         ) : displayList.length === 0 ? (
           <div className={`text-center ${isOpen ? 'py-10 mx-1' : 'py-6'} opacity-50 border border-dashed border-white/10 rounded-2xl bg-background/30 transition-all`}>
             <FaUserCircle className={`mx-auto ${isOpen ? 'text-3xl' : 'text-xl'} mb-2 text-gray-500`} />
@@ -245,69 +248,68 @@ export default function OnlineUsers({ currentUser }: { currentUser: BaseUser }) 
         ) : (
           displayList.map(u => (
             // Agora a linha principal é uma DIV, para não haver conflito de clique entre visitar perfil e seguir
-            <div 
-              key={u.user_id} 
+            <div
+              key={u.user_id}
               className={`flex items-center p-2 rounded-2xl hover:bg-surface/80 border border-transparent hover:border-white/5 transition-all group ${isOpen ? 'justify-between gap-2' : 'justify-center'}`}
             >
-               
-               {/* LADO ESQUERDO: Avatar + Nome (Clicável para ir ao perfil) */}
-               <Link 
-                 href={`/profile/${u.username}`} 
-                 title={!isOpen ? `${u.username} (${u.isOnline ? 'Online' : 'Offline'})` : undefined}
-                 className={`flex items-center gap-3 min-w-0 active:scale-95 transition-transform ${isOpen ? 'flex-1' : ''}`}
-               >
-                 <div className="relative shrink-0">
-                   <div className={`w-10 h-10 rounded-full overflow-hidden bg-background border shadow-sm transition-colors relative ${u.isOnline ? 'border-primary/30 group-hover:border-primary' : 'border-white/5 group-hover:border-white/20 grayscale opacity-80 group-hover:grayscale-0 group-hover:opacity-100'}`}>
-                      {u.avatar_url ? (
-                        <Image src={u.avatar_url} fill className="object-cover group-hover:scale-110 transition-transform" alt="" unoptimized />
-                      ) : (
-                        <span className={`flex items-center justify-center w-full h-full font-black text-xs ${u.isOnline ? 'text-primary bg-primary/10' : 'text-gray-400 bg-white/5'}`}>{u.username.charAt(0).toUpperCase()}</span>
-                      )}
-                   </div>
-                   {u.isOnline ? (
-                      <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 border-2 border-surface rounded-full shadow-sm"></div>
-                   ) : (
-                      <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-gray-500 border-2 border-surface rounded-full shadow-sm"></div>
-                   )}
-                 </div>
-                 
-                 {isOpen && (
-                   <div className="flex flex-col min-w-0 flex-1 pr-2">
-                     <span className={`font-bold text-sm truncate transition-colors ${u.isOnline ? 'text-gray-200 group-hover:text-white' : 'text-gray-500 group-hover:text-gray-300'}`}>
-                       {u.username}
-                     </span>
-                     <span className={`text-[9px] font-bold uppercase tracking-widest ${u.isOnline ? 'text-green-500' : 'text-gray-600'}`}>
-                       {u.isFollowing ? 'Amigo' : (u.isOnline ? 'Online' : 'Offline')}
-                     </span>
-                   </div>
-                 )}
-               </Link>
 
-               {/* LADO DIREITO: Botão de Seguir / Deixar de Seguir */}
-               {isOpen && (
-                 <button
-                   onClick={() => handleToggleFollow(u.user_id, u.isFollowing)}
-                   onMouseEnter={() => setHoveredBtnId(u.user_id)}
-                   onMouseLeave={() => setHoveredBtnId(null)}
-                   disabled={loadingActionId === u.user_id}
-                   className={`p-2 rounded-xl border transition-all active:scale-90 shrink-0 ${
-                     u.isFollowing 
-                       ? hoveredBtnId === u.user_id
-                         ? 'bg-red-500/10 border-red-500/30 text-red-400' // Hover quando já segue (Mostrar perigo de Unfollow)
-                         : 'bg-primary/10 border-primary/20 text-primary'  // Padrão quando já segue
-                       : 'bg-transparent border-transparent text-gray-500 hover:bg-white/5 hover:text-white' // Padrão quando não segue
-                   }`}
-                   title={u.isFollowing ? "Deixar de Seguir" : "Seguir Caçador"}
-                 >
-                   {loadingActionId === u.user_id ? (
-                     <RiLoader4Line className="w-5 h-5 animate-spin" />
-                   ) : u.isFollowing ? (
-                     hoveredBtnId === u.user_id ? <RiUserUnfollowLine className="w-5 h-5" /> : <RiUserFollowFill className="w-5 h-5" />
-                   ) : (
-                     <RiUserAddLine className="w-5 h-5" />
-                   )}
-                 </button>
-               )}
+              {/* LADO ESQUERDO: Avatar + Nome (Clicável para ir ao perfil) */}
+              <Link
+                href={`/profile/${u.username}`}
+                title={!isOpen ? `${u.username} (${u.isOnline ? 'Online' : 'Offline'})` : undefined}
+                className={`flex items-center gap-3 min-w-0 active:scale-95 transition-transform ${isOpen ? 'flex-1' : ''}`}
+              >
+                <div className="relative shrink-0">
+                  <div className={`w-10 h-10 rounded-full overflow-hidden bg-background border shadow-sm transition-colors relative ${u.isOnline ? 'border-primary/30 group-hover:border-primary' : 'border-white/5 group-hover:border-white/20 grayscale opacity-80 group-hover:grayscale-0 group-hover:opacity-100'}`}>
+                    {u.avatar_url ? (
+                      <Image src={u.avatar_url} fill className="object-cover group-hover:scale-110 transition-transform" alt="" unoptimized />
+                    ) : (
+                      <span className={`flex items-center justify-center w-full h-full font-black text-xs ${u.isOnline ? 'text-primary bg-primary/10' : 'text-gray-400 bg-white/5'}`}>{u.username.charAt(0).toUpperCase()}</span>
+                    )}
+                  </div>
+                  {u.isOnline ? (
+                    <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 border-2 border-surface rounded-full shadow-sm"></div>
+                  ) : (
+                    <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-gray-500 border-2 border-surface rounded-full shadow-sm"></div>
+                  )}
+                </div>
+
+                {isOpen && (
+                  <div className="flex flex-col min-w-0 flex-1 pr-2">
+                    <span className={`font-bold text-sm truncate transition-colors ${u.isOnline ? 'text-gray-200 group-hover:text-white' : 'text-gray-500 group-hover:text-gray-300'}`}>
+                      {u.username}
+                    </span>
+                    <span className={`text-[9px] font-bold uppercase tracking-widest ${u.isOnline ? 'text-green-500' : 'text-gray-600'}`}>
+                      {u.isFollowing ? 'Amigo' : (u.isOnline ? 'Online' : 'Offline')}
+                    </span>
+                  </div>
+                )}
+              </Link>
+
+              {/* LADO DIREITO: Botão de Seguir / Deixar de Seguir */}
+              {isOpen && (
+                <button
+                  onClick={() => handleToggleFollow(u.user_id, u.isFollowing)}
+                  onMouseEnter={() => setHoveredBtnId(u.user_id)}
+                  onMouseLeave={() => setHoveredBtnId(null)}
+                  disabled={loadingActionId === u.user_id}
+                  className={`p-2 rounded-xl border transition-all active:scale-90 shrink-0 ${u.isFollowing
+                      ? hoveredBtnId === u.user_id
+                        ? 'bg-red-500/10 border-red-500/30 text-red-400' // Hover quando já segue (Mostrar perigo de Unfollow)
+                        : 'bg-primary/10 border-primary/20 text-primary'  // Padrão quando já segue
+                      : 'bg-transparent border-transparent text-gray-500 hover:bg-white/5 hover:text-white' // Padrão quando não segue
+                    }`}
+                  title={u.isFollowing ? "Deixar de Seguir" : "Seguir Caçador"}
+                >
+                  {loadingActionId === u.user_id ? (
+                    <RiLoader4Line className="w-5 h-5 animate-spin" />
+                  ) : u.isFollowing ? (
+                    hoveredBtnId === u.user_id ? <RiUserUnfollowLine className="w-5 h-5" /> : <RiUserFollowFill className="w-5 h-5" />
+                  ) : (
+                    <RiUserAddLine className="w-5 h-5" />
+                  )}
+                </button>
+              )}
             </div>
           ))
         )}
