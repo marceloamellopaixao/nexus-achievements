@@ -8,9 +8,9 @@ import MuralList from "./MuralList";
 import { Metadata } from "next";
 import ClientBackButton from "@/app/components/ClientBackButton";
 
-// Ícones Modernos (🔥 FaSteam adicionado)
 import { GiPadlockOpen, GiCrossedSwords } from "react-icons/gi";
-import { FaMedal, FaEdit, FaCommentDots, FaCalendarAlt, FaGamepad, FaTrophy, FaSteam } from "react-icons/fa";
+import { FaMedal, FaEdit, FaCommentDots, FaCalendarAlt, FaGamepad, FaTrophy, FaSteam, FaPlaystation, FaXbox } from "react-icons/fa";
+import { SiEpicgames } from "react-icons/si"; // 🔥 Adicionado Epic Games
 import FlipGameCard from "@/app/components/FlipGameCard";
 
 export const metadata: Metadata = {
@@ -30,6 +30,12 @@ interface RawCommentWithAuthor { id: string; profile_id: string; author_id: stri
 interface RawUserBadge { badge_id: string; awarded_at: string; badges: { name: string; icon: string; color_class: string; description: string; } | { name: string; icon: string; color_class: string; description: string; }[]; }
 interface FormattedBadge { badge_id: string; awarded_at: string; name: string; icon: string; color_class: string; description: string; }
 
+// Tipagem para extrair plataformas corretamente sem erro no TypeScript
+interface PlatData {
+  is_platinum: boolean;
+  games: { platform: string } | { platform: string }[] | null;
+}
+
 export default async function PublicProfilePage({ params, searchParams }: ProfilePageProps) {
   const { username } = await params;
   const { back } = await searchParams;
@@ -48,7 +54,7 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
 
   if (error || !profile) notFound();
 
-  // 🔥 BUSCA RICH PRESENCE DA STEAM (Status In-Game)
+  // 1. RICH PRESENCE DA STEAM
   let playingNow: { title: string, platform: string } | null = null;
   const STEAM_KEY = process.env.STEAM_API_KEY;
 
@@ -59,16 +65,51 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
         const data = await res.json();
         const pData = data?.response?.players?.[0];
         if (pData && pData.gameextrainfo) {
-          playingNow = {
-            title: pData.gameextrainfo,
-            platform: 'Steam'
-          };
+          playingNow = { title: pData.gameextrainfo, platform: 'Steam' };
         }
       }
-    } catch (err) {
-      console.error("Erro ao buscar status do jogador na Steam:", err);
-    }
+    } catch (err) { console.error("Erro Rich Presence", err); }
   }
+
+  // 2. BUSCA AS CONEXÕES MULTIPLATAFORMA E EXTRAI O NOME LEGÍVEL
+  const { data: linkedAccounts } = await supabase.from('linked_accounts').select('*').eq('user_id', profile.id);
+
+  const connections = [];
+  const linkedMap = new Map<string, string>();
+  
+  linkedAccounts?.forEach(acc => {
+    // Dá prioridade ao Nome de Usuário. Se não tiver, usa o ID.
+    linkedMap.set(acc.platform, acc.platform_username || acc.platform_user_id);
+  });
+
+  const steamDisplayName = linkedMap.get('Steam') || profile.steam_id;
+  if (steamDisplayName) {
+    connections.push({ platform: 'Steam', username: steamDisplayName, icon: <FaSteam className="text-sm shrink-0" />, color: 'text-blue-400 bg-blue-900/20 border-blue-500/30 hover:bg-blue-900/40' });
+  }
+
+  if (linkedMap.has('PlayStation')) {
+    connections.push({ platform: 'PSN', username: linkedMap.get('PlayStation'), icon: <FaPlaystation className="text-sm shrink-0" />, color: 'text-blue-500 bg-blue-600/10 border-blue-600/30 hover:bg-blue-600/20' });
+  }
+
+  if (linkedMap.has('Xbox')) {
+    connections.push({ platform: 'Xbox', username: linkedMap.get('Xbox'), icon: <FaXbox className="text-sm shrink-0" />, color: 'text-green-500 bg-green-500/10 border-green-500/30 hover:bg-green-500/20' });
+  }
+
+  if (linkedMap.has('Epic')) {
+    connections.push({ platform: 'Epic', username: linkedMap.get('Epic'), icon: <SiEpicgames className="text-sm shrink-0" />, color: 'text-gray-300 bg-gray-500/10 border-gray-500/30 hover:bg-gray-500/20' });
+  }
+
+  // 3. O VERDADEIRO NEXUS: DIVISÃO DE PLATINAS
+  const { data: platsRaw } = await supabase.from('user_games').select('is_platinum, games(platform)').eq('user_id', profile.id).eq('is_platinum', true);
+  const platsData = platsRaw as unknown as PlatData[];
+  
+  let steamPlats = 0; let psPlats = 0; let xboxPlats = 0;
+  platsData?.forEach(p => {
+    const plat = Array.isArray(p.games) ? p.games[0]?.platform : p.games?.platform;
+    if (plat === 'Steam') steamPlats++;
+    else if (plat === 'PlayStation' || plat === 'PSN') psPlats++;
+    else if (plat === 'Xbox') xboxPlats++;
+  });
 
   const isOwner = authUser?.id === profile.id;
   const showcaseLimit = profile.showcase_limit || 5;
@@ -81,14 +122,7 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
 
   const badges: FormattedBadge[] = (badgesData as unknown as RawUserBadge[])?.map(ub => {
     const badgeDetails = Array.isArray(ub.badges) ? ub.badges[0] : ub.badges;
-    return {
-      badge_id: ub.badge_id,
-      awarded_at: ub.awarded_at,
-      name: badgeDetails?.name || 'Insígnia',
-      icon: badgeDetails?.icon || '',
-      color_class: badgeDetails?.color_class || 'text-gray-400',
-      description: badgeDetails?.description || ''
-    };
+    return { badge_id: ub.badge_id, awarded_at: ub.awarded_at, name: badgeDetails?.name || 'Insígnia', icon: badgeDetails?.icon || '', color_class: badgeDetails?.color_class || 'text-gray-400', description: badgeDetails?.description || '' };
   }) || [];
 
   let isFollowing = false;
@@ -98,9 +132,7 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
   }
 
   const { data: commentsRaw } = await supabase.from('profile_comments').select('*, author:users!author_id(id, username, avatar_url)').eq('profile_id', profile.id).order('created_at', { ascending: false });
-  const comments: ProfileComment[] = (commentsRaw as unknown as RawCommentWithAuthor[])?.map(c => ({
-    ...c, author: Array.isArray(c.author) ? c.author[0] : c.author
-  })) || [];
+  const comments: ProfileComment[] = (commentsRaw as unknown as RawCommentWithAuthor[])?.map(c => ({ ...c, author: Array.isArray(c.author) ? c.author[0] : c.author })) || [];
 
   const equippedIds = [profile.equipped_background, profile.equipped_border, profile.equipped_title].filter(Boolean);
   const styles = { background: '', border: '', titleStyle: '', titleName: '' };
@@ -123,28 +155,16 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
     const { data: gamesData } = await supabase.from("games").select("id, title, cover_url, total_achievements").in("id", profile.showcase_games);
     if (gamesData) showcaseGames = profile.showcase_games.map((id: string) => gamesData.find(g => g.id === id)).filter(Boolean) as ShowcaseGame[];
 
-    const { data: progressData } = await supabase
-      .from('user_games')
-      .select('game_id, unlocked_achievements, is_platinum, playtime_minutes')
-      .eq('user_id', profile.id)
-      .in('game_id', profile.showcase_games);
+    const { data: progressData } = await supabase.from('user_games').select('game_id, unlocked_achievements, is_platinum, playtime_minutes').eq('user_id', profile.id).in('game_id', profile.showcase_games);
 
     progressData?.forEach(p => {
-      userProgressMap[p.game_id] = { 
-        unlocked: p.unlocked_achievements, 
-        is_platinum: p.is_platinum,
-        playtime_minutes: p.playtime_minutes
-      };
+      userProgressMap[p.game_id] = { unlocked: p.unlocked_achievements, is_platinum: p.is_platinum, playtime_minutes: p.playtime_minutes };
     });
 
     showcaseGames.sort((a, b) => {
-      const pA = userProgressMap[a.id];
-      const pB = userProgressMap[b.id];
-      
-      const aPlat = pA?.is_platinum || false;
-      const bPlat = pB?.is_platinum || false;
-      const aUnl = pA?.unlocked || 0;
-      const bUnl = pB?.unlocked || 0;
+      const pA = userProgressMap[a.id]; const pB = userProgressMap[b.id];
+      const aPlat = pA?.is_platinum || false; const bPlat = pB?.is_platinum || false;
+      const aUnl = pA?.unlocked || 0; const bUnl = pB?.unlocked || 0;
 
       if (aPlat && !bPlat) return -1;
       if (!aPlat && bPlat) return 1;
@@ -206,7 +226,6 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
               </div>
             </div>
 
-            {/* 🔥 BADGE RICH PRESENCE (Status In-Game) */}
             {playingNow && (
               <div className="flex items-center justify-center mt-1 mb-1 animate-in fade-in zoom-in duration-500 px-2 w-full">
                 <span className="flex items-center gap-2 bg-green-500/10 border border-green-500/30 text-green-400 px-4 py-1.5 rounded-full text-[10px] sm:text-xs font-black uppercase tracking-widest shadow-[0_0_15px_rgba(34,197,94,0.15)] max-w-full">
@@ -222,6 +241,17 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
                 &quot;{profile.bio || "Este caçador prefere manter o mistério."}&quot;
               </p>
             </div>
+
+            {/* 🔥 CONTAS VINCULADAS: Agora exibe a platform_username e inclui a Epic! */}
+            {connections.length > 0 && (
+              <div className="flex flex-wrap justify-center gap-2 mt-4 px-2 animate-in fade-in">
+                {connections.map(c => (
+                  <div key={c.platform} title={`${c.platform}: ${c.username}`} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border font-black text-[10px] uppercase tracking-widest transition-all cursor-help shadow-sm ${c.color} max-w-full`}>
+                    {c.icon} <span className="truncate">{c.username}</span>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {badges.length > 0 && (
               <div className="flex flex-wrap justify-center gap-2 mt-2 px-2">
@@ -290,14 +320,24 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
                     <FaGamepad className="text-xs shrink-0" /> <span className="truncate">Jogos</span>
                   </p>
                 </div>
-                <div className="text-center bg-blue-500/10 border border-blue-500/20 px-2 py-4 rounded-2xl shadow-inner relative min-w-0">
+
+                <div className="text-center bg-blue-500/10 border border-blue-500/20 px-2 py-4 rounded-2xl shadow-inner relative min-w-0 flex flex-col justify-center">
                   <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-30 pointer-events-none"></div>
+
                   <p className="text-2xl sm:text-3xl font-black text-blue-400 relative z-10 truncate drop-shadow-md">
                     {profile.total_platinums || 0}
                   </p>
                   <p className="flex items-center justify-center gap-1.5 text-[9px] sm:text-[10px] text-blue-500 font-bold uppercase tracking-widest relative z-10 mt-1">
                     <FaTrophy className="text-xs shrink-0" /> <span className="truncate">Platinas</span>
                   </p>
+
+                  {(steamPlats > 0 || psPlats > 0 || xboxPlats > 0) && (
+                    <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 mt-2 relative z-10 border-t border-blue-500/20 pt-2 w-4/5 mx-auto">
+                      {steamPlats > 0 && <span className="text-[9px] font-black text-blue-300 flex items-center gap-1 opacity-80" title="Steam"><FaSteam /> {steamPlats}</span>}
+                      {psPlats > 0 && <span className="text-[9px] font-black text-blue-300 flex items-center gap-1 opacity-80" title="PlayStation"><FaPlaystation /> {psPlats}</span>}
+                      {xboxPlats > 0 && <span className="text-[9px] font-bold text-blue-300 flex items-center gap-1 opacity-80" title="Xbox"><FaXbox /> {xboxPlats}</span>}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
