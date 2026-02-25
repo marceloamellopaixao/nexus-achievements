@@ -8,9 +8,10 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   FaPaperPlane, FaBars, FaSpinner, FaRegComments, FaShieldAlt,
-  FaEllipsisV, FaTrash, FaUserShield, FaVolumeMute, FaVolumeUp, FaArchive, FaBoxOpen, FaUserCircle, FaTimes
+  FaEllipsisV, FaTrash, FaUserShield, FaVolumeMute, FaVolumeUp, FaArchive, FaBoxOpen, FaUserCircle, FaTimes, FaVideoSlash
 } from 'react-icons/fa'
 import { toast } from 'react-toastify'
+import { useFocusMode } from '@/app/contexts/FocusModeContext' // 🔥 Cérebro Importado
 
 type ChatMessage = {
   id: string;
@@ -54,7 +55,7 @@ export default function ChatClient({
   const [isMuted, setIsMuted] = useState(false)
   const [isArchived, setIsArchived] = useState(false)
 
-  // MODAIS CUSTOMIZADOS
+  // Modais
   const [modalState, setModalState] = useState<'none' | 'delete' | 'report'>('none')
   const [reportReason, setReportReason] = useState('')
   const [isSubmittingModal, setIsSubmittingModal] = useState(false)
@@ -62,6 +63,9 @@ export default function ChatClient({
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
   const router = useRouter()
+
+  // 🔥 Busca o estado do Modo Streamer
+  const { isFocusMode } = useFocusMode()
 
   useEffect(() => {
     async function loadPreferences() {
@@ -82,11 +86,11 @@ export default function ChatClient({
   }, [channelId])
 
   useEffect(() => {
-    if (currentUserId) {
+    if (currentUserId && !isFocusMode) {
       const timer = setTimeout(() => { markChannelAsRead(channelId); }, 500);
       return () => clearTimeout(timer);
     }
-  }, [channelId, currentUserId, messages.length]);
+  }, [channelId, currentUserId, messages.length, isFocusMode]);
 
   useEffect(() => {
     const channel = supabase
@@ -106,7 +110,8 @@ export default function ChatClient({
           return [...prev, newMsg];
         });
 
-        if (payloadNew.user_id !== currentUserId && !isMuted) {
+        // 🔥 O SOM ESTÁ AGORA BLINDADO CONTRA O MODO FOCUS
+        if (payloadNew.user_id !== currentUserId && !isMuted && !isFocusMode) {
           const audio = new Audio('/sounds/receive.mp3');
           audio.volume = 0.5;
           audio.play().catch(() => { });
@@ -121,7 +126,7 @@ export default function ChatClient({
       .subscribe();
 
     return () => { supabase.removeChannel(channel) }
-  }, [supabase, channelId, currentUserId, isMuted]);
+  }, [supabase, channelId, currentUserId, isMuted, isFocusMode]); // isFocusMode adicionado as dependências!
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -194,11 +199,21 @@ export default function ChatClient({
   const showSecurityBanner = isPrivate && !followingState && messages.length > 0;
   const deleteBtnText = isPrivate ? 'Apagar Conversa' : (isAdmin ? 'Apagar Chat Global (Admin)' : 'Apagar Minhas Mensagens');
 
+  // 🔥 SE O MODO FOCO ESTIVER LIGADO, PROTEGE O ECRÃ
+  if (isFocusMode) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full w-full bg-surface/40 backdrop-blur-xl md:border border-white/5 md:rounded-4xl rounded-3xl p-6 text-center shadow-2xl relative overflow-hidden">
+        <div className="absolute inset-0 bg-red-500/5 z-0 pointer-events-none"></div>
+        <FaVideoSlash className="text-6xl text-red-500 mb-6 animate-pulse drop-shadow-[0_0_15px_rgba(239,68,68,0.5)] relative z-10" />
+        <h2 className="text-2xl font-black text-white mb-2 tracking-tight relative z-10">Modo Streamer Ativado</h2>
+        <p className="text-gray-400 text-sm max-w-sm leading-relaxed relative z-10">As conversas e notificações foram ocultadas para garantir o seu foco total e proteger a sua privacidade. Desative o modo no topo da página para voltar.</p>
+      </div>
+    )
+  }
+
   return (
     <>
       <div className="flex flex-col w-full h-full min-h-0 max-h-full bg-surface/40 backdrop-blur-xl md:border border-white/5 md:rounded-4xl rounded-3xl overflow-hidden shadow-2xl relative">
-
-        {/* HEADER FIXO COM DROPDOWN DE OPÇÕES */}
         <div className="bg-background/80 backdrop-blur-md border-b border-white/5 p-4 flex items-center justify-between z-30 shadow-sm shrink-0">
           <div className="flex items-center gap-4 min-w-0">
             <label htmlFor="mobile-sidebar" className="md:hidden p-2 -ml-2 text-gray-400 hover:text-white cursor-pointer transition-colors active:scale-90">
@@ -269,7 +284,6 @@ export default function ChatClient({
           </div>
         )}
 
-        {/* ÁREA DE MENSAGENS */}
         <div className="flex-1 overflow-y-auto min-h-0 p-4 md:p-6 space-y-6 custom-scrollbar bg-black/10">
           {messages.map((msg) => {
             const isMe = currentUserId === msg.user_id;
@@ -305,7 +319,6 @@ export default function ChatClient({
           <div ref={messagesEndRef} />
         </div>
 
-        {/* INPUT FIXO EM BAIXO */}
         {currentUserId ? (
           <form onSubmit={handleSend} className="bg-background/90 backdrop-blur-xl border-t border-white/5 p-3 md:p-4 flex gap-3 z-20 shrink-0">
             <input type="text" disabled={showSecurityBanner} value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder={showSecurityBanner ? "Aceite o chat para responder..." : "Escreva a sua mensagem..."} className="flex-1 w-full bg-surface border border-white/10 rounded-xl px-4 py-3 md:py-3.5 text-sm text-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all shadow-inner placeholder:text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed" maxLength={500} />
@@ -321,13 +334,10 @@ export default function ChatClient({
         )}
       </div>
 
-      {/* POP-UPS (MODAIS) */}
       {modalState !== 'none' && (
-        // z-[100] alterado para z-100 nativo
         <div className="fixed inset-0 z-100 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => !isSubmittingModal && setModalState('none')}></div>
 
-          {/* rounded-[2rem] alterado para rounded-4xl */}
           <div className="bg-surface border border-white/10 p-6 md:p-8 rounded-4xl w-full max-w-md relative z-10 shadow-2xl animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between mb-6">
               <h3 className={`text-xl font-black flex items-center gap-2 ${modalState === 'delete' ? 'text-red-500' : 'text-orange-400'}`}>
