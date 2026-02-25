@@ -119,7 +119,7 @@ export async function processSingleGame(game: SteamGame, steamId: string) {
   const steamGameId = `steam-${appId}`
 
   console.log(`\n===========================================`);
-  console.log(`🔄 MODO CORREÇÃO (TRADUÇÃO): ${game.name} (${appId})`);
+  console.log(`🔄 MODO CORREÇÃO (TRADUÇÃO + OTIMIZAÇÃO): ${game.name} (${appId})`);
   console.log(`===========================================`);
 
   try {
@@ -141,32 +141,56 @@ export async function processSingleGame(game: SteamGame, steamId: string) {
       platinumUnlockedAt = new Date(unlockedAchievements[0]!.unlocktime * 1000).toISOString();
     }
 
-    // ==========================================
-    // LÓGICA DE IMAGENS (SGDB PRIMEIRO)
-    // ==========================================
-    let coverUrl = `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${appId}/library_600x900.jpg`;
-    let bannerUrl = `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${appId}/header.jpg`;
+    // 🔥 OTIMIZAÇÃO SÉNIOR APLICADA AQUI NO MODO DE TESTE
+    const { data: existingGame } = await supabase
+      .from('games')
+      .select('cover_url, banner_url, categories')
+      .eq('id', steamGameId)
+      .maybeSingle();
 
-    const premiumCover = await getBackupImage(appId, 'grids');
-    const premiumBanner = await getBackupImage(appId, 'heroes');
+    let coverUrl = existingGame?.cover_url;
+    let bannerUrl = existingGame?.banner_url;
+    let gameCategories = existingGame?.categories || [];
 
-    if (premiumCover) coverUrl = premiumCover;
-    if (premiumBanner) bannerUrl = premiumBanner;
+    // Só procura imagens novas se elas não existirem no nosso banco
+    if (!coverUrl || !bannerUrl) {
+      console.log(`[Cache] Imagens em falta. Procurando arte Premium no SteamGridDB...`);
 
-    // 🚀 PUXANDO GÊNEROS OFICIAIS DA LOJA DA STEAM!
-    let gameCategories: string[] = [];
-    try {
-      const storeRes = await fetch(`https://store.steampowered.com/api/appdetails?appids=${appId}&l=portuguese`);
-      if (storeRes.ok) {
-        const storeData = await storeRes.json();
-        if (storeData?.[appId]?.success) {
-          gameCategories = storeData[appId].data.genres?.map((g: { id: string; description: string }) => g.description) || [];
-        }
+      if (!coverUrl) coverUrl = `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${appId}/library_600x900.jpg`;
+      if (!bannerUrl) bannerUrl = `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${appId}/header.jpg`;
+
+      if (!existingGame?.cover_url) {
+        const premiumCover = await getBackupImage(appId, 'grids');
+        if (premiumCover) coverUrl = premiumCover;
       }
-    } catch (error) {
-      console.log(`⚠️ Falha ao buscar categorias para o jogo ${appId}.`, error);
+
+      if (!existingGame?.banner_url) {
+        const premiumBanner = await getBackupImage(appId, 'heroes');
+        if (premiumBanner) bannerUrl = premiumBanner;
+      }
+    } else {
+      console.log(`[Cache] Artes já existem no banco. Pulando SGDB!`);
     }
 
+    // Só procura categorias se elas não existirem no nosso banco
+    if (!gameCategories || gameCategories.length === 0) {
+      try {
+        console.log(`[Cache] Categorias em falta. Buscando na Loja Steam...`);
+        const storeRes = await fetch(`https://store.steampowered.com/api/appdetails?appids=${appId}&l=portuguese`);
+        if (storeRes.ok) {
+          const storeData = await storeRes.json();
+          if (storeData?.[appId]?.success) {
+            gameCategories = storeData[appId].data.genres?.map((g: { id: string; description: string }) => g.description) || [];
+          }
+        }
+      } catch (error) {
+        console.log(`Falha ao buscar categorias para o jogo ${appId}.`, error);
+      }
+    } else {
+      console.log(`[Cache] Categorias já existem. Pulando Steam Store!`);
+    }
+
+    // Salva o jogo preservando as capas e categorias
     await supabase.from('games').upsert({
       id: steamGameId,
       title: game.name,
@@ -186,14 +210,11 @@ export async function processSingleGame(game: SteamGame, steamId: string) {
       await supabase.from('user_games').insert({ user_id: user.id, game_id: steamGameId, playtime_minutes: game.playtime_forever, unlocked_achievements: unlockedCount, total_achievements: totalCount, is_platinum: isPlat, platinum_unlocked_at: platinumUnlockedAt })
     }
 
-    // 🔥 FORÇAMOS A ATUALIZAÇÃO TRADUZIDA DE TODAS AS CONQUISTAS DESBLOQUEADAS
-    // Removi a trava de "unlockedCount > previousUnlocked" para que ele leia as antigas também!
-
+    // 🔥 MANTIDO O MODO FORÇADO: Lê todas as conquistas, mesmo as já registadas, para traduzir os nomes antigos
     if (unlockedCount > 0) {
       const schemaMap = new Map<string, { displayName: string, icon: string }>()
-      // Busca o esquema (nomes e ícones) traduzido
+      
       const schemaRes = await fetch(`http://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?key=${STEAM_KEY}&appid=${appId}&l=brazilian`)
-
       if (schemaRes.ok) {
         const schemaData = await schemaRes.json()
         const schemaAchs: SteamSchemaAchievement[] = schemaData?.game?.availableGameStats?.achievements || []
@@ -201,9 +222,7 @@ export async function processSingleGame(game: SteamGame, steamId: string) {
       }
 
       const percentagesMap = new Map<string, number>()
-      // A chamada de percentagens globais não aceita 'key', 'steamid' nem 'l=brazilian' nativamente
       const percentRes = await fetch(`http://api.steampowered.com/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v0002/?gameid=${appId}`)
-
       if (percentRes.ok) {
         const percentData = await percentRes.json()
         const percentList: SteamGlobalPercentage[] = percentData?.achievementpercentages?.achievements || []
@@ -212,7 +231,6 @@ export async function processSingleGame(game: SteamGame, steamId: string) {
 
       const activitiesToInsert = []
 
-      // Processa TODAS as conquistas que o usuário tem
       for (const ach of unlockedAchievements) {
         const percent = percentagesMap.get(ach.apiname) || 100
         let rarity = 'bronze', pts = 5;
