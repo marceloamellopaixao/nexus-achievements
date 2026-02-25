@@ -110,3 +110,38 @@ export async function claimQuestReward(progressId: string, rewardCoins: number) 
   
   return { success: true, newBalance }
 }
+
+// ==========================================
+// SISTEMA DE RICH PRESENCE (STATUS IN-GAME)
+// ==========================================
+export async function fetchCurrentPlayingGame() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+
+  // Busca a Steam ID vinculada ao usuário
+  const { data: userData } = await supabase.from('users').select('steam_id').eq('id', user.id).single()
+  if (!userData?.steam_id) return null
+
+  const STEAM_KEY = process.env.STEAM_API_KEY
+  try {
+    // Ping na API de Resumo de Jogador da Steam (Não faz cache para termos tempo real)
+    const res = await fetch(`http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key=${STEAM_KEY}&steamids=${userData.steam_id}`, { cache: 'no-store' })
+    const data = await res.json()
+    const player = data?.response?.players?.[0]
+
+    // A Steam só retorna "gameextrainfo" se o usuário estiver com um jogo aberto AGORA!
+    if (player && player.gameextrainfo) {
+      return {
+        title: player.gameextrainfo,
+        appId: player.gameid,
+        platform: 'Steam',
+        image_url: player.gameid ? `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${player.gameid}/capsule_231x87.jpg` : null
+      }
+    }
+    return null
+  } catch (err) {
+    console.error("Erro ao buscar Rich Presence:", err)
+    return null
+  }
+}
