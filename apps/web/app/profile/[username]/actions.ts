@@ -1,5 +1,6 @@
 'use server'
 
+import { processQuestEvent } from '@/app/actions/questEngine'
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 
@@ -33,6 +34,8 @@ export async function toggleFollow(targetUserId: string, currentPath: string) {
       return { error: `Erro do banco: ${error.message}` }
     }
     isNowFollowing = true;
+
+    await processQuestEvent('FOLLOW_USER');
   }
 
   revalidatePath(currentPath, 'layout')
