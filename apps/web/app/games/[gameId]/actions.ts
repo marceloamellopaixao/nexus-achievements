@@ -1,5 +1,6 @@
 'use server'
 
+import { processQuestEvent } from '@/app/actions/questEngine'
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 
@@ -21,6 +22,8 @@ export async function createGuide(gameId: string, title: string, content: string
     console.error("Erro ao criar guia:", error)
     return { error: 'Ocorreu um erro ao publicar o teu guia.' }
   }
+
+  await processQuestEvent('WRITE_GUIDE');
 
   revalidatePath(`/games/${gameId}`)
   return { success: true }
@@ -83,6 +86,8 @@ export async function toggleGuideVote(guideId: string, gameId: string) {
 
   await supabase.from('game_guides').update({ upvotes: count || 0 }).eq('id', guideId)
 
+  await processQuestEvent('LIKE_GUIDE');
+  
   revalidatePath(`/games/${gameId}`)
   return { success: true, newCount: count || 0, isVoted: !existing }
 }
