@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { FaImage, FaSpinner, FaUpload, FaLink, FaTimes } from 'react-icons/fa'
+import { FaImage, FaSpinner, FaUpload, FaLink, FaTimes, FaCamera } from 'react-icons/fa' // 🔥 FaCamera adicionada
 import { toast } from 'react-toastify'
 import { uploadGameCustomization } from './actions'
 
@@ -12,7 +12,6 @@ interface Props {
   className?: string;
 }
 
-// 1. Criamos um tipo para o resultado do upload para remover o "any"
 interface UploadResult {
   success?: string;
   error?: string;
@@ -25,10 +24,8 @@ export default function CustomizationButton({ gameId, type, className = "" }: Pr
   const [mounted, setMounted] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Previne erros de "Hydration" do Next.js ao usar Portals
   useEffect(() => setMounted(true), [])
 
-  // 2. Trocamos "any" por "UploadResult"
   const processResult = (res: UploadResult) => {
     if (res.success) {
       toast.success(res.success, { theme: 'dark' })
@@ -39,7 +36,6 @@ export default function CustomizationButton({ gameId, type, className = "" }: Pr
     }
   }
 
-  // --- OPÇÃO 1: Ficheiro do Computador ---
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -65,7 +61,6 @@ export default function CustomizationButton({ gameId, type, className = "" }: Pr
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
-  // --- OPÇÃO 2: Colar URL (SteamGridDB, etc) ---
   const handleUrlSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!imageUrl.trim()) return;
@@ -78,7 +73,6 @@ export default function CustomizationButton({ gameId, type, className = "" }: Pr
 
   const modalContent = (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Overlay Escuro (Fecha ao clicar fora) */}
       <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => !loading && setIsOpen(false)}></div>
       
       <div className="bg-surface border border-white/10 p-6 md:p-8 rounded-4xl w-full max-w-sm relative z-10 shadow-2xl animate-in zoom-in-95 duration-200">
@@ -93,8 +87,6 @@ export default function CustomizationButton({ gameId, type, className = "" }: Pr
         </div>
 
         <div className="space-y-6">
-          
-          {/* Opção 1 */}
           <div>
             <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3">Opção 1: Arquivo (Max 5MB)</p>
             <input type="file" accept="image/*" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
@@ -114,7 +106,6 @@ export default function CustomizationButton({ gameId, type, className = "" }: Pr
             <div className="h-px bg-white/20 flex-1"></div>
           </div>
 
-          {/* Opção 2 */}
           <form onSubmit={handleUrlSubmit}>
             <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3">Opção 2: Link (SteamGridDB)</p>
             <div className="flex flex-col gap-3">
@@ -139,7 +130,6 @@ export default function CustomizationButton({ gameId, type, className = "" }: Pr
               </button>
             </div>
           </form>
-
         </div>
       </div>
     </div>
@@ -147,12 +137,16 @@ export default function CustomizationButton({ gameId, type, className = "" }: Pr
 
   return (
     <>
+      {/* 🔥 NOVIDADE: Overlay gigante que cobre a imagem inteira com a câmara no meio */}
       <button 
         onClick={(e) => { e.preventDefault(); setIsOpen(true); }}
         title={`Alterar ${type} do jogo`}
-        className={`bg-background/80 backdrop-blur-md border border-white/20 text-white p-2 md:p-3 rounded-xl hover:bg-primary hover:border-primary transition-all shadow-xl active:scale-90 flex items-center justify-center ${className}`}
+        className={`absolute inset-0 z-50 flex flex-col items-center justify-center gap-2 bg-black/60 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-all duration-300 w-full h-full cursor-pointer ${className}`}
       >
-        <FaImage className="text-sm md:text-base drop-shadow-md" />
+        <FaCamera className="text-3xl md:text-4xl text-white drop-shadow-md" />
+        <span className="text-white font-black uppercase tracking-widest text-[10px] md:text-xs drop-shadow-md">
+          Alterar {type === 'banner' ? 'Banner' : 'Capa'}
+        </span>
       </button>
 
       {isOpen && mounted && createPortal(modalContent, document.body)}
