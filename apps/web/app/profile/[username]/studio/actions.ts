@@ -4,7 +4,7 @@ import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 
 // ==========================================
-// UPLOAD DE FOTOS (AVATAR E BANNER)
+// UPLOAD DE AVATAR E BANNER COM LIMPEZA DE IMAGENS ANTIGAS
 // ==========================================
 export async function uploadProfileImage(formData: FormData, type: 'avatar' | 'banner') {
   const supabase = await createClient()
@@ -31,11 +31,22 @@ export async function uploadProfileImage(formData: FormData, type: 'avatar' | 'b
     const { data: publicData } = supabase.storage.from('avatars').getPublicUrl(fileName)
     const publicUrl = publicData.publicUrl
 
+    // 🧹 LIMPEZA: Buscar a URL antiga para apagar se for do nosso Storage
+    const { data: userData } = await supabase.from('users').select('username, avatar_url, profile_banner_url').eq('id', user.id).single()
+    const oldUrl = type === 'avatar' ? userData?.avatar_url : userData?.profile_banner_url
+
+    // Verifica se a imagem antiga estava no nosso bucket 'avatars'
+    if (oldUrl && oldUrl.includes('/avatars/')) {
+      const oldFileName = oldUrl.split('/avatars/').pop()?.split('?')[0]
+      if (oldFileName) {
+        await supabase.storage.from('avatars').remove([oldFileName])
+      }
+    }
+
     // Salva na tabela users
     const updateData = type === 'avatar' ? { avatar_url: publicUrl } : { profile_banner_url: publicUrl }
     await supabase.from('users').update(updateData).eq('id', user.id)
 
-    const { data: userData } = await supabase.from('users').select('username').eq('id', user.id).single()
     revalidatePath(`/profile/${userData?.username}`)
     revalidatePath(`/profile/${userData?.username}/studio`)
 
