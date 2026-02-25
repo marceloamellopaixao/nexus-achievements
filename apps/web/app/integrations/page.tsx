@@ -1,7 +1,9 @@
 'use client'
 
 import React, { useState, useEffect, Dispatch, SetStateAction, ReactNode } from "react";
+// Certifique-se de importar a função da PSN aqui!
 import { saveSteamId, fetchSteamGamesList, processSingleGame, finalizeSync, linkPlatformAccount } from "./actions";
+import { syncPlayStationGames } from "./psn"; 
 import { toast } from "react-toastify";
 import { createClient } from "@/utils/supabase/client";
 import { FaPlaystation, FaSteam, FaXbox, FaLock, FaLink, FaTrophy } from "react-icons/fa";
@@ -33,12 +35,14 @@ interface PlatformCardProps {
     tagBorder: string;
     tagText: string;
   };
-  children?: ReactNode; 
+  // 🔥 NOVIDADE: Separamos o botão da área de carregamento para não bugar o Layout!
+  actionButton?: ReactNode; 
+  expandedContent?: ReactNode;
 }
 
-function PlatformCard({ platform, title, icon, description, inputId, savedId, loading, onInputChange, onSubmit, placeholder, theme, children }: PlatformCardProps) {
+function PlatformCard({ platform, title, icon, description, inputId, savedId, loading, onInputChange, onSubmit, placeholder, theme, actionButton, expandedContent }: PlatformCardProps) {
   return (
-    <div className="bg-surface/50 border border-border rounded-3xl p-6 md:p-8 flex flex-col md:flex-row gap-8 items-start relative overflow-hidden shadow-2xl group">
+    <div className="bg-surface/50 border border-border rounded-3xl p-6 md:p-8 flex flex-col md:flex-row gap-8 items-start relative overflow-hidden shadow-2xl group transition-all duration-300">
       <div className={`absolute top-0 right-0 w-64 h-64 rounded-full blur-3xl pointer-events-none transition-colors ${theme.glow}`}></div>
       <div className={`w-20 h-20 text-white rounded-2xl flex items-center justify-center text-4xl shrink-0 border shadow-lg z-10 ${theme.iconBg} ${theme.iconBorder}`}>
         <span className="drop-shadow-lg">{icon}</span>
@@ -66,11 +70,16 @@ function PlatformCard({ platform, title, icon, description, inputId, savedId, lo
         </form>
 
         {savedId && (
-          <div className="pt-6 border-t border-border/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className={`flex items-center gap-3 px-4 py-2 rounded-xl border max-w-full ${theme.tagBg} ${theme.tagBorder}`}>
-              <span className={`text-sm font-bold truncate ${theme.tagText}`}>{platform}: <span className="text-white">{savedId}</span></span>
+          <div className="pt-6 border-t border-border/50 flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className={`flex items-center gap-3 px-4 py-2 rounded-xl border max-w-full ${theme.tagBg} ${theme.tagBorder}`}>
+                <span className={`text-sm font-bold truncate ${theme.tagText}`}>{platform}: <span className="text-white">{savedId}</span></span>
+              </div>
+              {actionButton}
             </div>
-            {children}
+            
+            {/* O bloco de carregamento empurra o fundo do cartão para baixo naturalmente! */}
+            {expandedContent}
           </div>
         )}
       </div>
@@ -99,7 +108,8 @@ export default function IntegrationsPage() {
   const [savedEpicId, setSavedEpicId] = useState<string | null>(null);
   const [loadingEpic, setLoadingEpic] = useState(false);
 
-  const [loadingSync, setLoadingSync] = useState(false);
+  // 🔥 NOVIDADE: Apenas UMA plataforma carrega de cada vez!
+  const [syncingPlatform, setSyncingPlatform] = useState<'Steam' | 'PlayStation' | null>(null);
   const [syncProgress, setSyncProgress] = useState(0);
   const [syncMessage, setSyncMessage] = useState("");
   const [syncStats, setSyncStats] = useState({ coins: 0, plats: 0 });
@@ -118,7 +128,6 @@ export default function IntegrationsPage() {
 
         const { data: linked } = await supabase.from('linked_accounts').select('*').eq('user_id', user.id);
         linked?.forEach(acc => {
-          // 🔥 AGORA LÊ A COLUNA NOVA DO BANCO! Se não existir, faz fallback para a antiga
           const displayName = acc.platform_username || acc.platform_user_id;
           
           if (acc.platform === 'Steam') setSteamUsername(displayName);
@@ -144,7 +153,6 @@ export default function IntegrationsPage() {
     setLoadingSave(false);
   };
 
-  // Correção rigorosa do TypeScript (sem any)
   const handleSavePlatform = async (platform: string, platformId: string, setLoading: Dispatch<SetStateAction<boolean>>, setSaved: Dispatch<SetStateAction<string | null>>) => {
     setLoading(true);
     const res = await linkPlatformAccount(platform, platformId);
@@ -156,8 +164,9 @@ export default function IntegrationsPage() {
     setLoading(false);
   }
 
+  // Sincronização Steam
   const handleSyncSteam = async () => {
-    setLoadingSync(true);
+    setSyncingPlatform('Steam');
     setSyncProgress(0);
     setSyncStats({ coins: 0, plats: 0 });
     setSyncMessage("Procurando a sua biblioteca na Steam...");
@@ -165,7 +174,7 @@ export default function IntegrationsPage() {
     const listResult = await fetchSteamGamesList();
     if (listResult.error || !listResult.games) {
       toast.error(listResult.error || 'Erro ao buscar jogos.', { theme: 'dark' });
-      setLoadingSync(false);
+      setSyncingPlatform(null);
       return;
     }
 
@@ -189,13 +198,41 @@ export default function IntegrationsPage() {
     setSyncMessage("Guardando os seus ganhos no Nexus...");
     await finalizeSync(totalCoins, totalPlats, games.length);
 
-    toast.success(`Sincronização épica concluída!`, { theme: 'dark' });
+    toast.success(`Sincronização Steam concluída!`, { theme: 'dark' });
     setSyncMessage("");
     setSyncProgress(0);
-    setLoadingSync(false);
+    setSyncingPlatform(null);
   };
 
-  const lockButton = (
+  // Sincronização PlayStation
+  const handleSyncPSN = async () => {
+    if (!savedPsnId) return;
+    
+    setSyncingPlatform('PlayStation');
+    setSyncProgress(25);
+    setSyncStats({ coins: 0, plats: 0 });
+    setSyncMessage("Conectando aos servidores da PlayStation Network...");
+
+    const result = await syncPlayStationGames(savedPsnId);
+    
+    setSyncProgress(80);
+    setSyncMessage("Guardando os seus troféus no Nexus...");
+    
+    await finalizeSync(result.coins, result.plats, 0); 
+
+    setSyncStats({ coins: result.coins, plats: result.plats });
+    setSyncProgress(100);
+    
+    toast.success(`Sincronização da PSN concluída com sucesso!`, { theme: 'dark' });
+    
+    setTimeout(() => {
+      setSyncMessage("");
+      setSyncProgress(0);
+      setSyncingPlatform(null);
+    }, 2000);
+  };
+
+  const LockButton = () => (
     <button disabled className="w-full sm:w-auto px-6 py-2.5 bg-surface border border-white/5 text-gray-500 rounded-xl font-bold text-sm flex items-center justify-center gap-2 cursor-not-allowed">
       <FaLock /> Sincronização na Fase 2
     </button>
@@ -214,6 +251,7 @@ export default function IntegrationsPage() {
 
       <div className="grid grid-cols-1 gap-6 pt-4">
 
+        {/* ======================= STEAM ======================= */}
         <PlatformCard
           platform="Steam" title="Steam" icon={<FaSteam />}
           inputId={steamId} savedId={steamUsername || savedSteamId} loading={loadingSave}
@@ -227,15 +265,19 @@ export default function IntegrationsPage() {
               </span>
             </>
           }
-        >
-          <div className="flex flex-col w-full sm:w-auto relative">
-            <button onClick={handleSyncSteam} disabled={loadingSync} className="w-full sm:w-auto px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-sm transition-all shadow-[0_0_15px_rgba(37,99,235,0.4)] hover:shadow-[0_0_20px_rgba(37,99,235,0.6)] disabled:opacity-50 disabled:grayscale flex items-center justify-center gap-2 active:scale-95">
-              {loadingSync ? <FiLoader className="text-lg animate-spin" /> : null}
-              {loadingSync ? 'Sincronizando...' : 'Sincronizar Todos os Jogos'}
+          actionButton={
+            <button 
+              onClick={handleSyncSteam} 
+              disabled={syncingPlatform !== null} 
+              className="w-full sm:w-auto px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-sm transition-all shadow-[0_0_15px_rgba(37,99,235,0.4)] disabled:opacity-50 disabled:grayscale flex items-center justify-center gap-2 active:scale-95"
+            >
+              {syncingPlatform === 'Steam' ? <FiLoader className="text-lg animate-spin" /> : null}
+              {syncingPlatform === 'Steam' ? 'Sincronizando...' : 'Sincronizar Todos os Jogos'}
             </button>
-            
-            {loadingSync && (
-              <div className="absolute left-0 right-0 top-full mt-2 bg-background/95 backdrop-blur-md p-5 rounded-2xl border border-border shadow-2xl z-50 animate-in slide-in-from-top-2 mx-4 md:mx-0 min-w-xs">
+          }
+          expandedContent={
+            syncingPlatform === 'Steam' && (
+              <div className="w-full mt-2 bg-background/90 backdrop-blur-md p-5 rounded-2xl border border-border shadow-inner animate-in fade-in slide-in-from-top-4">
                 <div className="flex justify-between text-xs font-bold mb-3 text-gray-400">
                   <span className="truncate pr-4">{syncMessage}</span>
                   <span className="text-blue-400 shrink-0">{Math.round(syncProgress)}%</span>
@@ -250,29 +292,57 @@ export default function IntegrationsPage() {
                   <span className="text-blue-400 flex items-center gap-1.5"><FaTrophy className="text-lg" /> +{syncStats.plats} <span className="hidden sm:inline">Platinas</span></span>
                 </div>
               </div>
-            )}
-          </div>
-        </PlatformCard>
+            )
+          }
+        />
 
+        {/* ======================= PLAYSTATION ======================= */}
         <PlatformCard
           platform="PSN" title="PlayStation Network" icon={<FaPlaystation />}
           inputId={psnId} savedId={savedPsnId} loading={loadingPsn}
           onInputChange={setPsnId} onSubmit={(e) => { e.preventDefault(); handleSavePlatform('PlayStation', psnId, setLoadingPsn, setSavedPsnId); }} placeholder="Ex: cacador_psn"
           theme={{ glow: 'bg-blue-600/10 group-hover:bg-blue-600/20', iconBg: 'bg-linear-to-br from-blue-600 to-blue-900', iconBorder: 'border-blue-400/30 shadow-[0_0_20px_rgba(59,130,246,0.2)]', btn: 'bg-blue-600', btnHover: 'hover:bg-blue-500', tagBg: 'bg-blue-500/10', tagBorder: 'border-blue-500/20', tagText: 'text-blue-400' }}
-          description={<>Vincule a sua <strong>PSN ID</strong> para exibir a conta no seu perfil. A sincronização de troféus chegará na Fase 2.</>}
-        >
-          {lockButton}
-        </PlatformCard>
+          description={<>Vincule a sua <strong>PSN ID</strong> para exibir a conta no seu perfil e importar os seus troféus.</>}
+          actionButton={
+            <button 
+              onClick={handleSyncPSN} 
+              disabled={syncingPlatform !== null} 
+              className="w-full sm:w-auto px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-sm transition-all shadow-[0_0_15px_rgba(37,99,235,0.4)] disabled:opacity-50 disabled:grayscale flex items-center justify-center gap-2 active:scale-95"
+            >
+              {syncingPlatform === 'PlayStation' ? <FiLoader className="text-lg animate-spin" /> : null}
+              {syncingPlatform === 'PlayStation' ? 'Buscando Troféus...' : 'Sincronizar Troféus'}
+            </button>
+          }
+          expandedContent={
+            syncingPlatform === 'PlayStation' && (
+              <div className="w-full mt-2 bg-background/90 backdrop-blur-md p-5 rounded-2xl border border-border shadow-inner animate-in fade-in slide-in-from-top-4">
+                <div className="flex justify-between text-xs font-bold mb-3 text-gray-400">
+                  <span className="truncate pr-4">{syncMessage}</span>
+                  <span className="text-blue-400 shrink-0">{Math.round(syncProgress)}%</span>
+                </div>
+                <div className="w-full bg-surface rounded-full h-3 overflow-hidden border border-white/5">
+                  <div className="bg-linear-to-r from-blue-600 to-purple-500 h-full rounded-full transition-all duration-300 relative" style={{ width: `${syncProgress}%` }}>
+                     <div className="absolute top-0 left-0 w-full h-full bg-white/20 animate-[shimmer_2s_infinite]"></div>
+                  </div>
+                </div>
+                <div className="flex justify-between mt-4 text-sm font-black border-t border-white/5 pt-3">
+                  <span className="text-yellow-500 flex items-center gap-1.5"><BiSolidCoinStack className="text-lg" /> +{syncStats.coins} <span className="hidden sm:inline">Nexus Coins</span></span>
+                  <span className="text-blue-400 flex items-center gap-1.5"><FaTrophy className="text-lg" /> +{syncStats.plats} <span className="hidden sm:inline">Platinas</span></span>
+                </div>
+              </div>
+            )
+          }
+        />
 
+        {/* ======================= XBOX E EPIC ======================= */}
         <PlatformCard
           platform="Xbox" title="Xbox Live" icon={<FaXbox />}
           inputId={xboxId} savedId={savedXboxId} loading={loadingXbox}
           onInputChange={setXboxId} onSubmit={(e) => { e.preventDefault(); handleSavePlatform('Xbox', xboxId, setLoadingXbox, setSavedXboxId); }} placeholder="Ex: MasterChief117"
           theme={{ glow: 'bg-green-600/10 group-hover:bg-green-600/20', iconBg: 'bg-linear-to-br from-green-500 to-green-900', iconBorder: 'border-green-400/30 shadow-[0_0_20px_rgba(34,197,94,0.2)]', btn: 'bg-green-600', btnHover: 'hover:bg-green-500', tagBg: 'bg-green-500/10', tagBorder: 'border-green-500/20', tagText: 'text-green-400' }}
           description={<>Vincule a sua <strong>Gamertag</strong> para exibir a conta no seu perfil. A sincronização de Gamerscore chegará na Fase 2.</>}
-        >
-          {lockButton}
-        </PlatformCard>
+          actionButton={<LockButton />}
+        />
 
         <PlatformCard
           platform="Epic" title="Epic Games" icon={<SiEpicgames />}
@@ -280,9 +350,8 @@ export default function IntegrationsPage() {
           onInputChange={setEpicId} onSubmit={(e) => { e.preventDefault(); handleSavePlatform('Epic', epicId, setLoadingEpic, setSavedEpicId); }} placeholder="Ex: ProGamer"
           theme={{ glow: 'bg-gray-600/10 group-hover:bg-gray-600/20', iconBg: 'bg-linear-to-br from-gray-500 to-gray-900', iconBorder: 'border-gray-400/30 shadow-[0_0_20px_rgba(156,163,175,0.2)]', btn: 'bg-gray-600', btnHover: 'hover:bg-gray-500', tagBg: 'bg-gray-500/10', tagBorder: 'border-gray-500/20', tagText: 'text-gray-400' }}
           description={<>Vincule a sua <strong>Epic ID</strong> para exibir a conta no seu perfil. Traga as suas conquistas para o Nexus na Fase 2.</>}
-        >
-          {lockButton}
-        </PlatformCard>
+          actionButton={<LockButton />}
+        />
 
       </div>
     </div>
