@@ -8,9 +8,9 @@ import MuralList from "./MuralList";
 import { Metadata } from "next";
 import ClientBackButton from "@/app/components/ClientBackButton";
 
-// Ícones Modernos
+// Ícones Modernos (🔥 FaSteam adicionado)
 import { GiPadlockOpen, GiCrossedSwords } from "react-icons/gi";
-import { FaMedal, FaEdit, FaCommentDots, FaCalendarAlt, FaGamepad, FaTrophy } from "react-icons/fa";
+import { FaMedal, FaEdit, FaCommentDots, FaCalendarAlt, FaGamepad, FaTrophy, FaSteam } from "react-icons/fa";
 import FlipGameCard from "@/app/components/FlipGameCard";
 
 export const metadata: Metadata = {
@@ -47,6 +47,28 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
   const { data: profile, error } = await supabase.from("users").select("*").eq("username", username).single();
 
   if (error || !profile) notFound();
+
+  // 🔥 BUSCA RICH PRESENCE DA STEAM (Status In-Game)
+  let playingNow: { title: string, platform: string } | null = null;
+  const STEAM_KEY = process.env.STEAM_API_KEY;
+
+  if (profile.steam_id && STEAM_KEY) {
+    try {
+      const res = await fetch(`http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key=${STEAM_KEY}&steamids=${profile.steam_id}`, { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        const pData = data?.response?.players?.[0];
+        if (pData && pData.gameextrainfo) {
+          playingNow = {
+            title: pData.gameextrainfo,
+            platform: 'Steam'
+          };
+        }
+      }
+    } catch (err) {
+      console.error("Erro ao buscar status do jogador na Steam:", err);
+    }
+  }
 
   const isOwner = authUser?.id === profile.id;
   const showcaseLimit = profile.showcase_limit || 5;
@@ -115,7 +137,6 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
       };
     });
 
-    // 🔥 A MÁGICA DO ALGORITMO: Ordenar a Estante (Platinados > Progresso > Vazios)
     showcaseGames.sort((a, b) => {
       const pA = userProgressMap[a.id];
       const pB = userProgressMap[b.id];
@@ -125,18 +146,11 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
       const aUnl = pA?.unlocked || 0;
       const bUnl = pB?.unlocked || 0;
 
-      // 1º Regra: Platinados primeiro
       if (aPlat && !bPlat) return -1;
       if (!aPlat && bPlat) return 1;
-      
-      // 2º Regra: Em progresso vs Zerados
       if (aUnl > 0 && bUnl === 0) return -1;
       if (aUnl === 0 && bUnl > 0) return 1;
-      
-      // 3º Regra: Quem tem mais conquistas ganha
       if (bUnl !== aUnl) return bUnl - aUnl;
-      
-      // 4º Regra: Ordem alfabética
       return a.title.localeCompare(b.title);
     });
   }
@@ -191,6 +205,16 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
                 )}
               </div>
             </div>
+
+            {/* 🔥 BADGE RICH PRESENCE (Status In-Game) */}
+            {playingNow && (
+              <div className="flex items-center justify-center mt-1 mb-1 animate-in fade-in zoom-in duration-500 px-2 w-full">
+                <span className="flex items-center gap-2 bg-green-500/10 border border-green-500/30 text-green-400 px-4 py-1.5 rounded-full text-[10px] sm:text-xs font-black uppercase tracking-widest shadow-[0_0_15px_rgba(34,197,94,0.15)] max-w-full">
+                  {playingNow.platform === 'Steam' ? <FaSteam className="text-sm md:text-base shrink-0" /> : <FaGamepad className="text-sm md:text-base shrink-0" />}
+                  <span className="truncate">Jogando: {playingNow.title}</span>
+                </span>
+              </div>
+            )}
 
             <div className="relative w-full max-w-lg mx-auto mt-2 px-2">
               <FaCommentDots className="absolute top-5 left-6 text-white/10 text-xl sm:text-2xl" />
