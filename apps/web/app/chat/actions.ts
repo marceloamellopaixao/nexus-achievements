@@ -2,6 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { processQuestEvent } from '../actions/questEngine'
 
 export async function sendMessage(content: string, channel: string = 'global') {
   const supabase = await createClient()
@@ -15,6 +16,8 @@ export async function sendMessage(content: string, channel: string = 'global') {
     content: content.trim(),
     channel
   })
+
+  await processQuestEvent('SEND_CHAT');
 
   if (error) return { error: 'Falha ao enviar mensagem.' }
   return { success: true }
