@@ -7,7 +7,8 @@
     "NEXT_PUBLIC_SUPABASE_ANON_KEY",
     "NEXT_PUBLIC_BASE_URL",
     "STEAM_API_KEY",
-    "STEAMGRIDDB_API_KEY"
+    "STEAMGRIDDB_API_KEY",
+    "PSN_NPSSO_TOKEN"
   ],
   "tasks": {
     "build": {
@@ -19,7 +20,8 @@
         "NEXT_PUBLIC_SUPABASE_ANON_KEY", 
         "NEXT_PUBLIC_BASE_URL",
         "STEAM_API_KEY",
-        "STEAMGRIDDB_API_KEY"
+        "STEAMGRIDDB_API_KEY",
+        "PSN_NPSSO_TOKEN"
       ]
     },
     "lint": {
