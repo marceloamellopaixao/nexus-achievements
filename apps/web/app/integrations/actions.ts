@@ -43,9 +43,9 @@ async function getBackupImage(appId: string, type: 'grids' | 'heroes' | 'logos')
     let url = `https://www.steamgriddb.com/api/v2/${type}/steam/${appId}`;
 
     if (type === 'grids') {
-      url += '?dimensions=600x900'; 
+      url += '?dimensions=600x900';
     } else if (type === 'heroes') {
-      url += '?dimensions=1920x620'; 
+      url += '?dimensions=1920x620';
     }
 
     const response = await fetch(url, {
@@ -55,7 +55,7 @@ async function getBackupImage(appId: string, type: 'grids' | 'heroes' | 'logos')
     const resData = await response.json();
 
     if (resData.success && resData.data && resData.data.length > 0) {
-      return resData.data[0].url; 
+      return resData.data[0].url;
     } else {
       return null;
     }
@@ -136,6 +136,11 @@ export async function processSingleGame(game: SteamGame, steamId: string) {
     const totalCount = achievements.length
     const isPlat = unlockedCount === totalCount && totalCount > 0
 
+    let platinumUnlockedAt = null
+    if (isPlat && unlockedCount > 0) {
+      platinumUnlockedAt = new Date(unlockedAchievements[0]!.unlocktime * 1000).toISOString();
+    }
+
     // ==========================================
     // LÓGICA DE IMAGENS (SGDB PRIMEIRO)
     // ==========================================
@@ -176,19 +181,19 @@ export async function processSingleGame(game: SteamGame, steamId: string) {
     const wasPlat = existingRecord?.is_platinum || false
 
     if (existingRecord) {
-      await supabase.from('user_games').update({ playtime_minutes: game.playtime_forever, unlocked_achievements: unlockedCount, total_achievements: totalCount, is_platinum: isPlat }).eq('id', existingRecord.id)
+      await supabase.from('user_games').update({ playtime_minutes: game.playtime_forever, unlocked_achievements: unlockedCount, total_achievements: totalCount, is_platinum: isPlat, platinum_unlocked_at: platinumUnlockedAt }).eq('id', existingRecord.id)
     } else {
-      await supabase.from('user_games').insert({ user_id: user.id, game_id: steamGameId, playtime_minutes: game.playtime_forever, unlocked_achievements: unlockedCount, total_achievements: totalCount, is_platinum: isPlat })
+      await supabase.from('user_games').insert({ user_id: user.id, game_id: steamGameId, playtime_minutes: game.playtime_forever, unlocked_achievements: unlockedCount, total_achievements: totalCount, is_platinum: isPlat, platinum_unlocked_at: platinumUnlockedAt })
     }
 
     // 🔥 FORÇAMOS A ATUALIZAÇÃO TRADUZIDA DE TODAS AS CONQUISTAS DESBLOQUEADAS
     // Removi a trava de "unlockedCount > previousUnlocked" para que ele leia as antigas também!
-    
+
     if (unlockedCount > 0) {
       const schemaMap = new Map<string, { displayName: string, icon: string }>()
       // Busca o esquema (nomes e ícones) traduzido
       const schemaRes = await fetch(`http://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?key=${STEAM_KEY}&appid=${appId}&l=brazilian`)
-      
+
       if (schemaRes.ok) {
         const schemaData = await schemaRes.json()
         const schemaAchs: SteamSchemaAchievement[] = schemaData?.game?.availableGameStats?.achievements || []
@@ -198,7 +203,7 @@ export async function processSingleGame(game: SteamGame, steamId: string) {
       const percentagesMap = new Map<string, number>()
       // A chamada de percentagens globais não aceita 'key', 'steamid' nem 'l=brazilian' nativamente
       const percentRes = await fetch(`http://api.steampowered.com/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v0002/?gameid=${appId}`)
-      
+
       if (percentRes.ok) {
         const percentData = await percentRes.json()
         const percentList: SteamGlobalPercentage[] = percentData?.achievementpercentages?.achievements || []
@@ -213,16 +218,16 @@ export async function processSingleGame(game: SteamGame, steamId: string) {
         let rarity = 'bronze', pts = 5;
         if (percent <= 10) { rarity = 'gold'; pts = 25; }
         else if (percent <= 50) { rarity = 'silver'; pts = 10; }
-        
+
         activitiesToInsert.push({
-          user_id: user.id, 
-          game_id: steamGameId, 
+          user_id: user.id,
+          game_id: steamGameId,
           game_name: game.name,
           achievement_name: schemaMap.get(ach.apiname)?.displayName || ach.apiname,
           achievement_icon: schemaMap.get(ach.apiname)?.icon || null,
-          rarity, 
-          points_earned: pts, 
-          platform: 'Steam', 
+          rarity,
+          points_earned: pts,
+          platform: 'Steam',
           created_at: new Date(ach.unlocktime * 1000).toISOString()
         })
       }
@@ -239,10 +244,10 @@ export async function processSingleGame(game: SteamGame, steamId: string) {
         await supabase.from('global_activity').upsert(activitiesToInsert, { onConflict: 'user_id, game_id, achievement_name' })
       }
     }
-    
+
     // 🔥 SEGURANÇA MÁXIMA: Devolvemos sempre ZERO moedas no Modo de Correção!
     return { coins: 0, plats: 0 }
-    
+
   } catch (err) {
     console.log(`❌ ERRO GERAL NO JOGO ${game.name}:`, err)
     return { coins: 0, plats: 0 }
@@ -274,7 +279,7 @@ export async function finalizeSync(totalCoinsEarned: number, totalPlatsEarned: n
   // 🔥 SEGURANÇA MÁXIMA: Congelamos as moedas, não importa o que aconteça
   await supabase.from('users').update({
     nexus_coins: userData?.nexus_coins || 0, // Nunca soma nada novo nesta versão!
-    total_platinums: userData?.total_platinums || 0, 
+    total_platinums: userData?.total_platinums || 0,
     total_games: totalGamesCount > 0 ? totalGamesCount : (userData?.total_games || 0),
     last_steam_sync: new Date().toISOString()
   }).eq('id', user.id)
