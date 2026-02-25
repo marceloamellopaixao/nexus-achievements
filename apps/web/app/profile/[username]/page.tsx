@@ -11,6 +11,7 @@ import ClientBackButton from "@/app/components/ClientBackButton";
 // Ícones Modernos
 import { GiPadlockOpen, GiCrossedSwords } from "react-icons/gi";
 import { FaMedal, FaEdit, FaCommentDots, FaCalendarAlt, FaGamepad, FaTrophy } from "react-icons/fa";
+import FlipGameCard from "@/app/components/FlipGameCard";
 
 export const metadata: Metadata = {
   title: "Perfil Público | Nexus Achievements",
@@ -22,7 +23,8 @@ interface ProfilePageProps {
   searchParams: Promise<{ back?: string }>;
 }
 
-type ShowcaseGame = { id: string; title: string; cover_url: string; };
+type ShowcaseGame = { id: string; title: string; cover_url: string | null; total_achievements: number; };
+
 interface ProfileComment { id: string; profile_id: string; author_id: string; content: string; created_at: string; author?: { id: string; username: string; avatar_url: string | null; }; }
 interface RawCommentWithAuthor { id: string; profile_id: string; author_id: string; content: string; created_at: string; author: { id: string; username: string; avatar_url: string | null } | { id: string; username: string; avatar_url: string | null }[]; }
 interface RawUserBadge { badge_id: string; awarded_at: string; badges: { name: string; icon: string; color_class: string; description: string; } | { name: string; icon: string; color_class: string; description: string; }[]; }
@@ -92,10 +94,29 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
     }
   }
 
+  // 🔥 Substituímos o 'any[]' pelo tipo ShowcaseGame[] que criámos
   let showcaseGames: ShowcaseGame[] = [];
+  const userProgressMap: Record<string, { unlocked: number, is_platinum: boolean, playtime_minutes: number }> = {};
+
   if (profile.showcase_games && profile.showcase_games.length > 0) {
-    const { data: gamesData } = await supabase.from("games").select("id, title, cover_url").in("id", profile.showcase_games);
+    const { data: gamesData } = await supabase.from("games").select("id, title, cover_url, total_achievements").in("id", profile.showcase_games);
+    
+    // Cast garantindo que o filter devolve o tipo correto
     if (gamesData) showcaseGames = profile.showcase_games.map((id: string) => gamesData.find(g => g.id === id)).filter(Boolean) as ShowcaseGame[];
+
+    const { data: progressData } = await supabase
+      .from('user_games')
+      .select('game_id, unlocked_achievements, is_platinum, playtime_minutes')
+      .eq('user_id', profile.id)
+      .in('game_id', profile.showcase_games);
+
+    progressData?.forEach(p => {
+      userProgressMap[p.game_id] = { 
+        unlocked: p.unlocked_achievements, 
+        is_platinum: p.is_platinum,
+        playtime_minutes: p.playtime_minutes
+      };
+    });
   }
 
   const joinDate = new Date(profile.created_at).toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' });
@@ -107,24 +128,18 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
 
       {/* BANNER COM IMAGEM PERSONALIZADA */}
       <div className="-mx-4 md:-mx-8 -mt-4 md:-mt-8 h-56 md:h-72 lg:h-80 relative overflow-hidden border-b border-white/5 shadow-2xl rounded-b-4xl transition-all duration-700 z-0 bg-background">
-
-        {/* Se tiver Fundo Personalizado (Banner Upload) */}
         {profile.profile_banner_url && (
           <Image src={profile.profile_banner_url} alt="Banner" fill className="object-cover opacity-70 mix-blend-lighten" unoptimized />
         )}
-
-        {/* Camada de Cor da Loja (Sobrepõe à imagem com transparência se existir) */}
         <div className="absolute inset-0" style={styles.background ? { background: styles.background, opacity: profile.profile_banner_url ? 0.6 : 1 } : { background: '#18181b', opacity: profile.profile_banner_url ? 0.8 : 1 }}></div>
-
         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-20 mix-blend-overlay pointer-events-none"></div>
         <div className="absolute inset-0 bg-linear-to-t from-background via-background/60 to-transparent pointer-events-none" />
       </div>
 
-      {/* NOVO CARTÃO PRINCIPAL - w-full e min-w-0 forçam o cartão a respeitar a tela */}
+      {/* NOVO CARTÃO PRINCIPAL */}
       <div className="max-w-5xl mx-auto -mt-24 md:-mt-32 relative z-10 px-2 sm:px-4 md:px-0">
         <div className="bg-surface/80 backdrop-blur-2xl border border-white/10 rounded-4xl p-4 sm:p-6 md:p-10 shadow-2xl relative w-full min-w-0">
 
-          {/* FOTO NO MEIO (Posicionamento Absoluto) */}
           <div className="absolute left-1/2 -translate-x-1/2 -top-16 md:-top-20 w-32 h-32 md:w-40 md:h-40 z-20">
             <div className="absolute inset-0 rounded-4xl p-1 shadow-2xl transition-all duration-700" style={{ background: styles.border || 'transparent' }}>
               <div className="w-full h-full rounded-[1.75rem] bg-background overflow-hidden relative flex items-center justify-center">
@@ -137,22 +152,16 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
             </div>
           </div>
 
-          {/* CABEÇALHO DO PERFIL */}
           <div className="pt-16 md:pt-20 pb-6 md:pb-8 flex flex-col items-center text-center border-b border-white/5 gap-3 w-full min-w-0">
-
-            {/* Título Responsivo - max-w-full impede que o nome estique tudo */}
             <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-3 w-full min-w-0 px-2">
               <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight truncate max-w-full drop-shadow-md">
                 {profile.username}
               </h1>
-
               <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                 <span className="text-[10px] md:text-xs font-black bg-primary/20 text-primary border border-primary/50 px-2.5 py-1 rounded-lg uppercase tracking-wider">
                   Lvl {profile.global_level || 1}
                 </span>
-
                 <span className="hidden sm:block w-px h-4 bg-white/20"></span>
-
                 {styles.titleStyle && styles.titleName ? (
                   <span className="inline-block px-3 py-1.5 rounded-lg border border-white/20 text-[10px] sm:text-xs font-black shadow-lg text-white truncate max-w-30 sm:max-w-full" style={{ background: styles.titleStyle }}>
                     {styles.titleName}
@@ -163,7 +172,6 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
               </div>
             </div>
 
-            {/* Biografia Limitada para não estourar a tela com palavras longas */}
             <div className="relative w-full max-w-lg mx-auto mt-2 px-2">
               <FaCommentDots className="absolute top-5 left-6 text-white/10 text-xl sm:text-2xl" />
               <p className="text-gray-300 leading-relaxed text-xs sm:text-sm bg-background/40 p-4 sm:p-5 pl-10 sm:pl-12 rounded-2xl border border-white/5 shadow-inner italic text-center sm:text-left wrap-break-words w-full">
@@ -171,7 +179,6 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
               </p>
             </div>
 
-            {/* Insígnias */}
             {badges.length > 0 && (
               <div className="flex flex-wrap justify-center gap-2 mt-2 px-2">
                 {badges.map((ub) => {
@@ -188,10 +195,7 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
             )}
           </div>
 
-          {/* AS DUAS COLUNAS INFERIORES */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-12 pt-6 w-full">
-
-            {/* ESQUERDA: Seguidores e Data */}
             <div className="flex flex-col gap-3 w-full min-w-0">
               {!isOwner && (
                 <Link href={`/chat/${profile.username}`} className="w-full flex items-center justify-center gap-2 px-6 py-3.5 bg-surface border border-white/10 text-white hover:bg-white/10 rounded-xl font-black text-sm transition-all shadow-sm active:scale-95">
@@ -217,7 +221,6 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
               </div>
             </div>
 
-            {/* DIREITA: Estatísticas e Botões Secundários */}
             <div className="flex flex-col gap-3 w-full min-w-0">
               <div className="flex flex-col sm:flex-row gap-3 w-full">
                 {isOwner ? (
@@ -254,15 +257,12 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
                 </div>
               </div>
             </div>
-
           </div>
         </div>
       </div>
 
-      {/* SECÇÃO INFERIOR */}
+      {/* ESTANTE E MURAL */}
       <div className="max-w-5xl mx-auto px-4 md:px-0 mt-8 md:mt-10 grid grid-cols-1 xl:grid-cols-2 gap-2 md:gap-4 items-start">
-
-        {/* ESTANTE */}
         <div className="xl:col-span-2 space-y-4 w-full min-w-0">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-white/10 pb-3 gap-2">
             <h2 className="text-lg sm:text-xl md:text-2xl font-black text-white flex items-center gap-2 truncate w-full">
@@ -281,13 +281,12 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 w-full">
               {showcaseGames.map((game) => (
-                <Link
-                  href={`/games/${game.id}?back=${encodeURIComponent(currentPath)}`}
+                <FlipGameCard
                   key={game.id}
-                  className="group relative aspect-3/4 rounded-2xl border border-white/10 bg-surface overflow-hidden hover:border-primary/50 transition-all shadow-lg hover:-translate-y-1 w-full"
-                >
-                  <Image src={game.cover_url} alt={game.title} fill className="object-cover group-hover:scale-105 transition-transform" unoptimized />
-                </Link>
+                  game={game}
+                  progress={userProgressMap[game.id] || null}
+                  backUrl={currentPath}
+                />
               ))}
               {Array.from({ length: Math.max(0, showcaseLimit - showcaseGames.length) }).map((_, i) => (
                 <div key={`empty-${i}`} className="aspect-3/4 rounded-2xl border-2 border-dashed border-white/5 bg-surface/20 flex flex-col items-center justify-center gap-2 opacity-50 w-full">
@@ -299,7 +298,6 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
           )}
         </div>
 
-        {/* MURAL */}
         <div className="space-y-4 xl:sticky xl:top-24 w-full min-w-0">
           <div className="flex items-center justify-between border-b border-white/10 pb-3">
             <h2 className="text-lg sm:text-xl md:text-2xl font-black text-white flex items-center gap-2 truncate">
@@ -318,13 +316,11 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
               )}
             </div>
 
-            {/* O pb-6 (padding-bottom) garante que a caixa não encobre a última mensagem */}
             <div className="flex-1 min-h-0 overflow-y-auto pr-1 md:pr-2 custom-scrollbar relative z-0 w-full">
               <MuralList initialComments={comments} profileId={profile.id} authUserId={authUser?.id} isOwner={isOwner} currentPath={currentPath} />
             </div>
           </div>
         </div>
-
       </div>
     </div>
   );
