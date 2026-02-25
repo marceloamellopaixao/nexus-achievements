@@ -8,10 +8,22 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   FaPaperPlane, FaBars, FaSpinner, FaRegComments, FaShieldAlt,
-  FaEllipsisV, FaTrash, FaUserShield, FaVolumeMute, FaVolumeUp, FaArchive, FaBoxOpen, FaUserCircle, FaTimes, FaVideoSlash
+  FaEllipsisV, FaTrash, FaUserShield, FaVolumeMute, FaVolumeUp, FaArchive, FaBoxOpen, FaUserCircle, FaTimes, FaVideoSlash, FaSteam, FaGamepad
 } from 'react-icons/fa'
 import { toast } from 'react-toastify'
-import { useFocusMode } from '@/app/contexts/FocusModeContext' // 🔥 Cérebro Importado
+import { useFocusMode } from '@/app/contexts/FocusModeContext' // Importa o Modo Foco
+
+interface PlayingState {
+  title: string;
+  appId: string | number;
+  platform: string;
+  image_url: string | null;
+}
+
+interface PresencePayload {
+  user_id: string;
+  playing?: PlayingState | null;
+}
 
 type ChatMessage = {
   id: string;
@@ -55,7 +67,9 @@ export default function ChatClient({
   const [isMuted, setIsMuted] = useState(false)
   const [isArchived, setIsArchived] = useState(false)
 
-  // Modais
+  // 🔥 Tipagem forte no estado do alvo!
+  const [targetPresence, setTargetPresence] = useState<{ online: boolean, playing: PlayingState | null }>({ online: false, playing: null });
+
   const [modalState, setModalState] = useState<'none' | 'delete' | 'report'>('none')
   const [reportReason, setReportReason] = useState('')
   const [isSubmittingModal, setIsSubmittingModal] = useState(false)
@@ -63,8 +77,6 @@ export default function ChatClient({
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
   const router = useRouter()
-
-  // 🔥 Busca o estado do Modo Streamer
   const { isFocusMode } = useFocusMode()
 
   useEffect(() => {
@@ -77,6 +89,25 @@ export default function ChatClient({
     }
     loadPreferences();
   }, [channelId]);
+
+  useEffect(() => {
+    if (!isPrivate || !targetUserId) return;
+    const channel = supabase.channel('online-hunters').on('presence', { event: 'sync' }, () => {
+      const state = channel.presenceState();
+      let found = false;
+      for (const id in state) {
+        const user = (state[id] as unknown as PresencePayload[]).find(u => u.user_id === targetUserId);
+        if (user) {
+          setTargetPresence({ online: true, playing: user.playing || null });
+          found = true;
+          break;
+        }
+      }
+      if (!found) setTargetPresence({ online: false, playing: null });
+    }).subscribe();
+
+    return () => { supabase.removeChannel(channel); }
+  }, [isPrivate, targetUserId, supabase]);
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
 
@@ -110,7 +141,6 @@ export default function ChatClient({
           return [...prev, newMsg];
         });
 
-        // 🔥 O SOM ESTÁ AGORA BLINDADO CONTRA O MODO FOCUS
         if (payloadNew.user_id !== currentUserId && !isMuted && !isFocusMode) {
           const audio = new Audio('/sounds/receive.mp3');
           audio.volume = 0.5;
@@ -126,7 +156,7 @@ export default function ChatClient({
       .subscribe();
 
     return () => { supabase.removeChannel(channel) }
-  }, [supabase, channelId, currentUserId, isMuted, isFocusMode]); // isFocusMode adicionado as dependências!
+  }, [supabase, channelId, currentUserId, isMuted, isFocusMode]);
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -166,7 +196,7 @@ export default function ChatClient({
     if (targetUserId) {
       await toggleChatFollow(targetUserId);
       setFollowingState(true);
-      toast.success("Caçador aceite! O chat está livre.");
+      toast.success("Caçador aceito! O chat está livre.");
     }
   }
 
@@ -199,14 +229,13 @@ export default function ChatClient({
   const showSecurityBanner = isPrivate && !followingState && messages.length > 0;
   const deleteBtnText = isPrivate ? 'Apagar Conversa' : (isAdmin ? 'Apagar Chat Global (Admin)' : 'Apagar Minhas Mensagens');
 
-  // 🔥 SE O MODO FOCO ESTIVER LIGADO, PROTEGE O ECRÃ
   if (isFocusMode) {
     return (
       <div className="flex flex-col items-center justify-center h-full w-full bg-surface/40 backdrop-blur-xl md:border border-white/5 md:rounded-4xl rounded-3xl p-6 text-center shadow-2xl relative overflow-hidden">
         <div className="absolute inset-0 bg-red-500/5 z-0 pointer-events-none"></div>
         <FaVideoSlash className="text-6xl text-red-500 mb-6 animate-pulse drop-shadow-[0_0_15px_rgba(239,68,68,0.5)] relative z-10" />
         <h2 className="text-2xl font-black text-white mb-2 tracking-tight relative z-10">Modo Streamer Ativado</h2>
-        <p className="text-gray-400 text-sm max-w-sm leading-relaxed relative z-10">As conversas e notificações foram ocultadas para garantir o seu foco total e proteger a sua privacidade. Desative o modo no topo da página para voltar.</p>
+        <p className="text-gray-400 text-sm max-w-sm leading-relaxed relative z-10">As conversas e notificações foram ocultadas para garantir o seu foco total e proteger a sua privacidade. Desative o modo no topo da tela para voltar.</p>
       </div>
     )
   }
@@ -223,16 +252,30 @@ export default function ChatClient({
               {icon}
               {isMuted && <div className="absolute -bottom-1 -right-1 bg-surface border border-white/10 rounded-full p-0.5"><FaVolumeMute className="text-[10px] text-red-400" /></div>}
             </div>
-            <div className="min-w-0">
+
+            <div className="min-w-0 flex-1">
               <h2 className="font-black text-white text-base md:text-lg tracking-tight truncate flex items-center gap-2">
                 {chatTitle}
+
+                {/* 🔥 Bolinha verde se estiver Online no chat Privado */}
+                {isPrivate && targetPresence.online && <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.8)]"></span>}
+
                 {isArchived && <span className="bg-gray-700 text-white text-[9px] px-1.5 py-0.5 rounded uppercase tracking-widest">Arquivado</span>}
               </h2>
-              <p className="text-[10px] text-primary font-black uppercase tracking-[0.2em] truncate">{chatSubtitle}</p>
+
+              {/* 🔥 Mostra exatamente o jogo que a pessoa está jogando */}
+              {isPrivate && targetPresence.playing ? (
+                <p className="text-[10px] text-green-400 font-black uppercase tracking-widest truncate flex items-center gap-1.5 mt-0.5">
+                  {targetPresence.playing.platform === 'Steam' ? <FaSteam className="text-xs shrink-0" /> : <FaGamepad className="text-xs shrink-0" />}
+                  <span className="truncate">Jogando: {targetPresence.playing.title}</span>
+                </p>
+              ) : (
+                <p className="text-[10px] text-primary font-black uppercase tracking-[0.2em] truncate mt-0.5">{chatSubtitle}</p>
+              )}
             </div>
           </div>
 
-          <div className="relative">
+          <div className="relative shrink-0">
             <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2 md:p-3 text-gray-400 hover:text-white transition-colors rounded-xl hover:bg-white/10 active:scale-90">
               <FaEllipsisV />
             </button>

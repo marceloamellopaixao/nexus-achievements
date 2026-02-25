@@ -1,11 +1,24 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { FaGlobeAmericas, FaSearch, FaPlus, FaTimes, FaRegCommentDots, FaArchive } from 'react-icons/fa'
+import { createClient } from '@/utils/supabase/client'
+import { FaGlobeAmericas, FaSearch, FaPlus, FaTimes, FaRegCommentDots, FaArchive, FaSteam, FaGamepad } from 'react-icons/fa'
 
 interface ChatUser { id: string; username: string; avatar_url: string | null; }
+
+interface PlayingState {
+  title: string;
+  appId: string | number;
+  platform: string;
+  image_url: string | null;
+}
+
+interface PresencePayload {
+  user_id: string;
+  playing?: PlayingState | null;
+}
 
 interface ChatSidebarProps {
   activeUsers: ChatUser[];
@@ -18,9 +31,29 @@ interface ChatSidebarProps {
 export default function ChatSidebar({ activeUsers, archivedUsers, followingUsers, unreadCounts, unreadGlobalCount }: ChatSidebarProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [search, setSearch] = useState('');
-  
-  // Controle de abas
   const [tab, setTab] = useState<'active' | 'archived'>('active');
+  
+  // 🔥 NOVIDADE: Estado Global de Presença e Rich Presence
+  const [onlinePresence, setOnlinePresence] = useState<Record<string, { online: boolean, playing: PlayingState | null }>>({});
+  const supabase = createClient();
+
+  useEffect(() => {
+    const channel = supabase.channel('online-hunters').on('presence', { event: 'sync' }, () => {
+      const state = channel.presenceState();
+      
+      // Tipagem forte na variável provisória
+      const newPresence: Record<string, { online: boolean, playing: PlayingState | null }> = {};
+      
+      for (const id in state) {
+        (state[id] as unknown as PresencePayload[]).forEach(u => {
+          newPresence[u.user_id] = { online: true, playing: u.playing || null };
+        });
+      }
+      setOnlinePresence(newPresence);
+    }).subscribe();
+    
+    return () => { supabase.removeChannel(channel); }
+  }, [supabase]);
 
   const filteredFollowing = useMemo(() => {
     return followingUsers.filter(u => u.username.toLowerCase().includes(search.toLowerCase()));
@@ -47,14 +80,13 @@ export default function ChatSidebar({ activeUsers, archivedUsers, followingUsers
             <div className="w-11 h-11 bg-primary/20 rounded-xl flex items-center justify-center text-xl shadow-inner border border-primary/20 group-hover:scale-105 transition-transform text-primary"><FaGlobeAmericas /></div>
             {unreadGlobalCount > 0 && <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-red-500 border-2 border-surface rounded-full animate-pulse z-10 shadow-sm"></div>}
           </div>
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             <div className="font-black text-white text-sm">Chat Global</div>
             <div className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter flex items-center gap-1"><span className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse inline-block"></span> Sala da Comunidade</div>
           </div>
           {unreadGlobalCount > 0 && <div className="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shrink-0 shadow-[0_0_10px_rgba(239,68,68,0.5)]">{unreadGlobalCount > 99 ? '99+' : unreadGlobalCount}</div>}
         </Link>
 
-        {/* MUDANÇA DE ABAS (ATIVOS vs ARQUIVADOS) */}
         <div className="flex items-center gap-2 mb-4 bg-background/50 p-1 rounded-xl shrink-0">
           <button 
             onClick={() => setTab('active')} 
@@ -82,17 +114,30 @@ export default function ChatSidebar({ activeUsers, archivedUsers, followingUsers
           ) : (
             displayUsers.map(u => {
               const unread = unreadCounts[u.id] || 0;
+              const presence = onlinePresence[u.id]; // Pega o status do usuário
+
               return (
                 <Link key={u.id} href={`/chat/${u.username}`} className="flex items-center gap-3 p-3 rounded-2xl hover:bg-surface/80 hover:border-primary/30 transition-all border border-transparent group active:scale-95">
                   <div className="relative shrink-0">
                     <div className="w-11 h-11 rounded-full overflow-hidden bg-background border border-white/10 relative shadow-md group-hover:border-primary/50 transition-colors">
                       {u.avatar_url ? <Image src={u.avatar_url} fill className="object-cover group-hover:scale-110 transition-transform" alt="" unoptimized /> : <span className="flex items-center justify-center w-full h-full font-black text-primary bg-primary/5 text-xs">{u.username.charAt(0).toUpperCase()}</span>}
                     </div>
+                    {/* Bolinha Verde de Online */}
+                    {presence?.online && <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 border-2 border-surface rounded-full shadow-[0_0_8px_rgba(34,197,94,0.6)]"></span>}
                     {unread > 0 && <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-red-500 border-2 border-surface rounded-full animate-pulse z-10 shadow-sm"></div>}
                   </div>
                   <div className="flex flex-col min-w-0 flex-1">
                     <span className="font-bold text-gray-300 text-sm truncate group-hover:text-white transition-colors">{u.username}</span>
-                    <span className="text-[9px] text-primary font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity translate-y-1 group-hover:translate-y-0 absolute mt-5">Mensagem Direta</span>
+                    
+                    {/* Renderiza o que ele está jogando ou apenas 'Mensagem Direta' */}
+                    {presence?.playing ? (
+                      <span className="text-[9px] text-green-400 font-black truncate flex items-center gap-1.5 uppercase tracking-widest mt-0.5">
+                        {presence.playing.platform === 'Steam' ? <FaSteam className="text-xs shrink-0" /> : <FaGamepad className="text-xs shrink-0" />} 
+                        <span className="truncate">Jogando: {presence.playing.title}</span>
+                      </span>
+                    ) : (
+                      <span className="text-[9px] text-primary font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity translate-y-1 group-hover:translate-y-0 absolute mt-5">Mensagem Direta</span>
+                    )}
                   </div>
                   {unread > 0 && <div className="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shrink-0 shadow-[0_0_10px_rgba(239,68,68,0.5)]">{unread}</div>}
                 </Link>
@@ -102,7 +147,6 @@ export default function ChatSidebar({ activeUsers, archivedUsers, followingUsers
         </div>
       </div>
 
-      {/* MODAL DE NOVA MENSAGEM */}
       {isModalOpen && (
         <div className="fixed inset-0 z-60 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsModalOpen(false)}></div>

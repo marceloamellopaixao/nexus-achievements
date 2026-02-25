@@ -2,7 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
-import { processQuestEvent } from '../actions/questEngine'
+import { processQuestEvent } from '../actions'
 
 export async function sendMessage(content: string, channel: string = 'global') {
   const supabase = await createClient()
