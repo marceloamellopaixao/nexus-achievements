@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { FaScroll, FaTimes, FaSpinner, FaCheckCircle, FaCoins, FaStar } from 'react-icons/fa'
 import { GiLockedChest, GiOpenTreasureChest } from 'react-icons/gi'
-import { getUserQuests, claimQuestReward } from '@/app/actions/questEngine'
+import { getUserQuests, claimQuestReward } from '@/app/actions'
 import { toast } from 'react-toastify'
 
 type Quest = {
