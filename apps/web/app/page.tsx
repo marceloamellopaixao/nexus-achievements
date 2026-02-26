@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Gradient } from "@repo/ui/gradient";
+import { Gradient } from "./components/Gradient";
 import { FaDiscord, FaSteam } from "react-icons/fa";
 import { Metadata } from "next";
 

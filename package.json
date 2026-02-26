@@ -22,6 +22,7 @@
     "packages/*"
   ],
   "dependencies": {
+    "next": "^16.1.6",
     "psn-api": "^2.17.0",
     "react-icons": "^5.5.0",
     "react-toastify": "^11.0.5"

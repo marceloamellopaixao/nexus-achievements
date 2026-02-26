@@ -10,6 +10,9 @@
   --color-primary-foreground: hsl(210 40% 98%);
   --color-secondary: hsl(48 100% 67%);
   --color-secondary-foreground: hsl(210 40% 98%);
+  --color-blue-1000: #2a8af6;
+  --color-purple-1000: #a853ba;
+  --color-red-1000: #e92a67;
 }
 
 @layer base {
