@@ -45,7 +45,7 @@ export async function proxy(request: NextRequest) {
 
   // 2. Se ESTÁ logado, precisamos verificar se o perfil "físico" dele existe no banco
   if (user && !url.pathname.startsWith('/auth')) {
-    
+
     // A MÁGICA: Usamos maybeSingle() em vez de single() para não gerar Erro 500 se o banco foi resetado
     const { data: profile } = await supabase
       .from('users')
