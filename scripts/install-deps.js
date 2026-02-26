@@ -1,8 +1,17 @@
 import { execSync } from 'child_process';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const root = resolve(__dirname, '..');
+
+console.log('CWD from process:', process.cwd());
+console.log('Root resolved to:', root);
 
 console.log('Running npm install in monorepo root...');
 try {
-  const result = execSync('cd /vercel/share/v0-project && npm install --legacy-peer-deps', {
+  const result = execSync('npm install --legacy-peer-deps', {
+    cwd: root,
     encoding: 'utf-8',
     timeout: 120000,
     stdio: 'pipe'
