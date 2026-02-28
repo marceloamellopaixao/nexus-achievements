@@ -1,9 +1,8 @@
 'use client'
 
 import React, { useState, useEffect, Dispatch, SetStateAction, ReactNode } from "react";
-// Certifique-se de importar a função da PSN aqui!
 import { saveSteamId, fetchSteamGamesList, processSingleGame, finalizeSync, linkPlatformAccount } from "./actions";
-import { syncPlayStationGames } from "./psn"; 
+import { fetchPlayStationGamesList, processSinglePlayStationGame, TitleThin } from "./psn"; // 🔥 MUDANÇA AQUI
 import { toast } from "react-toastify";
 import { createClient } from "@/utils/supabase/client";
 import { FaPlaystation, FaSteam, FaXbox, FaLock, FaLink, FaTrophy } from "react-icons/fa";
@@ -35,7 +34,6 @@ interface PlatformCardProps {
     tagBorder: string;
     tagText: string;
   };
-  // 🔥 NOVIDADE: Separamos o botão da área de carregamento para não bugar o Layout!
   actionButton?: ReactNode; 
   expandedContent?: ReactNode;
 }
@@ -77,8 +75,6 @@ function PlatformCard({ platform, title, icon, description, inputId, savedId, lo
               </div>
               {actionButton}
             </div>
-            
-            {/* O bloco de carregamento empurra o fundo do cartão para baixo naturalmente! */}
             {expandedContent}
           </div>
         )}
@@ -108,7 +104,6 @@ export default function IntegrationsPage() {
   const [savedEpicId, setSavedEpicId] = useState<string | null>(null);
   const [loadingEpic, setLoadingEpic] = useState(false);
 
-  // 🔥 NOVIDADE: Apenas UMA plataforma carrega de cada vez!
   const [syncingPlatform, setSyncingPlatform] = useState<'Steam' | 'PlayStation' | null>(null);
   const [syncProgress, setSyncProgress] = useState(0);
   const [syncMessage, setSyncMessage] = useState("");
@@ -146,18 +141,12 @@ export default function IntegrationsPage() {
     
     const result = await saveSteamId(steamId) as { error?: string; success?: string; username?: string };
     
-    if (result.error) {
-      toast.error(result.error, { theme: 'dark' });
-    } else if (result.success) { 
+    if (result.error) toast.error(result.error, { theme: 'dark' });
+    else if (result.success) { 
       toast.success(result.success, { theme: 'dark' }); 
       setSavedSteamId(steamId);
-      
-      // Agora o TypeScript sabe que username pode existir e permite a leitura segura
-      if (result.username) {
-        setSteamUsername(result.username);
-      }
+      if (result.username) setSteamUsername(result.username);
     }
-    
     setLoadingSave(false);
   };
 
@@ -172,7 +161,7 @@ export default function IntegrationsPage() {
     setLoading(false);
   }
 
-  // Sincronização Steam
+  // 🔥 SINCRONIZAÇÃO STEAM
   const handleSyncSteam = async () => {
     setSyncingPlatform('Steam');
     setSyncProgress(0);
@@ -212,32 +201,51 @@ export default function IntegrationsPage() {
     setSyncingPlatform(null);
   };
 
-  // Sincronização PlayStation
+  // 🔥 NOVA SINCRONIZAÇÃO DA PLAYSTATION (Idêntica à Steam!)
   const handleSyncPSN = async () => {
     if (!savedPsnId) return;
     
     setSyncingPlatform('PlayStation');
-    setSyncProgress(25);
+    setSyncProgress(0);
     setSyncStats({ coins: 0, plats: 0 });
-    setSyncMessage("Conectando aos servidores da PlayStation Network...");
+    setSyncMessage("Conectando e buscando biblioteca na PSN...");
 
-    const result = await syncPlayStationGames(savedPsnId);
+    // 1. Busca a lista completa de jogos e os Tokens
+    const listResult = await fetchPlayStationGamesList(savedPsnId);
     
-    setSyncProgress(80);
-    setSyncMessage("Guardando os seus troféus no Nexus...");
-    
-    await finalizeSync(result.coins, result.plats, 0); 
-
-    setSyncStats({ coins: result.coins, plats: result.plats });
-    setSyncProgress(100);
-    
-    toast.success(`Sincronização da PSN concluída com sucesso!`, { theme: 'dark' });
-    
-    setTimeout(() => {
-      setSyncMessage("");
-      setSyncProgress(0);
+    if (listResult.error || !listResult.games || !listResult.accountId || !listResult.accessToken) {
+      toast.error(listResult.error || 'Erro ao comunicar com a Sony.', { theme: 'dark' });
       setSyncingPlatform(null);
-    }, 2000);
+      return;
+    }
+
+    const games = listResult.games as TitleThin[];
+    let totalCoins = 0;
+    let totalPlats = 0;
+
+    // 2. Loop no Front-end (Impede Timeout do Servidor e anima a barra!)
+    for (let i = 0; i < games.length; i++) {
+      const game = games[i];
+      if (!game || game.progress === 0) continue;
+
+      setSyncMessage(`Sincronizando: ${game.trophyTitleName} (${i + 1}/${games.length})`);
+      
+      // Envia 1 jogo de cada vez para baixar nomes e ícones de troféus com segurança
+      const result = await processSinglePlayStationGame(game, listResult.accountId, listResult.accessToken);
+
+      totalCoins += result.coins;
+      totalPlats += result.plats;
+      setSyncStats({ coins: totalCoins, plats: totalPlats });
+      setSyncProgress(((i + 1) / games.length) * 100);
+    }
+
+    setSyncMessage("Guardando as suas platinas no Nexus...");
+    await finalizeSync(totalCoins, totalPlats, 0); 
+
+    toast.success(`Sincronização da PSN concluída com excelência!`, { theme: 'dark' });
+    setSyncMessage("");
+    setSyncProgress(0);
+    setSyncingPlatform(null);
   };
 
   const LockButton = () => (
