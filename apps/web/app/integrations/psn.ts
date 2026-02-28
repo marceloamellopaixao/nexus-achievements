@@ -22,7 +22,7 @@ export interface TitleThin {
     definedTrophies: { bronze: number; silver: number; gold: number; platinum: number };
 }
 
-// Recriamos a tipagem do AuthTokens localmente
+// Recriamos a tipagem do AuthTokens localmente para o ESLint não reclamar
 interface AuthTokens {
     accessToken: string;
     expiresIn?: number;
@@ -45,37 +45,50 @@ export async function fetchPlayStationGamesList(platformUserId: string) {
     }
 
     try {
-        console.log(`\n📚 [PSN-SYNC] Iniciando busca da Biblioteca para: ${platformUserId}`);
+        console.log(`\n========================================================`)
+        console.log(`📡 [PSN NEXUS-SYNC] INICIANDO VARREDURA: ${platformUserId}`)
+        console.log(`========================================================\n`)
 
         const accessCode = await exchangeNpssoForAccessCode(npsso)
         const authorization = await exchangeAccessCodeForAuthTokens(accessCode)
         let accountId = null;
 
         try {
+            console.log(`   ↳ 🌐 Buscando Nickname na PSN (Modo Direto)...`);
             const profileResponse = await getProfileFromUserName(authorization, platformUserId);
-            if (profileResponse?.profile?.accountId) accountId = profileResponse.profile.accountId;
+            if (profileResponse?.profile?.accountId) {
+                accountId = profileResponse.profile.accountId;
+                console.log(`   ↳ ✅ Nickname resgatado: ${platformUserId}`);
+            }
         } catch (error) {
-            // 🔥 CORREÇÃO 1: Evita o erro 'no-empty' e 'no-unused-vars' do ESLint
-            console.warn(`   ↳ ⚠️ Busca direta falhou (perfil pode ser privado). Tentando busca em rede...`, error instanceof Error ? error.message : '');
+            console.warn(`   ↳ ⚠️ Busca direta falhou (perfil privado ou erro de API). Tentando rede...`, error instanceof Error ? error.message : '');
         }
 
         if (!accountId) {
+            console.log(`   ↳ 🌐 Buscando Nickname na PSN (Modo Universal)...`);
             const searchResult = await makeUniversalSearch(authorization, platformUserId, 'SocialAllAccounts')
             const resultsArray = searchResult.domainResponses[0]?.results || []
             const targetMatch = resultsArray.find(
                 (r: { socialMetadata?: { onlineId?: string } }) => r.socialMetadata?.onlineId?.toLowerCase() === platformUserId.toLowerCase()
             )
-            if (targetMatch?.socialMetadata?.accountId) accountId = targetMatch.socialMetadata.accountId;
+            if (targetMatch?.socialMetadata?.accountId) {
+                accountId = targetMatch.socialMetadata.accountId;
+                console.log(`   ↳ ✅ Nickname resgatado: ${platformUserId}`);
+            }
         }
 
         if (!accountId) {
-            console.error(`❌ [PSN] Erro: Conta "${platformUserId}" não encontrada ou privada.`);
+            console.error(`❌ [PSN] Erro: Conta "${platformUserId}" não encontrada na PSN ou totalmente privada.`);
             return { error: 'Conta PSN não encontrada ou perfil privado.' }
         }
+
+        console.log(`   ↳ ✅ Alvo Confirmado! AccountID: ${accountId}\n`)
 
         const allTrophyTitles: TitleThin[] = [];
         let currentOffset = 0;
         const limitPerPage = 250;
+        
+        console.log(`   ↳ 📚 Puxando Biblioteca de Jogos da PSN (Todas as páginas)...`);
         
         while (true) {
             const response = await getUserTitles(authorization, accountId, { limit: limitPerPage, offset: currentOffset })
@@ -86,10 +99,11 @@ export async function fetchPlayStationGamesList(platformUserId: string) {
         }
 
         if (allTrophyTitles.length === 0) {
+            console.warn(`   ↳ ⚠️ Nenhum jogo público encontrado no perfil.`);
             return { error: 'Nenhum jogo público encontrado no perfil.' }
         }
 
-        console.log(`✅ [PSN-SYNC] Biblioteca carregada. ${allTrophyTitles.length} jogos encontrados.`);
+        console.log(`   ↳ ✅ Encontrados ${allTrophyTitles.length} jogos!\n`);
         
         return { 
             games: allTrophyTitles, 
@@ -127,6 +141,7 @@ export async function processSinglePlayStationGame(title: TitleThin, accountId: 
         console.log(`🎮 [PSN] Jogo Resgatado: ${title.trophyTitleName} (${gameId})`);
         console.log(`   ↳ Progresso: ${unlockedCount}/${totalCount} (${title.progress}%) | Platinado: ${isPlat ? 'Sim 🏆' : 'Não'}`);
 
+        console.log(`   ↳ 🔍 Verificando Cache de Imagens e Categorias...`);
         await supabase.from('games').upsert({
             id: gameId,
             title: title.trophyTitleName,
@@ -154,13 +169,38 @@ export async function processSinglePlayStationGame(title: TitleThin, accountId: 
         let gameCoinsEarned = 0;
         let gamePlatsEarned = 0;
 
-        if (unlockedCount > previousUnlocked) {
-            console.log(`   ↳ 🧮 Executando Motor de Anti-Fraude e Cálculo de Raridade...`);
+        // 🔥 A CURA DO BUG FANTASMA: Lemos a tabela de verdade!
+        const { data: pastActivities } = await supabase.from('global_activity')
+            .select('points_earned, rarity, achievement_name')
+            .eq('user_id', user.id)
+            .eq('game_id', gameId);
             
+        let alreadyRegisteredCoins = 0;
+        const pastSet = new Set(pastActivities?.map(a => a.achievement_name) || []);
+
+        pastActivities?.forEach(act => {
+            // Conta TUDO, exceto a Platina (porque a platina tem pontuação separada na nossa lógica de bônus)
+            if (act.rarity !== 'platinum') {
+                alreadyRegisteredCoins += act.points_earned;
+            }
+        });
+
+        // Calculamos o total de moedas base que a pessoa DEVERIA ter
+        const expectedBaseCoins = (earned.bronze * 5) + (earned.silver * 10) + (earned.gold * 25);
+        const coinsToAward = expectedBaseCoins - alreadyRegisteredCoins;
+
+        console.log(`   ↳ 🧮 Executando Motor de Anti-Fraude e Cálculo de Raridade...`);
+        console.log(`      • Valor total base das conquistas: ${expectedBaseCoins}`);
+        console.log(`      • Valor base já pago no banco: ${alreadyRegisteredCoins}`);
+
+        // Se o valor já pago no banco é MENOR que o total de moedas do jogo, forçamos a busca das conquistas!
+        if (coinsToAward > 0 || unlockedCount > previousUnlocked) {
+            
+            console.log(`      • Saldo a injetar agora: +${coinsToAward}`);
+
             try {
                 const authorization = { accessToken } as AuthTokens;
-
-                // 🔥 CORREÇÃO 2: Extrai a tipagem nativa da biblioteca sem usar 'any'! (Parameters<typeof Func>[0])
+                
                 type AuthParamTitle = Parameters<typeof getTitleTrophies>[0];
                 const titleTrophiesData = await getTitleTrophies(authorization as unknown as AuthParamTitle, title.npCommunicationId, npServiceName);
                 
@@ -181,8 +221,6 @@ export async function processSinglePlayStationGame(title: TitleThin, accountId: 
                     platform: string;
                     created_at: string;
                 }[] = [];
-                
-                let expectedBaseCoins = 0;
 
                 for (const earnedTrophy of earnedTrophiesData.trophies) {
                     if (earnedTrophy.earned) {
@@ -190,14 +228,12 @@ export async function processSinglePlayStationGame(title: TitleThin, accountId: 
                         if (!def) continue;
 
                         let pts = 0;
-                        const rarity = def.trophyType; // 'bronze', 'silver', 'gold', 'platinum'
+                        const rarity = def.trophyType; 
                         
                         if (rarity === 'bronze') pts = 5;
                         else if (rarity === 'silver') pts = 10;
                         else if (rarity === 'gold') pts = 25;
                         else if (rarity === 'platinum') pts = 100;
-
-                        expectedBaseCoins += pts;
 
                         activitiesToInsert.push({
                             user_id: user.id,
@@ -213,24 +249,7 @@ export async function processSinglePlayStationGame(title: TitleThin, accountId: 
                     }
                 }
 
-                const { data: pastActivities } = await supabase.from('global_activity')
-                    .select('points_earned, rarity, achievement_name')
-                    .eq('user_id', user.id)
-                    .eq('game_id', gameId);
-                    
-                let alreadyRegisteredCoins = 0;
-                const pastSet = new Set(pastActivities?.map(a => a.achievement_name) || []);
-
-                pastActivities?.forEach(act => {
-                    alreadyRegisteredCoins += act.points_earned;
-                });
-
-                const coinsToAward = expectedBaseCoins - alreadyRegisteredCoins;
-                
-                console.log(`      • Valor total das conquistas: ${expectedBaseCoins}`);
-                console.log(`      • Valor já pago no banco: ${alreadyRegisteredCoins}`);
-                console.log(`      • Saldo a injetar agora: ${coinsToAward > 0 ? `+${coinsToAward}` : '0'}`);
-
+                // Excluímos as conquistas que já estão salvas no banco
                 const newActivities = activitiesToInsert.filter(a => !pastSet.has(a.achievement_name));
                 
                 if (newActivities.length > 0) {
@@ -239,21 +258,34 @@ export async function processSinglePlayStationGame(title: TitleThin, accountId: 
                     console.log(`   ↳ 💾 Inseridas ${newActivities.length} novas conquistas na Timeline Global.`);
                     
                     newActivities.forEach(a => {
-                        gameCoinsEarned += a.points_earned;
-                        if (a.rarity === 'platinum') gamePlatsEarned += 1;
+                        // Não somamos a platina aqui, pois ela será tratada no bloco abaixo
+                        if (a.rarity !== 'platinum') {
+                            gameCoinsEarned += a.points_earned;
+                        }
                     });
                 }
 
             } catch (apiError) {
                 console.error(`   ↳ ❌ Erro ao baixar detalhes dos troféus:`, apiError);
             }
+        } else {
+            console.log(`      • Saldo a injetar agora: 0`);
         }
 
-        if (isPlat && !wasPlat) {
+        // Tratamento da Platina
+        if (isPlat && !wasPlat && !pastSet.has('🏆 PLATINA CONQUISTADA!')) {
             console.log(`   ↳ 🏆 NOVA PLATINA REGISTRADA! Conta atualizada.`);
+            gamePlatsEarned += 1;
+            gameCoinsEarned += 100; // O bônus da Platina entra aqui!
+            
+            await supabase.from('global_activity').upsert({
+                user_id: user.id, game_id: gameId, game_name: title.trophyTitleName, achievement_name: '🏆 PLATINA CONQUISTADA!',
+                achievement_icon: 'platinum_ps5', rarity: 'platinum', points_earned: 100, platform: 'PlayStation',
+                created_at: new Date().toISOString()
+            }, { onConflict: 'user_id, game_id, achievement_name' })
         }
         
-        if (gameCoinsEarned > 0) {
+        if (gameCoinsEarned > 0 || gamePlatsEarned > 0) {
             console.log(`✅ [RESULTADO] 💰 Injetando: +${gameCoinsEarned} Nexus Coins | 🏆 Platinas: +${gamePlatsEarned}`);
         } else {
             console.log(`✅ [RESULTADO] ✔️ Banco Atualizado. Nenhum coin extra adicionado.`);
