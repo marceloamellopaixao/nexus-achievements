@@ -11,9 +11,10 @@ import {
     getUserTrophiesEarnedForTitle
 } from 'psn-api'
 
+// 🔥 CORREÇÃO 1: Travamos o tipo exato que a Sony permite ("trophy" ou "trophy2")
 export interface TitleThin {
     npCommunicationId: string;
-    npServiceName: string; 
+    npServiceName: "trophy" | "trophy2" | string; 
     trophyTitleName: string;
     trophyTitleIconUrl: string;
     progress: number;
@@ -28,7 +29,6 @@ interface AuthTokens {
     refreshToken?: string;
 }
 
-// 🔥 Criamos a tipagem exata de um Troféu da Sony para matar o erro do ESLint
 interface PsnTrophyDef {
     trophyId: number;
     trophyType: string;
@@ -129,7 +129,10 @@ export async function processSinglePlayStationGame(title: TitleThin, accountId: 
         if (title.progress === 0) return { coins: 0, plats: 0 };
 
         const gameId = `psn-${title.npCommunicationId}`
-        const npServiceName = title.npServiceName || 'trophy'
+        
+        // 🔥 CORREÇÃO 2: Forçamos a tipagem estrita para o TypeScript parar de reclamar
+        const npServiceName: "trophy" | "trophy2" = title.npServiceName === 'trophy2' ? 'trophy2' : 'trophy';
+        
         const earned = title.earnedTrophies
         const defined = title.definedTrophies
 
@@ -199,16 +202,29 @@ export async function processSinglePlayStationGame(title: TitleThin, accountId: 
                 const authorization = { accessToken } as AuthTokens;
                 
                 type AuthParamTitle = Parameters<typeof getTitleTrophies>[0];
-                const titleTrophiesData = await getTitleTrophies(authorization as unknown as AuthParamTitle, title.npCommunicationId, npServiceName);
+                
+                // O npServiceName agora é 100% garantido como "trophy" ou "trophy2"
+                const titleTrophiesData = await getTitleTrophies(
+                    authorization as unknown as AuthParamTitle, 
+                    title.npCommunicationId, 
+                    'all', 
+                    { npServiceName }
+                );
                 
                 const availableTrophies = titleTrophiesData?.trophies || [];
                 const defsMap = new Map();
                 
-                // 🔥 AQUI ESTÁ A CORREÇÃO: Substituímos o "any" pela interface PsnTrophyDef
                 availableTrophies.forEach((t: PsnTrophyDef) => defsMap.set(t.trophyId, t));
 
                 type AuthParamUser = Parameters<typeof getUserTrophiesEarnedForTitle>[0];
-                const earnedTrophiesData = await getUserTrophiesEarnedForTitle(authorization as unknown as AuthParamUser, accountId, title.npCommunicationId, npServiceName);
+                
+                const earnedTrophiesData = await getUserTrophiesEarnedForTitle(
+                    authorization as unknown as AuthParamUser, 
+                    accountId, 
+                    title.npCommunicationId, 
+                    'all', 
+                    { npServiceName }
+                );
                 
                 const earnedTrophiesList = earnedTrophiesData?.trophies || [];
                 
@@ -272,7 +288,6 @@ export async function processSinglePlayStationGame(title: TitleThin, accountId: 
                 usedFallback = true;
             }
 
-            // O PLANO B DO NEXUS
             if (usedFallback && coinsToAward > 0) {
                 console.log(`   ↳ 🛡️ Ativando Fallback do Nexus: Injetando pacote genérico para não perder as moedas!`);
                 await supabase.from('global_activity').insert({
@@ -289,7 +304,6 @@ export async function processSinglePlayStationGame(title: TitleThin, accountId: 
             }
         }
 
-        // Tratamento da Platina
         if (isPlat && !wasPlat && !pastSet.has('🏆 PLATINA CONQUISTADA!')) {
             console.log(`   ↳ 🏆 NOVA PLATINA REGISTRADA! Conta atualizada.`);
             gamePlatsEarned += 1;
