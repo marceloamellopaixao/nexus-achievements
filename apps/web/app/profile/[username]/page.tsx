@@ -8,10 +8,10 @@ import MuralList from "./MuralList";
 import { Metadata } from "next";
 import ClientBackButton from "@/app/components/ClientBackButton";
 
-import { GiPadlockOpen, GiCrossedSwords } from "react-icons/gi";
+import { GiCrossedSwords } from "react-icons/gi";
 import { FaMedal, FaEdit, FaCommentDots, FaCalendarAlt, FaGamepad, FaTrophy, FaSteam, FaPlaystation, FaXbox } from "react-icons/fa";
-import { SiEpicgames } from "react-icons/si"; // 🔥 Adicionado Epic Games
-import FlipGameCard from "@/app/components/FlipGameCard";
+import { SiEpicgames } from "react-icons/si";
+import ShowcaseDraggable from "./ShowcaseDraggable";
 
 export const metadata: Metadata = {
   title: "Perfil Público | Nexus Achievements",
@@ -23,14 +23,13 @@ interface ProfilePageProps {
   searchParams: Promise<{ back?: string }>;
 }
 
-type ShowcaseGame = { id: string; title: string; cover_url: string | null; total_achievements: number; };
+type ShowcaseGame = { id: string; title: string; cover_url: string | null; total_achievements: number; console?: string | null; };
 
 interface ProfileComment { id: string; profile_id: string; author_id: string; content: string; created_at: string; author?: { id: string; username: string; avatar_url: string | null; }; }
 interface RawCommentWithAuthor { id: string; profile_id: string; author_id: string; content: string; created_at: string; author: { id: string; username: string; avatar_url: string | null } | { id: string; username: string; avatar_url: string | null }[]; }
 interface RawUserBadge { badge_id: string; awarded_at: string; badges: { name: string; icon: string; color_class: string; description: string; } | { name: string; icon: string; color_class: string; description: string; }[]; }
 interface FormattedBadge { badge_id: string; awarded_at: string; name: string; icon: string; color_class: string; description: string; }
 
-// Tipagem para extrair plataformas corretamente sem erro no TypeScript
 interface PlatData {
   is_platinum: boolean;
   games: { platform: string } | { platform: string }[] | null;
@@ -54,6 +53,9 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
 
   if (error || !profile) notFound();
 
+  // 🔥 IDENTIFICA SE O VISITANTE É O DONO DO PERFIL ANTES DE TUDO!
+  const isOwner = authUser?.id === profile.id;
+
   // 1. RICH PRESENCE DA STEAM
   let playingNow: { title: string, platform: string } | null = null;
   const STEAM_KEY = process.env.STEAM_API_KEY;
@@ -71,14 +73,13 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
     } catch (err) { console.error("Erro Rich Presence", err); }
   }
 
-  // 2. BUSCA AS CONEXÕES MULTIPLATAFORMA E EXTRAI O NOME LEGÍVEL
+  // 2. BUSCA AS CONEXÕES MULTIPLATAFORMA
   const { data: linkedAccounts } = await supabase.from('linked_accounts').select('*').eq('user_id', profile.id);
 
   const connections = [];
   const linkedMap = new Map<string, string>();
-  
+
   linkedAccounts?.forEach(acc => {
-    // Dá prioridade ao Nome de Usuário. Se não tiver, usa o ID.
     linkedMap.set(acc.platform, acc.platform_username || acc.platform_user_id);
   });
 
@@ -86,32 +87,52 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
   if (steamDisplayName) {
     connections.push({ platform: 'Steam', username: steamDisplayName, icon: <FaSteam className="text-sm shrink-0" />, color: 'text-blue-400 bg-blue-900/20 border-blue-500/30 hover:bg-blue-900/40' });
   }
-
   if (linkedMap.has('PlayStation')) {
     connections.push({ platform: 'PSN', username: linkedMap.get('PlayStation'), icon: <FaPlaystation className="text-sm shrink-0" />, color: 'text-blue-500 bg-blue-600/10 border-blue-600/30 hover:bg-blue-600/20' });
   }
-
   if (linkedMap.has('Xbox')) {
     connections.push({ platform: 'Xbox', username: linkedMap.get('Xbox'), icon: <FaXbox className="text-sm shrink-0" />, color: 'text-green-500 bg-green-500/10 border-green-500/30 hover:bg-green-500/20' });
   }
-
   if (linkedMap.has('Epic')) {
     connections.push({ platform: 'Epic', username: linkedMap.get('Epic'), icon: <SiEpicgames className="text-sm shrink-0" />, color: 'text-gray-300 bg-gray-500/10 border-gray-500/30 hover:bg-gray-500/20' });
   }
 
-  // 3. O VERDADEIRO NEXUS: DIVISÃO DE PLATINAS
-  const { data: platsRaw } = await supabase.from('user_games').select('is_platinum, games(platform)').eq('user_id', profile.id).eq('is_platinum', true);
-  const platsData = platsRaw as unknown as PlatData[];
-  
-  let steamPlats = 0; let psPlats = 0; let xboxPlats = 0;
-  platsData?.forEach(p => {
-    const plat = Array.isArray(p.games) ? p.games[0]?.platform : p.games?.platform;
-    if (plat === 'Steam') steamPlats++;
-    else if (plat === 'PlayStation' || plat === 'PSN') psPlats++;
-    else if (plat === 'Xbox') xboxPlats++;
-  });
+  // 3. 🔥 O VERDADEIRO NEXUS: AUTO-CURA (HEALING) E DIVISÃO DE PLATINAS
+  const { data: allUserGamesRaw } = await supabase.from('user_games').select('is_platinum, games(platform)').eq('user_id', profile.id);
+  const allUserGames = allUserGamesRaw as unknown as PlatData[];
 
-  const isOwner = authUser?.id === profile.id;
+  let realTotalPlatinums = 0;
+  let realTotalGames = 0;
+  let steamPlats = 0; let psPlats = 0; let xboxPlats = 0;
+
+  if (allUserGames) {
+    realTotalGames = allUserGames.length;
+
+    allUserGames.forEach(ug => {
+      if (ug.is_platinum) {
+        realTotalPlatinums++;
+        const plat = Array.isArray(ug.games) ? ug.games[0]?.platform : ug.games?.platform;
+        if (plat === 'Steam') steamPlats++;
+        else if (plat === 'PlayStation' || plat === 'PSN') psPlats++;
+        else if (plat === 'Xbox') xboxPlats++;
+      }
+    });
+
+    if (profile.total_platinums !== realTotalPlatinums || profile.total_games !== realTotalGames) {
+      // 1. Atualiza na interface visual para QUALQUER PESSOA ver o número certo na hora
+      profile.total_platinums = realTotalPlatinums;
+      profile.total_games = realTotalGames;
+
+      // 2. Tenta corrigir no Banco de Dados APENAS se for o dono (Para não violar as Policies de Segurança!)
+      if (isOwner) {
+        await supabase.from('users').update({
+          total_platinums: realTotalPlatinums,
+          total_games: realTotalGames
+        }).eq('id', profile.id);
+      }
+    }
+  }
+
   const showcaseLimit = profile.showcase_limit || 5;
 
   const [{ count: followersCount }, { count: followingCount }, { data: badgesData }] = await Promise.all([
@@ -152,26 +173,18 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
   const userProgressMap: Record<string, { unlocked: number, is_platinum: boolean, playtime_minutes: number }> = {};
 
   if (profile.showcase_games && profile.showcase_games.length > 0) {
-    const { data: gamesData } = await supabase.from("games").select("id, title, cover_url, total_achievements").in("id", profile.showcase_games);
-    if (gamesData) showcaseGames = profile.showcase_games.map((id: string) => gamesData.find(g => g.id === id)).filter(Boolean) as ShowcaseGame[];
+    const { data: gamesData } = await supabase.from("games").select("id, title, cover_url, total_achievements, console").in("id", profile.showcase_games);
+
+    if (gamesData) {
+      showcaseGames = profile.showcase_games
+        .map((id: string) => gamesData.find(g => g.id === id))
+        .filter(Boolean) as ShowcaseGame[];
+    }
 
     const { data: progressData } = await supabase.from('user_games').select('game_id, unlocked_achievements, is_platinum, playtime_minutes').eq('user_id', profile.id).in('game_id', profile.showcase_games);
 
     progressData?.forEach(p => {
       userProgressMap[p.game_id] = { unlocked: p.unlocked_achievements, is_platinum: p.is_platinum, playtime_minutes: p.playtime_minutes };
-    });
-
-    showcaseGames.sort((a, b) => {
-      const pA = userProgressMap[a.id]; const pB = userProgressMap[b.id];
-      const aPlat = pA?.is_platinum || false; const bPlat = pB?.is_platinum || false;
-      const aUnl = pA?.unlocked || 0; const bUnl = pB?.unlocked || 0;
-
-      if (aPlat && !bPlat) return -1;
-      if (!aPlat && bPlat) return 1;
-      if (aUnl > 0 && bUnl === 0) return -1;
-      if (aUnl === 0 && bUnl > 0) return 1;
-      if (bUnl !== aUnl) return bUnl - aUnl;
-      return a.title.localeCompare(b.title);
     });
   }
 
@@ -242,7 +255,6 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
               </p>
             </div>
 
-            {/* 🔥 CONTAS VINCULADAS: Agora exibe a platform_username e inclui a Epic! */}
             {connections.length > 0 && (
               <div className="flex flex-wrap justify-center gap-2 mt-4 px-2 animate-in fade-in">
                 {connections.map(c => (
@@ -314,7 +326,7 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
               </div>
 
               <div className="grid grid-cols-2 gap-3 w-full">
-                <div className="text-center bg-background/60 border border-white/5 px-2 py-4 rounded-2xl shadow-inner min-w-0">
+                <div className="flex flex-col justify-center items-center text-center bg-background/60 border border-white/5 px-2 py-4 rounded-2xl shadow-inner min-w-0">
                   <p className="text-2xl sm:text-3xl font-black text-white truncate">{profile.total_games || 0}</p>
                   <p className="flex items-center justify-center gap-1.5 text-[9px] sm:text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-1">
                     <FaGamepad className="text-xs shrink-0" /> <span className="truncate">Jogos</span>
@@ -362,22 +374,14 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
               <h3 className="text-sm sm:text-base md:text-lg font-bold text-white mb-1">Estante Vazia</h3>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 w-full">
-              {showcaseGames.map((game) => (
-                <FlipGameCard
-                  key={game.id}
-                  game={game}
-                  progress={userProgressMap[game.id] || null}
-                  backUrl={currentPath}
-                />
-              ))}
-              {Array.from({ length: Math.max(0, showcaseLimit - showcaseGames.length) }).map((_, i) => (
-                <div key={`empty-${i}`} className="aspect-3/4 rounded-2xl border-2 border-dashed border-white/5 bg-surface/20 flex flex-col items-center justify-center gap-2 opacity-50 w-full">
-                  <GiPadlockOpen className="text-xl sm:text-2xl md:text-3xl text-gray-600" />
-                  <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest text-gray-500 text-center px-1">Slot Livre</span>
-                </div>
-              ))}
-            </div>
+            <ShowcaseDraggable 
+              initialGames={showcaseGames} 
+              userProgressMap={userProgressMap} 
+              isOwner={isOwner} 
+              userId={profile.id} 
+              showcaseLimit={showcaseLimit} 
+              backUrl={currentPath} 
+            />
           )}
         </div>
 
