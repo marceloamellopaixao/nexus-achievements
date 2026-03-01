@@ -28,7 +28,6 @@ export default function AutoSync() {
         return;
       }
 
-      // Se o usuário ainda não existir na tabela public.users, aborta
       if (!userData) return;
 
       const lastSync = userData.last_steam_sync ? new Date(userData.last_steam_sync).getTime() : 0;
@@ -41,13 +40,17 @@ export default function AutoSync() {
         try {
           // 1. Busca a lista de jogos
           const listResult = await fetchSteamGamesList();
+          
           if (listResult.error || !listResult.games) {
-            console.warn('🤖 AutoSync abortado:', listResult.error);
+            console.warn('🤖 AutoSync abortado pela API:', listResult.error);
+            
+            // 🔥 PROTEÇÃO ANTI-SPAM: Atualizamos o relógio MESMO SE FALHAR!
+            // Isso impede que o Nexus fique a "martelar" os servidores da Steam a cada carregamento de página
+            await supabase.from('users').update({ last_steam_sync: new Date().toISOString() }).eq('id', user.id);
             return;
           }
 
           // 2. Limita a sincronização em background apenas aos 15 jogos mais recentes
-          // Isso mantém o site leve e atualiza o que o jogador acabou de jogar!
           const recentGames = listResult.games.slice(0, 15);
           let totalCoins = 0;
           let totalPlats = 0;
@@ -61,11 +64,14 @@ export default function AutoSync() {
           // 3. Finaliza a sync para registrar o horário e dar as moedas
           if (recentGames.length > 0) {
             await finalizeSync(totalCoins, totalPlats, listResult.games.length);
+          } else {
+             // Caso a lista de jogos esteja vazia, garante a atualização do relógio
+             await supabase.from('users').update({ last_steam_sync: new Date().toISOString() }).eq('id', user.id);
           }
           
           console.log(`🤖 AutoSync Concluído! +${totalCoins} Moedas encontradas no background.`);
         } catch (err) {
-          console.error('🤖 Erro no AutoSync:', err);
+          console.error('🤖 Erro fatal no AutoSync:', err);
         }
       }
     }
