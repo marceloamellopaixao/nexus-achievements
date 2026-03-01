@@ -65,14 +65,16 @@ export default async function GamePage(props: GamePageProps) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  let isAdmin = false;
-  if (user) {
-    const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
-    isAdmin = userData?.role === 'admin';
-  }
+  const gamePromise = supabase.from('games').select('*').eq('id', gameId).single();
+  const currentUserPromise = user
+    ? supabase.from('users').select('role, steam_id').eq('id', user.id).single()
+    : Promise.resolve({ data: null });
 
-  const { data: game, error } = await supabase.from("games").select("*").eq("id", gameId).single();
+  const [{ data: game, error }, { data: currentUserData }] = await Promise.all([gamePromise, currentUserPromise]);
+
   if (error || !game) notFound();
+
+  const isAdmin = currentUserData?.role === 'admin';
 
   const appId = gameId.replace("steam-", "");
   const STEAM_KEY = process.env.STEAM_API_KEY;
@@ -107,9 +109,13 @@ export default async function GamePage(props: GamePageProps) {
   }
 
   // 🔥 ADICIONADO: Buscando a platinum_unlocked_at no banco
-  const { data: communityRaw } = await supabase.from("user_games").select(`user_id, is_platinum, unlocked_achievements, total_achievements, playtime_minutes, last_synced_at, platinum_unlocked_at, users ( username, avatar_url )`).eq("game_id", gameId);
+  const { data: communityRaw } = await supabase
+    .from('user_games')
+    .select('user_id, is_platinum, unlocked_achievements, total_achievements, playtime_minutes, last_synced_at, platinum_unlocked_at, users ( username, avatar_url )')
+    .eq('game_id', gameId);
+
   const communityData = (communityRaw as unknown as CommunityUser[]) || [];
-  const userProgress = communityData.find(p => p.user_id === user?.id) || null;
+  const userProgress = user ? communityData.find(p => p.user_id === user.id) || null : null;
 
   // LÓGICA DO PÓDIO: Ordenação mantida pela Data de Sincronização (A Corrida Justa do Nexus)
   const platinumWinners = [...communityData]
@@ -142,13 +148,19 @@ export default async function GamePage(props: GamePageProps) {
 
   if (activeTab === 'overview' && STEAM_KEY && !isNaN(Number(appId))) {
     try {
-      const schemaRes = await fetch(`http://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?key=${STEAM_KEY}&appid=${appId}&l=brazilian`, { next: { revalidate: 86400 } });
+      const schemaPromise = fetch(`http://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?key=${STEAM_KEY}&appid=${appId}&l=brazilian`, { next: { revalidate: 86400 } });
+      const percentagesPromise = fetch(`http://api.steampowered.com/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v0002/?gameid=${appId}`, { next: { revalidate: 3600 } });
+      const playerAchievementsPromise = currentUserData?.steam_id && userProgress
+        ? fetch(`http://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v0001/?appid=${appId}&key=${STEAM_KEY}&steamid=${currentUserData.steam_id}&l=brazilian`, { cache: 'no-store' })
+        : Promise.resolve(null);
+
+      const [schemaRes, pctRes, playerAchRes] = await Promise.all([schemaPromise, percentagesPromise, playerAchievementsPromise]);
+
       if (schemaRes.ok) {
         const schemaData = await schemaRes.json();
         if (schemaData.game?.availableGameStats?.achievements) achievementsDetails = schemaData.game.availableGameStats.achievements;
       }
 
-      const pctRes = await fetch(`http://api.steampowered.com/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v0002/?gameid=${appId}`, { next: { revalidate: 3600 } });
       if (pctRes.ok) {
         const pctData = await pctRes.json();
         pctData.achievementpercentages?.achievements.forEach((a: SteamPercentage) => {
@@ -156,19 +168,13 @@ export default async function GamePage(props: GamePageProps) {
         });
       }
 
-      if (user && userProgress) {
-        const { data: userData } = await supabase.from('users').select('steam_id').eq('id', user.id).single();
-        if (userData?.steam_id) {
-          const playerAchRes = await fetch(`http://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v0001/?appid=${appId}&key=${STEAM_KEY}&steamid=${userData.steam_id}&l=brazilian`, { cache: 'no-store' });
-          if (playerAchRes.ok) {
-            const playerAchData = await playerAchRes.json();
-            playerAchData.playerstats?.achievements?.forEach((ach: SteamPlayerAchievement) => {
-              playerUnlockedMap[ach.apiname] = ach.achieved === 1;
-            });
-          }
-        }
+      if (playerAchRes && playerAchRes.ok) {
+        const playerAchData = await playerAchRes.json();
+        playerAchData.playerstats?.achievements?.forEach((ach: SteamPlayerAchievement) => {
+          playerUnlockedMap[ach.apiname] = ach.achieved === 1;
+        });
       }
-    } catch (e) { console.error("Erro API Steam", e); }
+    } catch (e) { console.error('Erro API Steam', e); }
   }
 
   const getTrophyType = (apiname: string): "bronze" | "silver" | "gold" => {

@@ -55,30 +55,102 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
   if (error || !profile) notFound();
 
   // 1. RICH PRESENCE DA STEAM
-  let playingNow: { title: string, platform: string } | null = null;
   const STEAM_KEY = process.env.STEAM_API_KEY;
+  const playingNowPromise = (async () => {
+    if (!profile.steam_id || !STEAM_KEY) return null;
 
-  if (profile.steam_id && STEAM_KEY) {
     try {
       const res = await fetch(`http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key=${STEAM_KEY}&steamids=${profile.steam_id}`, { cache: 'no-store' });
-      if (res.ok) {
-        const data = await res.json();
-        const pData = data?.response?.players?.[0];
-        if (pData && pData.gameextrainfo) {
-          playingNow = { title: pData.gameextrainfo, platform: 'Steam' };
-        }
+      if (!res.ok) return null;
+
+      const data = await res.json();
+      const pData = data?.response?.players?.[0];
+      if (pData?.gameextrainfo) {
+        return { title: pData.gameextrainfo, platform: 'Steam' };
       }
-    } catch (err) { console.error("Erro Rich Presence", err); }
-  }
+    } catch (err) {
+      console.error('Erro Rich Presence', err);
+    }
+
+    return null;
+  })();
+
+  const linkedAccountsPromise = supabase
+    .from('linked_accounts')
+    .select('platform, platform_username, platform_user_id')
+    .eq('user_id', profile.id);
+
+  const platsPromise = supabase
+    .from('user_games')
+    .select('is_platinum, games(platform)')
+    .eq('user_id', profile.id)
+    .eq('is_platinum', true);
+
+  const profileStatsPromise = Promise.all([
+    supabase.from('user_follows').select('*', { count: 'exact', head: true }).eq('following_id', profile.id),
+    supabase.from('user_follows').select('*', { count: 'exact', head: true }).eq('follower_id', profile.id),
+    supabase.from('user_badges').select('badge_id, awarded_at, badges(name, icon, color_class, description)').eq('user_id', profile.id),
+  ]);
+
+  const commentsPromise = supabase
+    .from('profile_comments')
+    .select('*, author:users!author_id(id, username, avatar_url)')
+    .eq('profile_id', profile.id)
+    .order('created_at', { ascending: false });
+
+  const isOwner = authUser?.id === profile.id;
+  const isFollowingPromise = authUser && !isOwner
+    ? supabase
+      .from('user_follows')
+      .select('follower_id')
+      .eq('follower_id', authUser.id)
+      .eq('following_id', profile.id)
+      .maybeSingle()
+    : Promise.resolve({ data: null });
+
+  const equippedIds = [profile.equipped_background, profile.equipped_border, profile.equipped_title].filter(Boolean);
+  const shopItemsPromise = equippedIds.length > 0
+    ? supabase.from('shop_items').select('*').in('id', equippedIds)
+    : Promise.resolve({ data: null });
+
+  const showcaseLimit = profile.showcase_limit || 5;
+  const hasShowcaseGames = profile.showcase_games && profile.showcase_games.length > 0;
+  const showcaseDataPromise = hasShowcaseGames
+    ? Promise.all([
+      supabase.from('games').select('id, title, cover_url, total_achievements').in('id', profile.showcase_games),
+      supabase
+        .from('user_games')
+        .select('game_id, unlocked_achievements, is_platinum, playtime_minutes')
+        .eq('user_id', profile.id)
+        .in('game_id', profile.showcase_games),
+    ])
+    : Promise.resolve([{ data: null }, { data: null }] as const);
+
+  const [
+    playingNow,
+    { data: linkedAccounts },
+    { data: platsRaw },
+    [{ count: followersCount }, { count: followingCount }, { data: badgesData }],
+    { data: commentsRaw },
+    { data: isFollowingData },
+    { data: shopItems },
+    [{ data: gamesData }, { data: progressData }],
+  ] = await Promise.all([
+    playingNowPromise,
+    linkedAccountsPromise,
+    platsPromise,
+    profileStatsPromise,
+    commentsPromise,
+    isFollowingPromise,
+    shopItemsPromise,
+    showcaseDataPromise,
+  ]);
 
   // 2. BUSCA AS CONEXÕES MULTIPLATAFORMA E EXTRAI O NOME LEGÍVEL
-  const { data: linkedAccounts } = await supabase.from('linked_accounts').select('*').eq('user_id', profile.id);
-
   const connections = [];
   const linkedMap = new Map<string, string>();
-  
+
   linkedAccounts?.forEach(acc => {
-    // Dá prioridade ao Nome de Usuário. Se não tiver, usa o ID.
     linkedMap.set(acc.platform, acc.platform_username || acc.platform_user_id);
   });
 
@@ -100,9 +172,8 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
   }
 
   // 3. O VERDADEIRO NEXUS: DIVISÃO DE PLATINAS
-  const { data: platsRaw } = await supabase.from('user_games').select('is_platinum, games(platform)').eq('user_id', profile.id).eq('is_platinum', true);
   const platsData = platsRaw as unknown as PlatData[];
-  
+
   let steamPlats = 0; let psPlats = 0; let xboxPlats = 0;
   platsData?.forEach(p => {
     const plat = Array.isArray(p.games) ? p.games[0]?.platform : p.games?.platform;
@@ -111,56 +182,36 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
     else if (plat === 'Xbox') xboxPlats++;
   });
 
-  const isOwner = authUser?.id === profile.id;
-  const showcaseLimit = profile.showcase_limit || 5;
-
-  const [{ count: followersCount }, { count: followingCount }, { data: badgesData }] = await Promise.all([
-    supabase.from('user_follows').select('*', { count: 'exact', head: true }).eq('following_id', profile.id),
-    supabase.from('user_follows').select('*', { count: 'exact', head: true }).eq('follower_id', profile.id),
-    supabase.from('user_badges').select('badge_id, awarded_at, badges(name, icon, color_class, description)').eq('user_id', profile.id)
-  ]);
-
   const badges: FormattedBadge[] = (badgesData as unknown as RawUserBadge[])?.map(ub => {
     const badgeDetails = Array.isArray(ub.badges) ? ub.badges[0] : ub.badges;
     return { badge_id: ub.badge_id, awarded_at: ub.awarded_at, name: badgeDetails?.name || 'Insígnia', icon: badgeDetails?.icon || '', color_class: badgeDetails?.color_class || 'text-gray-400', description: badgeDetails?.description || '' };
   }) || [];
 
-  let isFollowing = false;
-  if (authUser && !isOwner) {
-    const { data } = await supabase.from('user_follows').select('follower_id').eq('follower_id', authUser.id).eq('following_id', profile.id).maybeSingle();
-    if (data) isFollowing = true;
-  }
+  const isFollowing = Boolean(isFollowingData);
 
-  const { data: commentsRaw } = await supabase.from('profile_comments').select('*, author:users!author_id(id, username, avatar_url)').eq('profile_id', profile.id).order('created_at', { ascending: false });
   const comments: ProfileComment[] = (commentsRaw as unknown as RawCommentWithAuthor[])?.map(c => ({ ...c, author: Array.isArray(c.author) ? c.author[0] : c.author })) || [];
 
-  const equippedIds = [profile.equipped_background, profile.equipped_border, profile.equipped_title].filter(Boolean);
   const styles = { background: '', border: '', titleStyle: '', titleName: '' };
-
-  if (equippedIds.length > 0) {
-    const { data: shopItems } = await supabase.from("shop_items").select("*").in("id", equippedIds);
-    if (shopItems) {
-      styles.background = shopItems.find(i => i.id === profile.equipped_background)?.gradient || '';
-      styles.border = shopItems.find(i => i.id === profile.equipped_border)?.border_style || '';
-      const t = shopItems.find(i => i.id === profile.equipped_title);
-      styles.titleStyle = t?.tag_style || '';
-      styles.titleName = t?.name || '';
-    }
+  if (shopItems) {
+    styles.background = shopItems.find(i => i.id === profile.equipped_background)?.gradient || '';
+    styles.border = shopItems.find(i => i.id === profile.equipped_border)?.border_style || '';
+    const t = shopItems.find(i => i.id === profile.equipped_title);
+    styles.titleStyle = t?.tag_style || '';
+    styles.titleName = t?.name || '';
   }
 
   let showcaseGames: ShowcaseGame[] = [];
   const userProgressMap: Record<string, { unlocked: number, is_platinum: boolean, playtime_minutes: number }> = {};
 
-  if (profile.showcase_games && profile.showcase_games.length > 0) {
-    const { data: gamesData } = await supabase.from("games").select("id, title, cover_url, total_achievements").in("id", profile.showcase_games);
-    if (gamesData) showcaseGames = profile.showcase_games.map((id: string) => gamesData.find(g => g.id === id)).filter(Boolean) as ShowcaseGame[];
+  if (gamesData && hasShowcaseGames) {
+    showcaseGames = profile.showcase_games.map((id: string) => gamesData.find(g => g.id === id)).filter(Boolean) as ShowcaseGame[];
+  }
 
-    const { data: progressData } = await supabase.from('user_games').select('game_id, unlocked_achievements, is_platinum, playtime_minutes').eq('user_id', profile.id).in('game_id', profile.showcase_games);
+  progressData?.forEach(p => {
+    userProgressMap[p.game_id] = { unlocked: p.unlocked_achievements, is_platinum: p.is_platinum, playtime_minutes: p.playtime_minutes };
+  });
 
-    progressData?.forEach(p => {
-      userProgressMap[p.game_id] = { unlocked: p.unlocked_achievements, is_platinum: p.is_platinum, playtime_minutes: p.playtime_minutes };
-    });
-
+  if (showcaseGames.length > 0) {
     showcaseGames.sort((a, b) => {
       const pA = userProgressMap[a.id]; const pB = userProgressMap[b.id];
       const aPlat = pA?.is_platinum || false; const bPlat = pB?.is_platinum || false;
@@ -175,7 +226,7 @@ export default async function PublicProfilePage({ params, searchParams }: Profil
     });
   }
 
-  const joinDate = new Date(profile.created_at).toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' });
+const joinDate = new Date(profile.created_at).toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' });
 
   return (
     <div className="min-h-screen pb-20 animate-in fade-in duration-500 relative">
