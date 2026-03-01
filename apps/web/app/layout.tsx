@@ -42,21 +42,34 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   let userData: UserData | null = null;
   let totalUnreadDMs = 0;
 
-  if (user) {
-    const { data } = await supabase.from("users").select("id, username, avatar_url, nexus_coins, role").eq("id", user.id).maybeSingle();
-    if (data) userData = data as UserData;
+  const announcementPromise = supabase
+    .from('system_announcements')
+    .select('*')
+    .eq('is_active', true)
+    .maybeSingle();
 
-    const { count } = await supabase
+  if (user) {
+    const userDataPromise = supabase
+      .from('users')
+      .select('id, username, avatar_url, nexus_coins, role')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    const unreadCountPromise = supabase
       .from('chat_messages')
       .select('*', { count: 'exact', head: true })
       .like('channel', `%${user.id}%`)
       .eq('is_read', false)
       .neq('user_id', user.id);
 
+    const [{ data }, { count }] = await Promise.all([userDataPromise, unreadCountPromise]);
+
+    if (data) userData = data as UserData;
+
     totalUnreadDMs = count || 0;
   }
 
-  const { data: announcement } = await supabase.from('system_announcements').select('*').eq('is_active', true).maybeSingle();
+  const { data: announcement } = await announcementPromise;
 
   const navLinks = [
     { href: "/social", icon: <TbWorld />, label: "Comunidade", mobile: true },

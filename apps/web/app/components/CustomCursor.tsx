@@ -5,22 +5,37 @@ import { useEffect, useRef, useState } from 'react'
 export default function CustomCursor() {
   const cursorDotRef = useRef<HTMLDivElement>(null)
   const cursorRingRef = useRef<HTMLDivElement>(null)
+  const isHoveringRef = useRef(false)
+  const isVisibleRef = useRef(false)
   const [isHovering, setIsHovering] = useState(false)
   const [isVisible, setIsVisible] = useState(false)
+  const [isEnabled, setIsEnabled] = useState(false)
 
   useEffect(() => {
+    const isCoarsePointer = window.matchMedia('(pointer: coarse)').matches
+
     // Desativa o cursor customizado em dispositivos móveis (Touch)
-    if (window.matchMedia("(pointer: coarse)").matches) return;
+    if (isCoarsePointer) {
+      setIsEnabled(false)
+      return
+    }
+
+    setIsEnabled(true)
 
     let mouseX = 0;
     let mouseY = 0;
     let ringX = 0;
     let ringY = 0;
+    let animationFrameId = 0;
 
     const onMouseMove = (e: MouseEvent) => {
       mouseX = e.clientX;
       mouseY = e.clientY;
-      setIsVisible(true);
+
+      if (!isVisibleRef.current) {
+        isVisibleRef.current = true
+        setIsVisible(true)
+      }
 
       // O JS move apenas o Wrapper (sem atraso de CSS)
       if (cursorDotRef.current) {
@@ -30,13 +45,28 @@ export default function CustomCursor() {
       // Verifica se o rato está por cima de algo clicável
       const target = e.target as HTMLElement;
       const isClickable = target.closest('a, button, input, textarea, select') !== null;
-      setIsHovering(isClickable);
+
+      if (isHoveringRef.current !== isClickable) {
+        isHoveringRef.current = isClickable
+        setIsHovering(isClickable)
+      }
     };
 
-    const onMouseLeave = () => setIsVisible(false);
-    const onMouseEnter = () => setIsVisible(true);
+    const onMouseLeave = () => {
+      if (isVisibleRef.current) {
+        isVisibleRef.current = false
+        setIsVisible(false)
+      }
+    }
 
-    window.addEventListener('mousemove', onMouseMove);
+    const onMouseEnter = () => {
+      if (!isVisibleRef.current) {
+        isVisibleRef.current = true
+        setIsVisible(true)
+      }
+    }
+
+    window.addEventListener('mousemove', onMouseMove, { passive: true });
     document.body.addEventListener('mouseleave', onMouseLeave);
     document.body.addEventListener('mouseenter', onMouseEnter);
 
@@ -48,18 +78,20 @@ export default function CustomCursor() {
       if (cursorRingRef.current) {
         cursorRingRef.current.style.transform = `translate3d(${ringX}px, ${ringY}px, 0)`;
       }
-      requestAnimationFrame(animate);
+      animationFrameId = requestAnimationFrame(animate);
     };
-    requestAnimationFrame(animate);
+
+    animationFrameId = requestAnimationFrame(animate);
 
     return () => {
       window.removeEventListener('mousemove', onMouseMove);
       document.body.removeEventListener('mouseleave', onMouseLeave);
       document.body.removeEventListener('mouseenter', onMouseEnter);
+      cancelAnimationFrame(animationFrameId)
     };
   }, []);
 
-  if (typeof window !== 'undefined' && window.matchMedia("(pointer: coarse)").matches) return null;
+  if (!isEnabled) return null
 
   return (
     <>

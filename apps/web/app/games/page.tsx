@@ -37,15 +37,11 @@ export default async function GamesLibraryPage({ searchParams }: GamesLibraryPro
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  const { data: catData } = await supabase
+  const categoriesPromise = supabase
     .from('games')
     .select('categories')
     .eq('platform', currentPlatform)
     .not('categories', 'is', null);
-
-  const uniqueCategories = Array.from(
-    new Set(catData?.flatMap(item => item.categories || []) || [])
-  ).sort();
 
   let query = supabase
     .from('games')
@@ -61,7 +57,11 @@ export default async function GamesLibraryPage({ searchParams }: GamesLibraryPro
 
   query = query.range(offset, offset + ITEMS_PER_PAGE - 1);
 
-  const { data: games, count } = await query;
+  const [{ data: catData }, { data: games, count }] = await Promise.all([categoriesPromise, query]);
+
+  const uniqueCategories = Array.from(
+    new Set(catData?.flatMap(item => item.categories || []) || [])
+  ).sort();
 
   const totalItems = count || 0;
   const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
