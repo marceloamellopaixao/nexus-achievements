@@ -95,7 +95,6 @@ export default function IntegrationsPage() {
   const [syncMessage, setSyncMessage] = useState("");
   const [syncStats, setSyncStats] = useState({ coins: 0, plats: 0 });
   
-  // 🔥 NOVIDADE: Estado do Terminal
   const [syncTerminal, setSyncTerminal] = useState<string[]>([]);
   const terminalRef = useRef<HTMLDivElement>(null);
 
@@ -178,6 +177,8 @@ export default function IntegrationsPage() {
       setSyncStats({ coins: totalCoins, plats: totalPlats });
       
       if (result.coins > 0 || result.plats > 0) pushLog(`  ↳ 💰 +${result.coins} Coins | 🏆 +${result.plats} Platinas`);
+      // Total de Conquistas do Jogo para feedback detalhado
+      else if (game.total_achievements) pushLog(`  ↳ ✔️ ${game.total_achievements} conquistas, mas nenhuma nova para sincronizar.`);
       else pushLog(`  ↳ ✔️ Banco atualizado.`);
 
       setSyncProgress(((i + 1) / games.length) * 100);
@@ -283,9 +284,9 @@ export default function IntegrationsPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 pt-4">
-        <PlatformCard platform="Steam" title="Steam" icon={<FaSteam />} inputId={steamId} savedId={steamUsername || savedSteamId} loading={loadingSave} onInputChange={setSteamId} onSubmit={handleSaveSteam} placeholder="Ex: 76561198..." theme={{ glow: 'bg-blue-900/10 group-hover:bg-blue-800/20', iconBg: 'bg-linear-to-br from-blue-900 to-black', iconBorder: 'border-blue-500/30', btn: 'bg-white', btnHover: 'hover:bg-gray-200 text-black', tagBg: 'bg-green-500/10', tagBorder: 'border-green-500/20', tagText: 'text-green-400' }} description="Vincule a sua Steam ID64 para importar automaticamente os seus jogos." actionButton={<button onClick={handleSyncSteam} disabled={syncingPlatform !== null} className="w-full sm:w-auto px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2">Sincronizar</button>} expandedContent={syncingPlatform === 'Steam' && <SyncExpandedArea />} />
+        <PlatformCard platform="Steam" title="Steam" icon={<FaSteam />} inputId={steamId} savedId={steamUsername || savedSteamId} loading={loadingSave} onInputChange={setSteamId} onSubmit={handleSaveSteam} placeholder="Ex: 76561198..." theme={{ glow: 'bg-blue-900/10 group-hover:bg-blue-800/20', iconBg: 'bg-linear-to-br from-blue-900 to-black', iconBorder: 'border-blue-500/30', btn: 'bg-white', btnHover: 'hover:bg-gray-200 text-black', tagBg: 'bg-green-500/10', tagBorder: 'border-green-500/20', tagText: 'text-green-400' }} description="Vincule a sua Steam ID64 para importar automaticamente os seus jogos." actionButton={<button onClick={handleSyncSteam} disabled={syncingPlatform !== null} className="w-full sm:w-auto px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2">{syncingPlatform === 'Steam' ? 'Sincronizando...' : 'Sincronizar Jogos'}</button>} expandedContent={syncingPlatform === 'Steam' && <SyncExpandedArea />} />
 
-        <PlatformCard platform="PSN" title="PlayStation Network" icon={<FaPlaystation />} inputId={psnId} savedId={savedPsnId} loading={loadingPsn} onInputChange={setPsnId} onSubmit={(e) => { e.preventDefault(); handleSavePlatform('PlayStation', psnId, setLoadingPsn, setSavedPsnId); }} placeholder="Ex: cacador_psn" theme={{ glow: 'bg-blue-600/10 group-hover:bg-blue-600/20', iconBg: 'bg-linear-to-br from-blue-600 to-blue-900', iconBorder: 'border-blue-400/30', btn: 'bg-blue-600', btnHover: 'hover:bg-blue-500', tagBg: 'bg-blue-500/10', tagBorder: 'border-blue-500/20', tagText: 'text-blue-400' }} description="Vincule a sua PSN ID para importar os seus troféus." actionButton={<button onClick={handleSyncPSN} disabled={syncingPlatform !== null} className="w-full sm:w-auto px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2">Sincronizar</button>} expandedContent={syncingPlatform === 'PlayStation' && <SyncExpandedArea />} />
+        <PlatformCard platform="PSN" title="PlayStation Network" icon={<FaPlaystation />} inputId={psnId} savedId={savedPsnId} loading={loadingPsn} onInputChange={setPsnId} onSubmit={(e) => { e.preventDefault(); handleSavePlatform('PlayStation', psnId, setLoadingPsn, setSavedPsnId); }} placeholder="Ex: cacador_psn" theme={{ glow: 'bg-blue-600/10 group-hover:bg-blue-600/20', iconBg: 'bg-linear-to-br from-blue-600 to-blue-900', iconBorder: 'border-blue-400/30', btn: 'bg-blue-600', btnHover: 'hover:bg-blue-500', tagBg: 'bg-blue-500/10', tagBorder: 'border-blue-500/20', tagText: 'text-blue-400' }} description="Vincule a sua PSN ID para importar os seus troféus." actionButton={<button onClick={handleSyncPSN} disabled={syncingPlatform !== null} className="w-full sm:w-auto px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2">{syncingPlatform === 'PlayStation' ? 'Sincronizando...' : 'Sincronizar Troféus'}</button>} expandedContent={syncingPlatform === 'PlayStation' && <SyncExpandedArea />} />
 
         <PlatformCard platform="Xbox" title="Xbox Live" icon={<FaXbox />} inputId={xboxId} savedId={savedXboxId} loading={loadingXbox} onInputChange={setXboxId} onSubmit={(e) => { e.preventDefault(); handleSavePlatform('Xbox', xboxId, setLoadingXbox, setSavedXboxId); }} placeholder="Ex: MasterChief" theme={{ glow: 'bg-green-600/10', iconBg: 'bg-linear-to-br from-green-500 to-green-900', iconBorder: 'border-green-400/30', btn: 'bg-green-600', btnHover: 'hover:bg-green-500', tagBg: 'bg-green-500/10', tagBorder: 'border-green-500/20', tagText: 'text-green-400' }} description="Vincule a sua Gamertag." actionButton={<LockButton />} />
         
