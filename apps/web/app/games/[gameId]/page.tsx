@@ -28,15 +28,15 @@ type SteamSchemaAchievement = { name: string; defaultvalue: number; displayName:
 type SteamPlayerAchievement = { apiname: string; achieved: number; unlocktime?: number; };
 
 // 🔥 ADICIONADO: platinum_unlocked_at na tipagem
-type CommunityUser = { 
-  user_id: string; 
-  is_platinum: boolean; 
-  unlocked_achievements: number; 
-  total_achievements: number; 
-  playtime_minutes: number; 
-  last_synced_at: string; 
-  platinum_unlocked_at?: string | null; 
-  users: { username: string; avatar_url: string | null; } | null; 
+type CommunityUser = {
+  user_id: string;
+  is_platinum: boolean;
+  unlocked_achievements: number;
+  total_achievements: number;
+  playtime_minutes: number;
+  last_synced_at: string;
+  platinum_unlocked_at?: string | null;
+  users: { username: string; avatar_url: string | null; } | null;
 };
 
 interface SteamPercentage { name: string; percent: number; }
@@ -248,7 +248,7 @@ export default async function GamePage(props: GamePageProps) {
             {isFirst && <FaCrown className="text-yellow-400 text-3xl md:text-4xl mb-2 drop-shadow-[0_0_15px_rgba(250,204,21,0.8)] animate-pulse" />}
             {isSecond && <FaMedal className="text-gray-300 text-2xl mb-2 drop-shadow-md" />}
             {isThird && <FaMedal className="text-amber-600 text-xl mb-2 drop-shadow-md" />}
-            
+
             <div className={`relative rounded-full border-4 overflow-hidden mb-2 transition-transform duration-300 group-hover:scale-110 bg-background ${avatarSize} ${avatarBorder}`}>
               {avatarUrl ? (
                 <Image src={avatarUrl} fill className="object-cover" alt="Avatar" unoptimized />
@@ -265,12 +265,12 @@ export default async function GamePage(props: GamePageProps) {
           </Link>
         ) : (
           <div className="flex flex-col items-center opacity-30 mb-3 grayscale">
-             <div className={`rounded-full border-4 border-dashed border-white/20 mb-2 flex items-center justify-center bg-surface/30 ${avatarSize}`}>
-                <span className="text-gray-500 text-[10px] font-bold uppercase tracking-widest">Livre</span>
-             </div>
+            <div className={`rounded-full border-4 border-dashed border-white/20 mb-2 flex items-center justify-center bg-surface/30 ${avatarSize}`}>
+              <span className="text-gray-500 text-[10px] font-bold uppercase tracking-widest">Livre</span>
+            </div>
           </div>
         )}
-        
+
         <div className={`w-full rounded-t-xl bg-linear-to-b ${bgGradient} shadow-inner flex items-start justify-center pt-3 relative overflow-hidden ${height}`}>
           <div className="absolute inset-0 bg-white/10 mix-blend-overlay w-1/3"></div>
           <span className="font-black text-black/40 text-2xl md:text-4xl drop-shadow-sm">{position}</span>
@@ -313,8 +313,10 @@ export default async function GamePage(props: GamePageProps) {
 
           <div className="flex-1 w-full pb-2 md:pb-6 min-w-0">
             <h1 className="text-3xl md:text-4xl font-black text-white tracking-tighter drop-shadow-2xl leading-none truncate max-w-full">{game.title}</h1>
-            <p className="text-primary font-bold tracking-widest uppercase text-[10px] md:text-xs mt-3 md:mt-4 bg-primary/10 inline-block px-3 py-1.5 rounded-lg border border-primary/20">{game.developer || "Steam"}</p>
-
+            <div className="flex gap-2">
+              <p className="text-primary font-bold tracking-widest uppercase text-[10px] md:text-xs mt-3 md:mt-4 bg-primary/10 inline-block px-3 py-1.5 rounded-lg border border-primary/20">{game.platform || "Steam"}</p>
+              <p className="text-primary font-bold tracking-widest uppercase text-[10px] md:text-xs mt-3 md:mt-4 bg-primary/10 inline-block px-3 py-1.5 rounded-lg border border-primary/20">{game.console || "Nenhum console especificado"}</p>
+            </div>
             {userProgress && (
               <div className={`mt-6 md:mt-8 p-5 md:p-6 rounded-4xl border backdrop-blur-md relative overflow-hidden transition-all duration-500 shadow-xl w-full ${isPlat ? 'bg-cyan-950/40 border-cyan-500/40 shadow-cyan-900/20' : 'bg-surface/80 border-white/5'}`}>
                 {isPlat && <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-30 mix-blend-overlay pointer-events-none"></div>}
@@ -386,7 +388,7 @@ export default async function GamePage(props: GamePageProps) {
 
             <div className="bg-surface/30 border border-white/5 rounded-4xl p-6 md:p-8 shadow-inner relative overflow-hidden mt-8">
               <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-md h-32 bg-yellow-500/10 blur-[100px] pointer-events-none"></div>
-              
+
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-4 mb-8 relative z-10">
                 <h2 className="text-xl md:text-2xl font-black text-white flex items-center gap-3">
                   <FaCrown className="text-yellow-400 text-2xl md:text-3xl" /> Hall da Fama
@@ -407,10 +409,9 @@ export default async function GamePage(props: GamePageProps) {
                     {runnerUps.map((runner, index) => {
                       const uname = Array.isArray(runner.users) ? runner.users[0]?.username : runner.users?.username;
                       const avatar = Array.isArray(runner.users) ? runner.users[0]?.avatar_url : runner.users?.avatar_url;
-                      
-                      // 🔥 DATA DA STEAM NOS "OUTROS CONQUISTADORES"
+
                       const dateToUse = runner.platinum_unlocked_at ? runner.platinum_unlocked_at : runner.last_synced_at;
-                      
+
                       return (
                         <Link key={runner.user_id} href={`/profile/${uname}`} className="flex items-center gap-3 bg-surface/50 p-2.5 rounded-xl border border-white/5 hover:border-primary/50 transition-colors group">
                           <span className="text-gray-500 font-black w-5 text-center text-xs group-hover:text-primary transition-colors">#{index + 4}</span>
@@ -429,7 +430,7 @@ export default async function GamePage(props: GamePageProps) {
                   </div>
                 </div>
               )}
-              
+
               {totalPlatinums === 0 && (
                 <p className="text-center text-gray-500 font-bold text-sm mt-8 pb-4 relative z-10">
                   Ninguém platinou este jogo ainda. A coroa está à sua espera!
@@ -477,7 +478,7 @@ export default async function GamePage(props: GamePageProps) {
                   </div>
 
                   {totalAchievementPages > 1 && (
-                    <div className="flex items-center justify-between border-t border-white/5 pt-6 mt-8 mb-12 gap-2">
+                    <div className="flex items-center justify-between border-t border-white/5 pt-6 mt-8 pb-6 gap-2">
                       <Link href={hasPrevPage ? buildUrl(currentPage - 1) : '#'} scroll={false} className={`flex items-center justify-center gap-2 px-4 py-2.5 sm:px-6 sm:py-3 rounded-xl font-black text-xs sm:text-sm transition-all ${hasPrevPage ? 'bg-surface border border-white/10 text-white hover:bg-primary hover:border-primary shadow-sm' : 'bg-surface/30 border border-transparent text-gray-600 cursor-not-allowed pointer-events-none'}`}>
                         <FaArrowLeft /> <span className="hidden sm:inline">Anterior</span>
                       </Link>
@@ -506,9 +507,9 @@ export default async function GamePage(props: GamePageProps) {
             {guideId && selectedGuide ? (
               <div className="bg-surface/40 backdrop-blur-xl border border-white/5 rounded-4xl p-5 sm:p-6 md:p-10 shadow-2xl relative w-full min-w-0">
                 <div className="absolute top-0 left-0 w-full h-1.5 bg-linear-to-r from-primary via-purple-500 to-primary"></div>
-                
+
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 md:mb-8 mt-2">
-                  <Link 
+                  <Link
                     href={`/games/${gameId}?tab=guides${backQueryString}`}
                     className="flex items-center gap-2 px-4 py-2.5 bg-background border border-white/10 rounded-xl font-bold text-xs md:text-sm text-gray-400 hover:text-white hover:bg-white/5 hover:border-white/20 transition-all shadow-sm w-fit"
                   >
@@ -529,16 +530,16 @@ export default async function GamePage(props: GamePageProps) {
                     <p className="text-[10px] md:text-xs text-gray-500 mt-1 font-bold tracking-widest uppercase truncate">{new Date(selectedGuide.created_at).toLocaleDateString('pt-BR')}</p>
                   </div>
                 </div>
-                
+
                 <div className="text-sm md:text-base text-gray-300 leading-relaxed whitespace-pre-wrap wrap-break-word w-full overflow-hidden">
                   <TextFormatter content={selectedGuide.content} />
                 </div>
-                
+
                 <div className="mt-10 md:mt-12 pt-6 md:pt-8 border-t border-white/5 flex flex-col items-center gap-3 md:gap-4 w-full">
                   <p className="text-[10px] md:text-xs font-black text-gray-500 uppercase tracking-widest text-center">Este guia ajudou-o na jornada?</p>
                   <GuideVoteButton guideId={selectedGuide.id} gameId={gameId} initialVotes={selectedGuide.upvotes} hasVoted={hasVoted} />
                 </div>
-                
+
                 <div className="mt-12 md:mt-16 bg-background/50 border border-white/5 p-4 sm:p-6 md:p-8 rounded-3xl w-full min-w-0">
                   <h3 className="text-lg md:text-xl font-black text-white flex items-center gap-2 md:gap-3 mb-4 md:mb-6">
                     <FaCommentDots className="text-primary" /> Comentários
@@ -591,7 +592,7 @@ export default async function GamePage(props: GamePageProps) {
                           <h3 className="text-lg md:text-xl font-black text-white mb-2 md:mb-3 group-hover:text-primary transition-colors line-clamp-2 leading-tight wrap-break-word">{guide.title}</h3>
                           <p className="text-xs md:text-sm text-gray-400 line-clamp-3 leading-relaxed mb-4 md:mb-6 wrap-break-word">
                             {guide.content.replace(/!\[.*?\]\(.*?\)/g, '[Imagem Anexa] ').replace(/\|\|(.*?)\|\|/g, '[Spoiler Oculto] ')}
-                          </p>                       
+                          </p>
                         </div>
                         <div className="flex items-center justify-between pt-4 md:pt-5 border-t border-white/5 w-full min-w-0 gap-2">
                           <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
