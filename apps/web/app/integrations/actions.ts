@@ -9,6 +9,7 @@ interface SteamGame {
   playtime_forever: number;
   rtime_last_played?: number;
   img_icon_url?: string;
+  total_achievements?: number;
 }
 
 interface SteamAchievement {
@@ -63,8 +64,18 @@ async function getBackupImage(appId: string, type: 'grids' | 'heroes' | 'logos')
 // ==========================================
 // 2. VINCULAÇÃO DE CONTA STEAM
 // ==========================================
+// ==========================================
+// 2. VINCULAÇÃO DE CONTA STEAM
+// ==========================================
 export async function saveSteamId(steamId: string) {
   console.log(`\n🔗 [STEAM-LINK] Iniciando vinculação para ID: ${steamId}`);
+  
+  // 🔥 PROTEÇÃO SÊNIOR: Impede nomes customizados e garante o ID64 numérico de 17 dígitos
+  if (!/^\d{17}$/.test(steamId)) {
+    console.error(`❌ [STEAM-LINK] Erro: Formato inválido. Não é uma SteamID64.`);
+    return { error: 'Use sua SteamID64 (exatamente 17 números, ex: 765611...). Nomes customizados não funcionam.' }
+  }
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
@@ -112,7 +123,7 @@ export async function saveSteamId(steamId: string) {
 }
 
 // ==========================================
-// 3. BUSCA DE LISTA DE JOGOS
+// 3. BUSCA DE LISTA DE JOGOS (BLINDADA CONTRA ERROS HTML)
 // ==========================================
 export async function fetchSteamGamesList() {
   console.log(`\n📚 [STEAM-SYNC] Iniciando busca da Biblioteca...`);
@@ -132,6 +143,12 @@ export async function fetchSteamGamesList() {
       fetch(`http://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key=${STEAM_KEY}&steamid=${steamId}&format=json&include_appinfo=1&include_played_free_games=1`),
       fetch(`http://api.steampowered.com/IPlayerService/GetRecentlyPlayedGames/v0001/?key=${STEAM_KEY}&steamid=${steamId}&format=json`)
     ])
+
+    // 🔥 BLINDAGEM: Se a Steam devolver um erro 403, 404 ou 500 (HTML), nós paramos aqui com segurança!
+    if (!ownedRes.ok || !recentRes.ok) {
+        console.error(`❌ [STEAM-SYNC] Erro da API da Steam. Status: ${ownedRes.status} / ${recentRes.status}`);
+        return { error: 'O perfil da Steam é privado ou a chave da API é inválida.' }
+    }
 
     const ownedData = await ownedRes.json()
     const recentData = await recentRes.json()
@@ -155,7 +172,7 @@ export async function fetchSteamGamesList() {
 }
 
 // ==========================================
-// 4. PROCESSAMENTO INDIVIDUAL E ANTI-EXPLOIT
+// 4. PROCESSAMENTO INDIVIDUAL (COM COLUNA CONSOLE)
 // ==========================================
 export async function processSingleGame(game: SteamGame, steamId: string) {
   const supabase = await createClient()
@@ -171,63 +188,46 @@ export async function processSingleGame(game: SteamGame, steamId: string) {
 
   try {
     const res = await fetch(`http://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v0001/?appid=${appId}&key=${STEAM_KEY}&steamid=${steamId}&l=brazilian`)
-    const data = await res.json()
+    if (!res.ok) return { coins: 0, plats: 0 }; // Proteção anti-HTML
     
-    if (!data?.playerstats?.success) {
-      console.log(`   ↳ ⚠️ Sem conquistas suportadas ou perfil privado para este jogo.`);
-      return { coins: 0, plats: 0 }
-    }
+    const data = await res.json()
+    if (!data?.playerstats?.success) return { coins: 0, plats: 0 }
 
     const achievements: SteamAchievement[] = data.playerstats.achievements || []
-    if (achievements.length === 0) {
-      console.log(`   ↳ ⚠️ O jogo não possui conquistas.`);
-      return { coins: 0, plats: 0 }
-    }
+    if (achievements.length === 0) return { coins: 0, plats: 0 }
 
     const unlockedAchievements = achievements.filter(a => a.achieved === 1).sort((a, b) => b.unlocktime - a.unlocktime)
     const unlockedCount = unlockedAchievements.length
     const totalCount = achievements.length
     const isPlat = unlockedCount === totalCount && totalCount > 0
 
-    console.log(`   ↳ 📊 Progresso: ${unlockedCount}/${totalCount} | Platinado: ${isPlat ? 'Sim 🏆' : 'Não'}`);
-
     let platinumUnlockedAt = null;
-    if (isPlat && unlockedCount > 0) {
-      // 🔥 CORREÇÃO EXATA PEDIDA: Forçando o TypeScript a confiar que o index 0 existe!
-      platinumUnlockedAt = new Date(unlockedAchievements[0]!.unlocktime * 1000).toISOString();
-    }
+    if (isPlat && unlockedCount > 0) platinumUnlockedAt = new Date(unlockedAchievements[0]!.unlocktime * 1000).toISOString();
 
-    console.log(`   ↳ 🔍 Verificando Cache de Imagens e Categorias...`);
     const { data: existingGame } = await supabase.from('games').select('cover_url, banner_url, categories').eq('id', steamGameId).maybeSingle();
-
-    let coverUrl = existingGame?.cover_url;
-    let bannerUrl = existingGame?.banner_url;
+    let coverUrl = existingGame?.cover_url || `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${appId}/library_600x900.jpg`;
+    let bannerUrl = existingGame?.banner_url || `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${appId}/header.jpg`;
     let gameCategories = existingGame?.categories || [];
 
-    if (!coverUrl || !bannerUrl) {
-      if (!coverUrl) coverUrl = `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${appId}/library_600x900.jpg`;
-      if (!bannerUrl) bannerUrl = `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${appId}/header.jpg`;
-      if (!existingGame?.cover_url) { const premiumCover = await getBackupImage(appId, 'grids'); if (premiumCover) coverUrl = premiumCover; }
-      if (!existingGame?.banner_url) { const premiumBanner = await getBackupImage(appId, 'heroes'); if (premiumBanner) bannerUrl = premiumBanner; }
-    }
+    if (!existingGame?.cover_url) { const premiumCover = await getBackupImage(appId, 'grids'); if (premiumCover) coverUrl = premiumCover; }
+    if (!existingGame?.banner_url) { const premiumBanner = await getBackupImage(appId, 'heroes'); if (premiumBanner) bannerUrl = premiumBanner; }
 
-    // 🔥 CORREÇÃO DO BLOCO VAZIO (ESLint no-empty / no-unused-vars)
-    if (!gameCategories || gameCategories.length === 0) {
+    if (gameCategories.length === 0) {
       try {
         const storeRes = await fetch(`https://store.steampowered.com/api/appdetails?appids=${appId}&l=portuguese`);
         if (storeRes.ok) {
           const storeData = await storeRes.json();
-          if (storeData?.[appId]?.success) {
-            gameCategories = storeData[appId].data.genres?.map((g: { id: string; description: string }) => g.description) || [];
-          }
+          if (storeData?.[appId]?.success) gameCategories = storeData[appId].data.genres?.map((g: { description: string }) => g.description) || [];
         }
       } catch (err) {
-        console.warn(`   ↳ ⚠️ Aviso: Não foi possível buscar categorias extras na Steam Store.`, err);
+        console.log(`   ↳ ❌ Erro ao buscar categorias na API da Steam:`, err);
+        return { coins: 0, plats: 0 }
       }
     }
 
+    // 🔥 ADICIONADO: console: 'PC'
     await supabase.from('games').upsert({
-      id: steamGameId, title: game.name, cover_url: coverUrl, banner_url: bannerUrl, total_achievements: totalCount, platform: 'Steam', categories: gameCategories
+      id: steamGameId, title: game.name, cover_url: coverUrl, banner_url: bannerUrl, total_achievements: totalCount, platform: 'Steam', categories: gameCategories, console: 'PC'
     }, { onConflict: 'id' })
 
     const { data: existingRecord } = await supabase.from('user_games').select('id, unlocked_achievements, is_platinum').eq('user_id', user.id).eq('game_id', steamGameId).maybeSingle()
@@ -235,21 +235,15 @@ export async function processSingleGame(game: SteamGame, steamId: string) {
     const wasPlat = existingRecord?.is_platinum || false
 
     if (existingRecord) {
-      await supabase.from('user_games').update({ 
-        playtime_minutes: game.playtime_forever, unlocked_achievements: unlockedCount, total_achievements: totalCount, is_platinum: isPlat, platinum_unlocked_at: platinumUnlockedAt 
-      }).eq('id', existingRecord.id)
+      await supabase.from('user_games').update({ playtime_minutes: game.playtime_forever, unlocked_achievements: unlockedCount, total_achievements: totalCount, is_platinum: isPlat, platinum_unlocked_at: platinumUnlockedAt }).eq('id', existingRecord.id)
     } else {
-      await supabase.from('user_games').insert({ 
-        user_id: user.id, game_id: steamGameId, playtime_minutes: game.playtime_forever, unlocked_achievements: unlockedCount, total_achievements: totalCount, is_platinum: isPlat, platinum_unlocked_at: platinumUnlockedAt 
-      })
+      await supabase.from('user_games').insert({ user_id: user.id, game_id: steamGameId, playtime_minutes: game.playtime_forever, unlocked_achievements: unlockedCount, total_achievements: totalCount, is_platinum: isPlat, platinum_unlocked_at: platinumUnlockedAt })
     }
 
     let gameCoinsEarned = 0;
     let gamePlatsEarned = 0;
 
     if (unlockedCount > 0) {
-      console.log(`   ↳ 🧮 Executando Motor de Anti-Fraude e Cálculo de Raridade...`);
-      
       const percentagesMap = new Map<string, number>()
       const percentRes = await fetch(`http://api.steampowered.com/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v0002/?gameid=${appId}`)
       if (percentRes.ok) {
@@ -266,32 +260,18 @@ export async function processSingleGame(game: SteamGame, steamId: string) {
         let rarity = 'bronze', pts = 5;
         if (percent <= 10) { rarity = 'gold'; pts = 25; }
         else if (percent <= 50) { rarity = 'silver'; pts = 10; }
-        
         expectedBaseCoins += pts;
         parsedAchievements.push({ ...ach, rarity, pts });
       }
 
-      const { data: pastActivities } = await supabase.from('global_activity')
-        .select('points_earned, rarity')
-        .eq('user_id', user.id)
-        .eq('game_id', steamGameId);
-
+      const { data: pastActivities } = await supabase.from('global_activity').select('points_earned, rarity').eq('user_id', user.id).eq('game_id', steamGameId);
       let alreadyRegisteredCoins = 0;
-      pastActivities?.forEach(act => {
-        if (act.rarity !== 'platinum') {
-          alreadyRegisteredCoins += act.points_earned;
-        }
-      });
+      pastActivities?.forEach(act => { if (act.rarity !== 'platinum') alreadyRegisteredCoins += act.points_earned; });
 
       const coinsToAward = expectedBaseCoins - alreadyRegisteredCoins;
       if (coinsToAward > 0) gameCoinsEarned += coinsToAward;
 
-      console.log(`      • Valor total das conquistas: ${expectedBaseCoins}`);
-      console.log(`      • Valor já pago no banco: ${alreadyRegisteredCoins}`);
-      console.log(`      • Saldo a injetar agora: ${coinsToAward > 0 ? `+${coinsToAward}` : '0'}`);
-
       if (unlockedCount > previousUnlocked) {
-        console.log(`   ↳ 🌐 Baixando metadados das conquistas novas (nomes/ícones)...`);
         const schemaMap = new Map<string, { displayName: string, icon: string }>()
         const schemaRes = await fetch(`http://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?key=${STEAM_KEY}&appid=${appId}&l=brazilian`)
         if (schemaRes.ok) {
@@ -311,35 +291,20 @@ export async function processSingleGame(game: SteamGame, steamId: string) {
             rarity: ach.rarity, points_earned: ach.pts, platform: 'Steam', created_at: new Date(ach.unlocktime * 1000).toISOString()
           })
         }
-
-        if (activitiesToInsert.length > 0) {
-          await supabase.from('global_activity').upsert(activitiesToInsert, { onConflict: 'user_id, game_id, achievement_name' })
-          console.log(`   ↳ 💾 Inseridas ${activitiesToInsert.length} novas conquistas no Feed Global.`);
-        }
+        if (activitiesToInsert.length > 0) await supabase.from('global_activity').upsert(activitiesToInsert, { onConflict: 'user_id, game_id, achievement_name' })
       }
 
       if (isPlat && !wasPlat) {
-        gamePlatsEarned += 1;
-        gameCoinsEarned += 100;
-        console.log(`   ↳ 🏆 NOVA PLATINA REGISTRADA! +100 Nexus Coins.`);
-        
+        gamePlatsEarned += 1; gameCoinsEarned += 100;
         await supabase.from('global_activity').insert({
           user_id: user.id, game_id: steamGameId, game_name: game.name, achievement_name: '🏆 PLATINOU O JOGO!',
-          achievement_icon: 'platinum_ps5', rarity: 'platinum', points_earned: 100, platform: 'Steam',
-          created_at: platinumUnlockedAt || new Date().toISOString()
+          achievement_icon: 'platinum_ps5', rarity: 'platinum', points_earned: 100, platform: 'Steam', created_at: platinumUnlockedAt || new Date().toISOString()
         })
       }
     }
-    
-    if (gameCoinsEarned > 0) {
-        console.log(`✅ [RESULTADO] 💰 Injetando: +${gameCoinsEarned} Nexus Coins | 🏆 Platinas: +${gamePlatsEarned}`);
-    } else {
-        console.log(`✅ [RESULTADO] ✔️ Banco Atualizado. Nenhum coin extra adicionado.`);
-    }
-
     return { coins: gameCoinsEarned, plats: gamePlatsEarned }
   } catch (err) {
-    console.error(`❌ [STEAM] Erro Catastrófico no jogo ${game.name}:`, err)
+    console.error(`❌ [STEAM] Erro ao processar jogo ${game.name} (${appId}):`, err);
     return { coins: 0, plats: 0 }
   }
 }
@@ -374,6 +339,9 @@ export async function finalizeSync(totalCoinsEarned: number, totalPlatsEarned: n
   revalidatePath('/integrations'); revalidatePath('/profile');
 }
 
+// ==========================================
+// 6. VINCULAÇÃO DE OUTRAS PLATAFORMAS (GENÉRICO)
+// ==========================================
 export async function linkPlatformAccount(platform: string, platformUserId: string) {
   console.log(`\n🔗 [PLATFORM-LINK] Tentando vincular ${platform} para a ID/User: ${platformUserId}`);
   const supabase = await createClient()
