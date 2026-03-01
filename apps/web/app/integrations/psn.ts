@@ -35,6 +35,19 @@ interface PsnTrophyDef {
     trophyIconUrl?: string;
 }
 
+// 🔥 Criamos a interface para as Conquistas para banir o "any" do ESLint
+interface ActivityInsert {
+    user_id: string;
+    game_id: string;
+    game_name: string;
+    achievement_name: string;
+    achievement_icon: string;
+    rarity: string;
+    points_earned: number;
+    platform: string;
+    created_at: string;
+}
+
 export async function fetchPlayStationGamesList(platformUserId: string) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -129,6 +142,10 @@ export async function processSinglePlayStationGame(title: TitleThin, accountId: 
 
         const gameId = `psn-${title.npCommunicationId}`
         const npServiceName: "trophy" | "trophy2" = title.npServiceName === 'trophy2' ? 'trophy2' : 'trophy';
+        
+        // INTELIGÊNCIA DE CONSOLE: 'trophy2' é a arquitetura exclusiva do PS5
+        const platformConsole = npServiceName === 'trophy2' ? 'PS5' : 'PS4';
+
         const earned = title.earnedTrophies
         const defined = title.definedTrophies
 
@@ -137,12 +154,11 @@ export async function processSinglePlayStationGame(title: TitleThin, accountId: 
         const isPlat = earned.platinum > 0
 
         console.log(`\n========================================================`)
-        console.log(`🎮 [PSN] Jogo Resgatado: ${title.trophyTitleName} (${gameId})`);
+        console.log(`🎮 [PSN] Jogo Resgatado: ${title.trophyTitleName} [${platformConsole}]`);
         console.log(`   ↳ Progresso: ${unlockedCount}/${totalCount} (${title.progress}%) | Platinado: ${isPlat ? 'Sim 🏆' : 'Não'}`);
 
         console.log(`   ↳ 🔍 Verificando e preservando Cache de Imagens do Nexus...`);
         
-        // 🔥 CORREÇÃO 1: Preservamos as capas e banners customizados!
         const { data: existingGameData } = await supabase.from('games').select('cover_url, banner_url, categories').eq('id', gameId).maybeSingle();
         const finalCover = existingGameData?.cover_url || title.trophyTitleIconUrl;
         const finalBanner = existingGameData?.banner_url || title.trophyTitleIconUrl;
@@ -153,6 +169,7 @@ export async function processSinglePlayStationGame(title: TitleThin, accountId: 
             cover_url: finalCover,
             banner_url: finalBanner,
             platform: 'PlayStation',
+            console: platformConsole,
             total_achievements: totalCount,
             categories: existingGameData?.categories || []
         }, { onConflict: 'id' })
@@ -188,7 +205,6 @@ export async function processSinglePlayStationGame(title: TitleThin, accountId: 
             if (act.rarity !== 'platinum') {
                 alreadyRegisteredCoins += act.points_earned;
             }
-            // Verifica quantos troféus REAIS (com nome) estão na base, ignorando a Platina e os pacotes genéricos
             if (act.rarity !== 'platinum' && !act.achievement_name.startsWith('Pacote de Troféus PSN')) {
                 individualTrophiesSaved += 1;
             }
@@ -197,7 +213,6 @@ export async function processSinglePlayStationGame(title: TitleThin, accountId: 
         const expectedBaseCoins = (earned.bronze * 5) + (earned.silver * 10) + (earned.gold * 25);
         const coinsToAward = expectedBaseCoins - alreadyRegisteredCoins;
         
-        // 🔥 A MÁGICA DA AUTO-CURA: Conta se faltam troféus visuais na timeline (descontando a platina)
         const expectedIndividualTrophies = unlockedCount - (isPlat ? 1 : 0);
         const isMissingVisualTrophies = individualTrophiesSaved < expectedIndividualTrophies;
 
@@ -223,7 +238,8 @@ export async function processSinglePlayStationGame(title: TitleThin, accountId: 
                 const earnedTrophiesData = await getUserTrophiesEarnedForTitle(authorization as unknown as AuthParamUser, accountId, title.npCommunicationId, 'all', { npServiceName });
                 const earnedTrophiesList = earnedTrophiesData?.trophies || [];
                 
-                const activitiesToInsert: { user_id: string; game_id: string; game_name: string; achievement_name: string; achievement_icon: string; rarity: string; points_earned: number; platform: string; created_at: string; }[] = [];
+                // 🔥 RESOLUÇÃO: array tipado corretamente usando a interface
+                const activitiesToInsert: ActivityInsert[] = [];
 
                 for (const earnedTrophy of earnedTrophiesList) {
                     if (earnedTrophy.earned) {
@@ -252,7 +268,6 @@ export async function processSinglePlayStationGame(title: TitleThin, accountId: 
                 if (newActivities.length > 0) {
                     console.log(`   ↳ 🌐 Gravando metadados das conquistas novas (Nomes e Ícones)...`);
                     
-                    // 🔥 SE ESTAMOS A CURAR A TIMELINE, APAGAMOS O PACOTE GENÉRICO FALSO!
                     if (isMissingVisualTrophies) {
                         await supabase.from('global_activity').delete()
                             .eq('user_id', user.id).eq('game_id', gameId).like('achievement_name', 'Pacote de Troféus PSN%');
@@ -266,11 +281,11 @@ export async function processSinglePlayStationGame(title: TitleThin, accountId: 
                 }
 
             } catch (apiError) {
-                console.warn(`   ↳ ⚠️ A Sony limitou ou falhou na entrega dos troféus individuais:`, apiError instanceof Error ? apiError.message : '');
+                // 🔥 RESOLUÇÃO: O erro da API volta a ser logado corretamente e não é ignorado
+                console.warn(`   ↳ ⚠️ A Sony limitou ou falhou na entrega dos troféus individuais:`, apiError instanceof Error ? apiError.message : String(apiError));
                 usedFallback = true;
             }
 
-            // O PLANO B DO NEXUS
             if (usedFallback && coinsToAward > 0) {
                 console.log(`   ↳ 🛡️ Ativando Fallback do Nexus: Injetando pacote genérico para não perder as moedas!`);
                 await supabase.from('global_activity').insert({
@@ -280,13 +295,11 @@ export async function processSinglePlayStationGame(title: TitleThin, accountId: 
                 });
             }
 
-            // Apenas adicionamos ao saldo financeiro o que era efetivamente "Devido"
             if (coinsToAward > 0) {
                 gameCoinsEarned += coinsToAward;
             }
         }
 
-        // Tratamento da Platina
         if (isPlat && !wasPlat && !pastSet.has('🏆 PLATINA CONQUISTADA!')) {
             console.log(`   ↳ 🏆 NOVA PLATINA REGISTRADA! Conta atualizada.`);
             gamePlatsEarned += 1;
@@ -308,7 +321,8 @@ export async function processSinglePlayStationGame(title: TitleThin, accountId: 
         return { coins: gameCoinsEarned, plats: gamePlatsEarned }
 
     } catch (err) {
-        console.error(`❌ [PSN] Erro Fatal no jogo ${title.trophyTitleName}:`, err)
+        // 🔥 RESOLUÇÃO: Log do Erro Fatal de volta à ação
+        console.error(`❌ [PSN] Erro Fatal no jogo ${title.trophyTitleName}:`, err instanceof Error ? err.message : String(err));
         return { coins: 0, plats: 0 }
     }
 }
