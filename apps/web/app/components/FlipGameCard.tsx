@@ -9,6 +9,7 @@ interface FlipGameCardProps {
     title: string;
     cover_url: string | null;
     total_achievements: number;
+    console?: string | null; // 🔥 Adicionado o Console
   };
   progress?: {
     unlocked: number;
@@ -25,7 +26,7 @@ export default function FlipGameCard({ game, progress, backUrl }: FlipGameCardPr
   const isPlat = progress?.is_platinum;
   
   // Converte minutos para horas
-  const hours = progress ? Math.floor(progress.playtime_minutes / 60) : 0;
+  const hours = progress && progress.playtime_minutes > 0 ? Math.floor(progress.playtime_minutes / 60) : 0;
 
   // Sistema Dinâmico de Raridade com base no progresso do jogador
   let rarityText = "Iniciante";
@@ -35,6 +36,9 @@ export default function FlipGameCard({ game, progress, backUrl }: FlipGameCardPr
   else if (pct >= 80) { rarityText = "Épico"; rarityColor = "text-purple-400"; }
   else if (pct >= 40) { rarityText = "Veterano"; rarityColor = "text-primary"; }
   else if (pct > 0) { rarityText = "Ativo"; rarityColor = "text-green-400"; }
+
+  // Fallback de Console caso não exista
+  const consoleTag = game.console || (game.id.startsWith('steam') ? 'PC' : null);
 
   return (
     <Link 
@@ -54,6 +58,13 @@ export default function FlipGameCard({ game, progress, backUrl }: FlipGameCardPr
           className="absolute inset-0 w-full h-full rounded-2xl overflow-hidden bg-surface border border-white/5"
           style={{ backfaceVisibility: 'hidden' }}
         >
+          {/* 🔥 EMBLEMA DE CONSOLE (PS4/PS5/PC) NA FRENTE DA CARTA */}
+          {consoleTag && (
+            <div className="absolute top-2 left-2 z-30 bg-black/80 backdrop-blur-md text-[9px] md:text-[10px] font-black px-2 py-0.5 md:py-1 rounded-md border border-white/10 shadow-xl text-white uppercase tracking-wider pointer-events-none">
+              {consoleTag}
+            </div>
+          )}
+
           <GameCardImage src={game.cover_url} title={game.title} />
           
           <div className="absolute inset-x-0 bottom-0 h-1/2 bg-linear-to-t from-background via-background/80 to-transparent z-10 pointer-events-none"></div>
@@ -119,17 +130,24 @@ export default function FlipGameCard({ game, progress, backUrl }: FlipGameCardPr
             <p className="text-[8px] md:text-[9px] mt-1 font-bold text-gray-400 uppercase tracking-widest shrink-0">{pct}%</p>
           </div>
 
-          {/* Base do Verso (Tempo e Raridade colados ao fundo) */}
-          <div className="relative z-10 w-full flex items-center justify-between border-t border-white/10 bg-black/40 backdrop-blur-sm px-4 py-2 mt-auto shrink-0">
-            <div className="flex flex-col items-center flex-1">
-              <FaClock className="text-gray-500 mb-0.5 text-[9px] md:text-[10px]" />
-              <span className="text-[9px] md:text-[10px] font-black text-white">{hours}h</span>
-            </div>
-            <div className="w-px h-5 bg-white/10"></div>
+          {/* 🔥 Base do Verso DINÂMICA: Some com o relógio se não houver horas jogadas (ex: PSN) */}
+          <div className="relative z-10 w-full flex items-center justify-center border-t border-white/10 bg-black/40 backdrop-blur-sm px-4 py-2 mt-auto shrink-0 gap-4">
+            
+            {hours > 0 && (
+              <>
+                <div className="flex flex-col items-center flex-1">
+                  <FaClock className="text-gray-500 mb-0.5 text-[9px] md:text-[10px]" />
+                  <span className="text-[9px] md:text-[10px] font-black text-white">{hours}h</span>
+                </div>
+                <div className="w-px h-5 bg-white/10"></div>
+              </>
+            )}
+
             <div className="flex flex-col items-center flex-1">
               <FaFire className={`${rarityColor} mb-0.5 text-[9px] md:text-[10px] drop-shadow-md`} />
               <span className={`text-[8px] md:text-[9px] font-black ${rarityColor} uppercase tracking-wider`}>{rarityText}</span>
             </div>
+            
           </div>
 
         </div>
