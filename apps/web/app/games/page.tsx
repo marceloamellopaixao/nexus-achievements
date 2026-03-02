@@ -1,10 +1,11 @@
 import { createClient } from "@/utils/supabase/server";
 import Link from "next/link";
 import GameSearch from "./GameSearch";
-import { FaSteam, FaPlaystation, FaXbox, FaArrowRight, FaArrowLeft, FaGamepad, FaTrophy, FaGhost, FaTv } from "react-icons/fa";
+import ConsoleFilter from "./ConsoleFilter";
+import { FaSteam, FaPlaystation, FaXbox, FaArrowRight, FaArrowLeft, FaGamepad, FaTrophy, FaGhost, FaFire } from "react-icons/fa";
 import { SiEpicgames } from "react-icons/si";
 import { Metadata } from "next";
-import FlipGameCard from "../components/FlipGameCard"; 
+import FlipGameCard from "../components/FlipGameCard";
 
 export const metadata: Metadata = {
   title: "Biblioteca de Jogos | Nexus Achievements",
@@ -22,14 +23,33 @@ const PLATFORMS = [
   { id: 'Epic Games', icon: <SiEpicgames />, label: 'Epic' },
 ];
 
+interface BaseGame {
+  id: string;
+  title: string;
+  cover_url: string | null;
+  total_achievements: number;
+  console: string | null;
+  platform?: string;
+  categories?: string[] | null;
+}
+
+interface UserGameWithDetails {
+  is_platinum: boolean;
+  unlocked_achievements: number;
+  games: BaseGame | BaseGame[];
+}
+
 export default async function GamesLibraryPage({ searchParams }: GamesLibraryProps) {
   const params = await searchParams;
   const searchQuery = params.q || '';
   const currentPage = Number(params.page) || 1;
-  const sortBy = params.sort || 'name';
+
+  // 🔥 O FILTRO ATIVO POR PADRÃO AGORA É O PROGRESSO!
+  const sortBy = params.sort || 'progress';
+
   const currentPlatform = params.platform || 'Steam';
   const currentCategory = params.category || '';
-  const currentConsole = params.console || ''; // 🔥 ADICIONADO FILTRO CONSOLE
+  const currentConsole = params.console || '';
 
   const ITEMS_PER_PAGE = 32;
   const offset = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -47,30 +67,93 @@ export default async function GamesLibraryPage({ searchParams }: GamesLibraryPro
     new Set(catData?.flatMap(item => item.categories || []) || [])
   ).sort();
 
-  let query = supabase
-    .from('games')
-    .select('id, title, cover_url, total_achievements, console', { count: 'exact' })
-    .eq('platform', currentPlatform);
+  // ====================================================================
+  // 🔥 MOTOR HÍBRIDO DE BUSCA: ORDENAÇÃO PLATINA -> PROGRESSO -> ALFABÉTICA
+  // ====================================================================
+  let finalGames: BaseGame[] = [];
+  let totalItems = 0;
 
-  if (searchQuery) query = query.ilike('title', `%${searchQuery}%`);
-  if (currentCategory) query = query.contains('categories', [currentCategory]);
-  if (currentConsole) query = query.eq('console', currentConsole); // 🔥 APLICANDO O FILTRO
+  let baseQuery = supabase.from('games').select('id, title, cover_url, total_achievements, console', { count: 'exact' }).eq('platform', currentPlatform);
+  if (searchQuery) baseQuery = baseQuery.ilike('title', `%${searchQuery}%`);
+  if (currentCategory) baseQuery = baseQuery.contains('categories', [currentCategory]);
+  if (currentConsole) baseQuery = baseQuery.eq('console', currentConsole);
 
-  if (sortBy === 'achievements') query = query.order('total_achievements', { ascending: false });
-  else query = query.order('title', { ascending: true });
+  // SE ORDENAR POR PROGRESSO (Padrão) E O USUÁRIO ESTIVER LOGADO
+  if (sortBy === 'progress' && user) {
 
-  query = query.range(offset, offset + ITEMS_PER_PAGE - 1);
+    // 🔥 A MÁGICA SQL: Ordena 1º pelas Platinas, 2º pelo Progresso!
+    let ugQuery = supabase.from('user_games')
+      .select('is_platinum, unlocked_achievements, games!inner(id, title, cover_url, total_achievements, console, platform, categories)')
+      .eq('user_id', user.id)
+      .gt('unlocked_achievements', 0)
+      .order('is_platinum', { ascending: false }) // Platinados primeiro
+      .order('unlocked_achievements', { ascending: false }); // Depois os mais avançados
 
-  const { data: games, count } = await query;
+    if (currentPlatform) ugQuery = ugQuery.eq('games.platform', currentPlatform);
+    if (searchQuery) ugQuery = ugQuery.ilike('games.title', `%${searchQuery}%`);
+    if (currentConsole) ugQuery = ugQuery.eq('games.console', currentConsole);
+    if (currentCategory) ugQuery = ugQuery.contains('games.categories', [currentCategory]);
 
-  const totalItems = count || 0;
+    const { data: ugDataRaw } = await ugQuery;
+    const ugData = ugDataRaw as unknown as UserGameWithDetails[];
+
+    const playedGames = (ugData || []).map((ug) => Array.isArray(ug.games) ? ug.games[0] : ug.games).filter(Boolean) as BaseGame[];
+    const playedGamesIds = playedGames.map((g) => g.id);
+
+    const { count: globalCount } = await baseQuery;
+    totalItems = globalCount || 0;
+
+    if (offset < playedGames.length) {
+      finalGames = playedGames.slice(offset, offset + ITEMS_PER_PAGE);
+
+      if (finalGames.length < ITEMS_PER_PAGE) {
+        const remaining = ITEMS_PER_PAGE - finalGames.length;
+        // 🔥 JOGOS RESTANTES: Sempre em ordem Alfabética
+        let restQuery = supabase.from('games').select('id, title, cover_url, total_achievements, console').eq('platform', currentPlatform).order('title', { ascending: true });
+
+        if (searchQuery) restQuery = restQuery.ilike('title', `%${searchQuery}%`);
+        if (currentCategory) restQuery = restQuery.contains('categories', [currentCategory]);
+        if (currentConsole) restQuery = restQuery.eq('console', currentConsole);
+        if (playedGamesIds.length > 0) restQuery = restQuery.not('id', 'in', `(${playedGamesIds.join(',')})`);
+
+        const { data: restDataRaw } = await restQuery.range(0, remaining - 1);
+        const restData = restDataRaw as unknown as BaseGame[];
+        if (restData) finalGames = [...finalGames, ...restData];
+      }
+    } else {
+      const globalOffset = offset - playedGames.length;
+      // 🔥 JOGOS RESTANTES: Sempre em ordem Alfabética
+      let restQuery = supabase.from('games').select('id, title, cover_url, total_achievements, console').eq('platform', currentPlatform).order('title', { ascending: true });
+
+      if (searchQuery) restQuery = restQuery.ilike('title', `%${searchQuery}%`);
+      if (currentCategory) restQuery = restQuery.contains('categories', [currentCategory]);
+      if (currentConsole) restQuery = restQuery.eq('console', currentConsole);
+      if (playedGamesIds.length > 0) restQuery = restQuery.not('id', 'in', `(${playedGamesIds.join(',')})`);
+
+      const { data: restDataRaw } = await restQuery.range(globalOffset, globalOffset + ITEMS_PER_PAGE - 1);
+      const restData = restDataRaw as unknown as BaseGame[];
+      if (restData) finalGames = restData;
+    }
+
+  } else {
+    // ====================================================================
+    // ORDENAÇÕES ALTERNATIVAS (Quando o usuário clica explicitly)
+    // ====================================================================
+    if (sortBy === 'achievements') baseQuery = baseQuery.order('total_achievements', { ascending: false });
+    else baseQuery = baseQuery.order('title', { ascending: true });
+
+    const { data: normalDataRaw, count: normalCount } = await baseQuery.range(offset, offset + ITEMS_PER_PAGE - 1);
+    finalGames = normalDataRaw as unknown as BaseGame[] || [];
+    totalItems = normalCount || 0;
+  }
+
   const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
   const hasNextPage = currentPage < totalPages;
   const hasPrevPage = currentPage > 1;
 
   const userProgressMap: Record<string, { unlocked: number, is_platinum: boolean, playtime_minutes: number }> = {};
-  if (user && games && games.length > 0) {
-    const gameIds = games.map(g => g.id);
+  if (user && finalGames.length > 0) {
+    const gameIds = finalGames.map(g => g.id);
     const { data: progressData } = await supabase
       .from('user_games')
       .select('game_id, unlocked_achievements, is_platinum, playtime_minutes')
@@ -89,10 +172,10 @@ export default async function GamesLibraryPage({ searchParams }: GamesLibraryPro
   const buildUrl = (updates: Record<string, string | null>) => {
     const sp = new URLSearchParams();
     if (searchQuery) sp.set('q', searchQuery);
-    if (sortBy !== 'name') sp.set('sort', sortBy);
+    if (sortBy !== 'progress') sp.set('sort', sortBy); // Não suja a URL se for o padrão
     if (currentPlatform !== 'Steam') sp.set('platform', currentPlatform);
     if (currentCategory) sp.set('category', currentCategory);
-    if (currentConsole) sp.set('console', currentConsole); // 🔥 PRESERVA NA URL
+    if (currentConsole) sp.set('console', currentConsole);
     if (currentPage !== 1) sp.set('page', currentPage.toString());
 
     Object.entries(updates).forEach(([key, val]) => {
@@ -123,45 +206,13 @@ export default async function GamesLibraryPage({ searchParams }: GamesLibraryPro
           </div>
 
           <div className="bg-surface/30 p-4 md:p-5 rounded-2xl md:rounded-3xl border border-white/5 shadow-inner">
-            <div className="flex items-center justify-between mb-3 md:mb-4">
-              <h3 className="text-xs md:text-sm font-black text-gray-400 uppercase tracking-widest">Plataforma</h3>
-            </div>
-            <div className="space-y-2">
-              {PLATFORMS.map((plat) => (
-                <Link
-                  key={plat.id}
-                  href={`/games?platform=${plat.id}`}
-                  className={`flex items-center gap-3 px-4 py-2.5 md:py-3 rounded-xl font-bold text-sm transition-all ${currentPlatform === plat.id ? 'bg-primary/20 border border-primary/50 text-primary shadow-inner' : 'bg-background/50 border border-transparent text-gray-400 hover:text-white hover:bg-white/5'}`}
-                >
-                  <span className="text-lg">{plat.icon}</span> {plat.label}
-                </Link>
-              ))}
-            </div>
-          </div>
-
-          {/* 🔥 NOVO FILTRO DE CONSOLES (Só aparece se for PlayStation) */}
-          {currentPlatform === 'PlayStation' && (
-            <div className="bg-surface/30 p-4 md:p-5 rounded-2xl md:rounded-3xl border border-white/5 shadow-inner">
-              <div className="flex items-center justify-between mb-3 md:mb-4">
-                <h3 className="text-xs md:text-sm font-black text-gray-400 uppercase tracking-widest flex items-center gap-2"><FaTv /> Console</h3>
-              </div>
-              <div className="flex flex-col gap-2">
-                <Link href={buildUrl({ console: null, page: '1' })} className={`px-4 py-2.5 rounded-xl font-bold text-sm transition-all ${!currentConsole ? 'bg-primary/20 border border-primary/50 text-primary shadow-inner' : 'bg-background/50 border border-transparent text-gray-400 hover:text-white hover:bg-white/5'}`}>
-                  Todos
-                </Link>
-                <Link href={buildUrl({ console: 'PS5', page: '1' })} className={`px-4 py-2.5 rounded-xl font-bold text-sm transition-all ${currentConsole === 'PS5' ? 'bg-blue-500/20 border border-blue-500/50 text-blue-400 shadow-inner' : 'bg-background/50 border border-transparent text-gray-400 hover:text-white hover:bg-white/5'}`}>
-                  PlayStation 5
-                </Link>
-                <Link href={buildUrl({ console: 'PS4', page: '1' })} className={`px-4 py-2.5 rounded-xl font-bold text-sm transition-all ${currentConsole === 'PS4' ? 'bg-blue-500/20 border border-blue-500/50 text-blue-400 shadow-inner' : 'bg-background/50 border border-transparent text-gray-400 hover:text-white hover:bg-white/5'}`}>
-                  PlayStation 4 / 3
-                </Link>
-              </div>
-            </div>
-          )}
-
-          <div className="bg-surface/30 p-4 md:p-5 rounded-2xl md:rounded-3xl border border-white/5 shadow-inner">
             <h3 className="text-xs md:text-sm font-black text-gray-400 uppercase tracking-widest mb-3 md:mb-4">Ordenar Por</h3>
             <div className="flex flex-col gap-2">
+              {user && (
+                <Link href={buildUrl({ sort: 'progress', page: '1' })} className={`px-4 py-2.5 md:py-3 rounded-xl font-bold text-sm flex items-center gap-2 transition-all ${sortBy === 'progress' ? 'bg-orange-500/20 border border-orange-500/50 text-orange-400 shadow-inner' : 'bg-background/50 border border-transparent text-gray-400 hover:text-white hover:bg-white/5'}`}>
+                  <FaFire className={sortBy === 'progress' ? 'text-orange-400' : 'text-gray-500'} /> Meu Progresso
+                </Link>
+              )}
               <Link href={buildUrl({ sort: 'name', page: '1' })} className={`px-4 py-2.5 md:py-3 rounded-xl font-bold text-sm transition-all ${sortBy === 'name' ? 'bg-primary/20 border border-primary/50 text-primary shadow-inner' : 'bg-background/50 border border-transparent text-gray-400 hover:text-white hover:bg-white/5'}`}>
                 A-Z (Alfabética)
               </Link>
@@ -170,6 +221,25 @@ export default async function GamesLibraryPage({ searchParams }: GamesLibraryPro
               </Link>
             </div>
           </div>
+
+          <div className="bg-surface/30 p-4 md:p-5 rounded-2xl md:rounded-3xl border border-white/5 shadow-inner">
+            <div className="flex items-center justify-between mb-3 md:mb-4">
+              <h3 className="text-xs md:text-sm font-black text-gray-400 uppercase tracking-widest">Plataforma</h3>
+            </div>
+            <div className="space-y-2">
+              {PLATFORMS.map((plat) => (
+                <Link
+                  key={plat.id}
+                  href={buildUrl({ platform: plat.id, page: '1' })}
+                  className={`flex items-center gap-3 px-4 py-2.5 md:py-3 rounded-xl font-bold text-sm transition-all ${currentPlatform === plat.id ? 'bg-primary/20 border border-primary/50 text-primary shadow-inner' : 'bg-background/50 border border-transparent text-gray-400 hover:text-white hover:bg-white/5'}`}
+                >
+                  <span className="text-lg">{plat.icon}</span> {plat.label}
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          <ConsoleFilter currentPlatform={currentPlatform} currentConsole={currentConsole} buildUrl={buildUrl} />
 
           {uniqueCategories.length > 0 && (
             <div className="bg-surface/30 p-4 md:p-5 rounded-2xl md:rounded-3xl border border-white/5 shadow-inner">
@@ -192,17 +262,11 @@ export default async function GamesLibraryPage({ searchParams }: GamesLibraryPro
         </aside>
 
         <main className="lg:col-span-3">
-          {games && games.length > 0 ? (
+          {finalGames && finalGames.length > 0 ? (
             <div className="space-y-6 md:space-y-10">
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 md:gap-6">
-                {games.map((game) => (
+                {finalGames.map((game) => (
                   <div key={game.id} className="relative group">
-                    {/* 🔥 EXIBE A TAG DO CONSOLE NA CARTA! */}
-                    {game.console && (
-                      <div className="absolute top-2 left-2 z-20 bg-black/80 backdrop-blur text-[10px] font-black px-2 py-1 rounded border border-white/10 shadow-lg text-white uppercase pointer-events-none">
-                        {game.console}
-                      </div>
-                    )}
                     <FlipGameCard
                       game={game}
                       progress={userProgressMap[game.id] || null}
