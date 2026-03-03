@@ -113,7 +113,7 @@ export default function QuestsModal() {
           ) : (
             <div className="flex flex-col items-center text-gray-600">
               <GiLockedChest className="text-3xl mb-1 opacity-40" />
-              <span className="text-[9px] font-black uppercase tracking-widest">{pct}%</span>
+              <span className="text-[9px] font-black uppercase tracking-widest">{pct.toFixed(2)}%</span>
             </div>
           )}
         </div>
