@@ -2,6 +2,8 @@ import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import AdminClientPage from "./AdminClientPage";
 import { Metadata } from "next";
+import { MdAdminPanelSettings } from "react-icons/md";
+import { IoLogoGameControllerB, IoMdBook, IoMdFlash, IoMdPeople } from "react-icons/io";
 
 export const metadata: Metadata = {
   title: "Administração | Nexus Achievements",
@@ -29,6 +31,7 @@ export default async function AdminPage() {
   // Estatísticas Rápidas
   const { count: totalUsers } = await supabase.from('users').select('*', { count: 'exact', head: true });
   const { count: totalGuides } = await supabase.from('game_guides').select('*', { count: 'exact', head: true });
+  const { count: totalGames } = await supabase.from('games').select('*', { count: 'exact', head: true });
 
   // 2. Removemos o 'any[]' e usamos a nova interface 'ReportData[]'
   let pendingReports: ReportData[] = [];
@@ -58,7 +61,7 @@ export default async function AdminPage() {
 
         <div className="flex flex-col md:flex-row items-center md:items-start gap-6 relative z-10 text-center md:text-left">
           <div className="w-20 h-20 bg-linear-to-br from-red-500/20 to-red-900/20 text-red-500 rounded-3xl flex items-center justify-center text-4xl border border-red-500/30 shadow-[0_0_30px_rgba(239,68,68,0.2)] shrink-0">
-            🛡️
+            <MdAdminPanelSettings />
           </div>
           <div>
             <h1 className="text-4xl md:text-5xl font-black text-white tracking-tighter uppercase drop-shadow-md">
@@ -72,21 +75,27 @@ export default async function AdminPage() {
       </div>
 
       {/* ESTATÍSTICAS GAMIFICADAS */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="bg-surface/40 p-8 rounded-4xl border border-white/5 shadow-xl relative overflow-hidden group hover:border-primary/30 transition-colors">
-          <div className="absolute top-4 right-4 text-5xl opacity-10 group-hover:scale-110 group-hover:opacity-20 transition-all duration-500">👥</div>
+          <div className="absolute top-4 right-4 text-4xl opacity-10 group-hover:scale-110 group-hover:opacity-20 transition-all duration-500"><IoLogoGameControllerB /></div>
+          <p className="text-gray-500 text-[11px] font-black uppercase tracking-[0.2em] mb-2">Total de Jogos</p>
+          <p className="text-4xl font-black text-white">{totalGames || 0} <span className="text-sm font-bold text-gray-500">Jogos</span></p>
+        </div>
+
+        <div className="bg-surface/40 p-8 rounded-4xl border border-white/5 shadow-xl relative overflow-hidden group hover:border-primary/30 transition-colors">
+          <div className="absolute top-4 right-4 text-4xl opacity-10 group-hover:scale-110 group-hover:opacity-20 transition-all duration-500"><IoMdPeople /></div>
           <p className="text-gray-500 text-[11px] font-black uppercase tracking-[0.2em] mb-2">População Total</p>
           <p className="text-4xl font-black text-white">{totalUsers || 0} <span className="text-sm font-bold text-gray-500">Caçadores</span></p>
         </div>
 
         <div className="bg-surface/40 p-8 rounded-4xl border border-white/5 shadow-xl relative overflow-hidden group hover:border-purple-500/30 transition-colors">
-          <div className="absolute top-4 right-4 text-5xl opacity-10 group-hover:scale-110 group-hover:opacity-20 transition-all duration-500">📚</div>
+          <div className="absolute top-4 right-4 text-4xl opacity-10 group-hover:scale-110 group-hover:opacity-20 transition-all duration-500"><IoMdBook /></div>
           <p className="text-gray-500 text-[11px] font-black uppercase tracking-[0.2em] mb-2">Biblioteca</p>
           <p className="text-4xl font-black text-white">{totalGuides || 0} <span className="text-sm font-bold text-gray-500">Guias</span></p>
         </div>
 
         <div className="bg-red-500/5 p-8 rounded-4xl border-2 border-red-500/20 shadow-[0_0_20px_rgba(239,68,68,0.05)] relative overflow-hidden">
-          <div className="absolute top-4 right-4 text-5xl opacity-10">⚡</div>
+          <div className="absolute top-4 right-4 text-4xl opacity-10"><IoMdFlash /></div>
           <p className="text-red-500/80 text-[11px] font-black uppercase tracking-[0.2em] mb-2 flex items-center gap-2">
             <span className="relative flex h-2.5 w-2.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
@@ -94,7 +103,7 @@ export default async function AdminPage() {
             </span>
             Estado do Sistema
           </p>
-          <p className="text-4xl font-black text-red-400 tracking-tight">Operacional</p>
+          <p className="text-3xl font-black text-red-400 tracking-tight">Operacional</p>
         </div>
       </div>
 
