@@ -40,13 +40,13 @@ export default async function SocialPage({ searchParams }: SocialPageProps) {
     const followingIds = follows?.map(f => f.following_id) || [];
 
     if (followingIds.length > 0) {
-      const { data } = await supabase.from("global_activity").select(querySelect).in('user_id', followingIds).order("created_at", { ascending: false }).limit(100);
+      const { data } = await supabase.from("global_activity").select(querySelect).in('user_id', followingIds).order("created_at", { ascending: false }).limit(30);
       activities = data as unknown as GlobalActivity[] || [];
     } else {
       isFollowingNoOne = true;
     }
   } else {
-    const { data } = await supabase.from("global_activity").select(querySelect).order("created_at", { ascending: false }).limit(100);
+    const { data } = await supabase.from("global_activity").select(querySelect).order("created_at", { ascending: false }).limit(30);
     activities = data as unknown as GlobalActivity[] || [];
   }
 
