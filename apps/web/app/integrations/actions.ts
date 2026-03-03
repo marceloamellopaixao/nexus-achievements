@@ -2,6 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { createClient as createSupabaseAdmin } from '@supabase/supabase-js'
 
 interface SteamGame {
   appid: number;
@@ -32,6 +33,19 @@ interface SteamGlobalPercentage {
 const SGDB_KEY = process.env.STEAMGRIDDB_API_KEY;
 
 // ==========================================
+// 0. HELPER: SE O ADMIN ESTVER LOGADO, ELE PODE USAR O SUPABASE ADMIN CLIENT PARA OPERAÇÕES CRÍTICAS
+// ==========================================
+async function getDbClient(adminOverrideUserId?: string) {
+  if (adminOverrideUserId) {
+    return createSupabaseAdmin(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    )
+  }
+
+  return await createClient();
+}
+
 // 1. SISTEMA DE BUSCA SGDB COM LOGS
 // ==========================================
 async function getBackupImage(appId: string, type: 'grids' | 'heroes' | 'logos') {
@@ -42,17 +56,17 @@ async function getBackupImage(appId: string, type: 'grids' | 'heroes' | 'logos')
 
   try {
     let url = `https://www.steamgriddb.com/api/v2/${type}/steam/${appId}`;
-    if (type === 'grids') url += '?dimensions=600x900'; 
-    else if (type === 'heroes') url += '?dimensions=1920x620'; 
+    if (type === 'grids') url += '?dimensions=600x900';
+    else if (type === 'heroes') url += '?dimensions=1920x620';
 
     const response = await fetch(url, { headers: { 'Authorization': `Bearer ${SGDB_KEY}` } });
     const resData = await response.json();
 
     if (resData.success && resData.data && resData.data.length > 0) {
       console.log(`   ↳ 🖼️ [SGDB] Arte premium encontrada (${type}).`);
-      return resData.data[0].url; 
+      return resData.data[0].url;
     }
-    
+
     console.log(`   ↳ 🖼️ [SGDB] Nenhuma arte encontrada para ${appId} (${type}). Usando fallback.`);
     return null;
   } catch (err) {
@@ -64,12 +78,9 @@ async function getBackupImage(appId: string, type: 'grids' | 'heroes' | 'logos')
 // ==========================================
 // 2. VINCULAÇÃO DE CONTA STEAM
 // ==========================================
-// ==========================================
-// 2. VINCULAÇÃO DE CONTA STEAM
-// ==========================================
 export async function saveSteamId(steamId: string) {
   console.log(`\n🔗 [STEAM-LINK] Iniciando vinculação para ID: ${steamId}`);
-  
+
   // 🔥 PROTEÇÃO SÊNIOR: Impede nomes customizados e garante o ID64 numérico de 17 dígitos
   if (!/^\d{17}$/.test(steamId)) {
     console.error(`❌ [STEAM-LINK] Erro: Formato inválido. Não é uma SteamID64.`);
@@ -83,9 +94,9 @@ export async function saveSteamId(steamId: string) {
     return { error: 'Não autorizado.' }
   }
 
-  let steamUsername = steamId; 
+  let steamUsername = steamId;
   const STEAM_KEY = process.env.STEAM_API_KEY;
-  
+
   if (STEAM_KEY) {
     try {
       console.log(`   ↳ 🌐 Buscando Nickname na API da Steam...`);
@@ -123,15 +134,24 @@ export async function saveSteamId(steamId: string) {
 }
 
 // ==========================================
-// 3. BUSCA DE LISTA DE JOGOS (BLINDADA CONTRA ERROS HTML)
+// 3. BUSCA DE LISTA DE JOGOS
 // ==========================================
-export async function fetchSteamGamesList() {
+export async function fetchSteamGamesList(adminOverrideUserId?: string) {
   console.log(`\n📚 [STEAM-SYNC] Iniciando busca da Biblioteca...`);
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Não autorizado.' }
+  const supabase = await getDbClient()
+  let userId = adminOverrideUserId;
 
-  const { data: userData } = await supabase.from('users').select('steam_id').eq('id', user.id).single()
+  if (!userId) {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      console.error(`❌ [STEAM-SYNC]: Usuário não autenticado.`);
+      return { error: 'Não autorizado.' }
+    }
+
+    userId = user.id;
+  }
+
+  const { data: userData } = await supabase.from('users').select('steam_id').eq('id', userId).single()
   if (!userData?.steam_id) return { error: 'Nenhuma Steam ID vinculada.' }
 
   const STEAM_KEY = process.env.STEAM_API_KEY
@@ -144,10 +164,9 @@ export async function fetchSteamGamesList() {
       fetch(`http://api.steampowered.com/IPlayerService/GetRecentlyPlayedGames/v0001/?key=${STEAM_KEY}&steamid=${steamId}&format=json`)
     ])
 
-    // 🔥 BLINDAGEM: Se a Steam devolver um erro 403, 404 ou 500 (HTML), nós paramos aqui com segurança!
     if (!ownedRes.ok || !recentRes.ok) {
-        console.error(`❌ [STEAM-SYNC] Erro da API da Steam. Status: ${ownedRes.status} / ${recentRes.status}`);
-        return { error: 'O perfil da Steam é privado ou a chave da API é inválida.' }
+      console.error(`❌ [STEAM-SYNC] Erro da API da Steam. Status: ${ownedRes.status} / ${recentRes.status}`);
+      return { error: 'O perfil da Steam é privado ou a chave da API é inválida.' }
     }
 
     const ownedData = await ownedRes.json()
@@ -165,19 +184,28 @@ export async function fetchSteamGamesList() {
 
     console.log(`✅ [STEAM-SYNC] Biblioteca carregada. ${finalGamesList.length} jogos encontrados com tempo de jogo.`);
     return { games: finalGamesList, steamId }
-  } catch (err) { 
+  } catch (err) {
     console.error(`❌ [STEAM-SYNC] Falha ao buscar a biblioteca na Steam:`, err);
-    return { error: 'Falha ao buscar dados na Steam.' } 
+    return { error: 'Falha ao buscar dados na Steam.' }
   }
 }
 
 // ==========================================
 // 4. PROCESSAMENTO INDIVIDUAL (COM COLUNA CONSOLE)
 // ==========================================
-export async function processSingleGame(game: SteamGame, steamId: string) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { coins: 0, plats: 0 }
+export async function processSingleGame(game: SteamGame, steamId: string, adminOverrideUserId?: string) {
+  const supabase = await getDbClient()
+  let userId = adminOverrideUserId;
+
+  if (!userId) {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      console.error(`❌ [STEAM-SYNC]: Usuário não autenticado.`);
+      return { coins: 0, plats: 0 }
+    }
+
+    userId = user.id;
+  }
 
   const STEAM_KEY = process.env.STEAM_API_KEY
   const appId = game.appid.toString()
@@ -189,7 +217,7 @@ export async function processSingleGame(game: SteamGame, steamId: string) {
   try {
     const res = await fetch(`http://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v0001/?appid=${appId}&key=${STEAM_KEY}&steamid=${steamId}&l=brazilian`)
     if (!res.ok) return { coins: 0, plats: 0 }; // Proteção anti-HTML
-    
+
     const data = await res.json()
     if (!data?.playerstats?.success) return { coins: 0, plats: 0 }
 
@@ -225,19 +253,22 @@ export async function processSingleGame(game: SteamGame, steamId: string) {
       }
     }
 
-    // 🔥 ADICIONADO: console: 'PC'
     await supabase.from('games').upsert({
-      id: steamGameId, title: game.name, cover_url: coverUrl, banner_url: bannerUrl, total_achievements: totalCount, platform: 'Steam', categories: gameCategories, console: 'PC'
+      id: steamGameId, title: game.name, cover_url: coverUrl, banner_url: bannerUrl, total_achievements: totalCount,
+      platform: 'Steam', categories: gameCategories, console: 'PC'
     }, { onConflict: 'id' })
 
-    const { data: existingRecord } = await supabase.from('user_games').select('id, unlocked_achievements, is_platinum').eq('user_id', user.id).eq('game_id', steamGameId).maybeSingle()
+    const { data: existingRecord } = await supabase
+      .from('user_games').select('id, unlocked_achievements, is_platinum')
+      .eq('user_id', userId).eq('game_id', steamGameId).maybeSingle()
+
     const previousUnlocked = existingRecord?.unlocked_achievements || 0
     const wasPlat = existingRecord?.is_platinum || false
 
     if (existingRecord) {
       await supabase.from('user_games').update({ playtime_minutes: game.playtime_forever, unlocked_achievements: unlockedCount, total_achievements: totalCount, is_platinum: isPlat, platinum_unlocked_at: platinumUnlockedAt }).eq('id', existingRecord.id)
     } else {
-      await supabase.from('user_games').insert({ user_id: user.id, game_id: steamGameId, playtime_minutes: game.playtime_forever, unlocked_achievements: unlockedCount, total_achievements: totalCount, is_platinum: isPlat, platinum_unlocked_at: platinumUnlockedAt })
+      await supabase.from('user_games').insert({ user_id: userId, game_id: steamGameId, playtime_minutes: game.playtime_forever, unlocked_achievements: unlockedCount, total_achievements: totalCount, is_platinum: isPlat, platinum_unlocked_at: platinumUnlockedAt })
     }
 
     let gameCoinsEarned = 0;
@@ -264,7 +295,7 @@ export async function processSingleGame(game: SteamGame, steamId: string) {
         parsedAchievements.push({ ...ach, rarity, pts });
       }
 
-      const { data: pastActivities } = await supabase.from('global_activity').select('points_earned, rarity').eq('user_id', user.id).eq('game_id', steamGameId);
+      const { data: pastActivities } = await supabase.from('global_activity').select('points_earned, rarity').eq('user_id', userId).eq('game_id', steamGameId);
       let alreadyRegisteredCoins = 0;
       pastActivities?.forEach(act => { if (act.rarity !== 'platinum') alreadyRegisteredCoins += act.points_earned; });
 
@@ -285,7 +316,7 @@ export async function processSingleGame(game: SteamGame, steamId: string) {
 
         for (const ach of newOnes) {
           activitiesToInsert.push({
-            user_id: user.id, game_id: steamGameId, game_name: game.name,
+            user_id: userId, game_id: steamGameId, game_name: game.name,
             achievement_name: schemaMap.get(ach.apiname)?.displayName || ach.apiname,
             achievement_icon: schemaMap.get(ach.apiname)?.icon || null,
             rarity: ach.rarity, points_earned: ach.pts, platform: 'Steam', created_at: new Date(ach.unlocktime * 1000).toISOString()
@@ -297,7 +328,7 @@ export async function processSingleGame(game: SteamGame, steamId: string) {
       if (isPlat && !wasPlat) {
         gamePlatsEarned += 1; gameCoinsEarned += 100;
         await supabase.from('global_activity').insert({
-          user_id: user.id, game_id: steamGameId, game_name: game.name, achievement_name: '🏆 PLATINOU O JOGO!',
+          user_id: userId, game_id: steamGameId, game_name: game.name, achievement_name: '🏆 PLATINOU O JOGO!',
           achievement_icon: 'platinum_ps5', rarity: 'platinum', points_earned: 100, platform: 'Steam', created_at: platinumUnlockedAt || new Date().toISOString()
         })
       }
@@ -312,24 +343,30 @@ export async function processSingleGame(game: SteamGame, steamId: string) {
 // ==========================================
 // 5. FINALIZAÇÃO DA SINCRONIZAÇÃO
 // ==========================================
-export async function finalizeSync(totalCoinsEarned: number, totalPlatsEarned: number, totalGamesCount: number) {
+export async function finalizeSync(totalCoinsEarned: number, totalPlatsEarned: number, totalGamesCount: number, adminOverrideUserId?: string) {
   console.log(`\n========================================================`);
   console.log(`🏁 [FINALIZAÇÃO] Salvando Totais Finais do Usuário...`);
   console.log(`   ↳ 💰 Total Nexus Coins: +${totalCoinsEarned}`);
   console.log(`   ↳ 🏆 Total Platinas: +${totalPlatsEarned}`);
-  
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return
 
-  const { data: userData } = await supabase.from('users').select('nexus_coins, total_platinums, total_games').eq('id', user.id).single()
+  const supabase = await getDbClient(adminOverrideUserId)
+  let userId = adminOverrideUserId;
+
+  if (!userId) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    userId = user.id;
+  }
+
+  const { data: userData } = await supabase.from('users').select('nexus_coins, total_platinums, total_games').eq('id', userId).single()
 
   const { error } = await supabase.from('users').update({
-    nexus_coins: (userData?.nexus_coins || 0) + totalCoinsEarned, 
-    total_platinums: (userData?.total_platinums || 0) + totalPlatsEarned, 
+    nexus_coins: (userData?.nexus_coins || 0) + totalCoinsEarned,
+    total_platinums: (userData?.total_platinums || 0) + totalPlatsEarned,
     total_games: totalGamesCount > 0 ? totalGamesCount : (userData?.total_games || 0),
     last_steam_sync: new Date().toISOString()
-  }).eq('id', user.id)
+  }).eq('id', userId)
 
   if (error) console.error(`❌ [FINALIZAÇÃO] Erro ao salvar saldo final no banco:`, error);
   else console.log(`✅ [FINALIZAÇÃO] Saldo gravado com sucesso! Cofre do Nexus fechado.`);
@@ -350,7 +387,7 @@ export async function linkPlatformAccount(platform: string, platformUserId: stri
     console.error(`❌ Erro: Usuário não autenticado.`);
     return { error: 'Não autorizado.' }
   }
-  
+
   if (!platformUserId.trim()) {
     console.error(`❌ Erro: ID de usuário vazia.`);
     return { error: 'ID de usuário inválida.' }
@@ -365,14 +402,17 @@ export async function linkPlatformAccount(platform: string, platformUserId: stri
 
   if (existing) {
     console.log(`   ↳ Atualizando registro existente...`);
-    const { error } = await supabase.from('linked_accounts').update({ platform_user_id: platformUserId.trim(), platform_username: platformUserId.trim() }).eq('id', existing.id)
+    const { error } = await supabase.from('linked_accounts')
+      .update({ platform_user_id: platformUserId.trim(), platform_username: platformUserId.trim() })
+      .eq('id', existing.id)
     if (error) return { error: 'Erro ao atualizar conta.' }
   } else {
     console.log(`   ↳ Criando novo registro de conta...`);
-    const { error } = await supabase.from('linked_accounts').insert({ user_id: user.id, platform, platform_user_id: platformUserId.trim(), platform_username: platformUserId.trim() })
+    const { error } = await supabase.from('linked_accounts')
+      .insert({ user_id: user.id, platform, platform_user_id: platformUserId.trim(), platform_username: platformUserId.trim() })
     if (error) return { error: 'Erro ao vincular conta.' }
   }
-  
+
   console.log(`✅ [PLATFORM-LINK] Sucesso!`);
   revalidatePath('/integrations')
   revalidatePath('/profile', 'layout')
