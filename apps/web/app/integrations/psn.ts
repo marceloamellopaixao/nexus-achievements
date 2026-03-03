@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
+import { createClient as createSupabaseAdmin } from '@supabase/supabase-js'
 import {
     exchangeNpssoForAccessCode,
     exchangeAccessCodeForAuthTokens,
@@ -13,7 +14,7 @@ import {
 
 export interface TitleThin {
     npCommunicationId: string;
-    npServiceName: "trophy" | "trophy2" | string; 
+    npServiceName: "trophy" | "trophy2" | string;
     trophyTitleName: string;
     trophyTitleIconUrl: string;
     progress: number;
@@ -34,8 +35,6 @@ interface PsnTrophyDef {
     trophyName?: string;
     trophyIconUrl?: string;
 }
-
-// 🔥 Criamos a interface para as Conquistas para banir o "any" do ESLint
 interface ActivityInsert {
     user_id: string;
     game_id: string;
@@ -48,10 +47,24 @@ interface ActivityInsert {
     created_at: string;
 }
 
-export async function fetchPlayStationGamesList(platformUserId: string) {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return { error: 'Não autorizado.' }
+async function getDbClient(adminOverrideUserId?: string) {
+    if (adminOverrideUserId) {
+        return createSupabaseAdmin(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!
+        )
+    }
+
+    return await createClient();
+}
+
+export async function fetchPlayStationGamesList(platformUserId: string, adminOverrideUserId?: string) {
+    const supabase = await getDbClient(adminOverrideUserId);
+
+    if (!adminOverrideUserId) {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { error: 'Não autorizado.' }
+    }
 
     const npsso = process.env.PSN_NPSSO_TOKEN
     if (!npsso) {
@@ -102,9 +115,9 @@ export async function fetchPlayStationGamesList(platformUserId: string) {
         const allTrophyTitles: TitleThin[] = [];
         let currentOffset = 0;
         const limitPerPage = 250;
-        
+
         console.log(`   ↳ 📚 Puxando Biblioteca de Jogos da PSN (Todas as páginas)...`);
-        
+
         while (true) {
             const response = await getUserTitles(authorization, accountId, { limit: limitPerPage, offset: currentOffset })
             const titles = (response.trophyTitles || []) as unknown as TitleThin[];
@@ -119,11 +132,11 @@ export async function fetchPlayStationGamesList(platformUserId: string) {
         }
 
         console.log(`   ↳ ✅ Encontrados ${allTrophyTitles.length} jogos!\n`);
-        
-        return { 
-            games: allTrophyTitles, 
-            accountId, 
-            accessToken: authorization.accessToken 
+
+        return {
+            games: allTrophyTitles,
+            accountId,
+            accessToken: authorization.accessToken
         }
 
     } catch (err) {
@@ -132,20 +145,22 @@ export async function fetchPlayStationGamesList(platformUserId: string) {
     }
 }
 
-export async function processSinglePlayStationGame(title: TitleThin, accountId: string, accessToken: string) {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return { coins: 0, plats: 0 }
+export async function processSinglePlayStationGame(title: TitleThin, accountId: string, accessToken: string, adminOverrideUserId?: string) {
+    const supabase = await getDbClient();
+    let userId = adminOverrideUserId;
+
+    if (!userId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return { coins: 0, plats: 0 };
+        userId = user.id;
+    }
 
     try {
         if (title.progress === 0) return { coins: 0, plats: 0 };
 
         const gameId = `psn-${title.npCommunicationId}`
         const npServiceName: "trophy" | "trophy2" = title.npServiceName === 'trophy2' ? 'trophy2' : 'trophy';
-        
-        // INTELIGÊNCIA DE CONSOLE: 'trophy2' é a arquitetura exclusiva do PS5
         const platformConsole = npServiceName === 'trophy2' ? 'PS5' : 'PS4';
-
         const earned = title.earnedTrophies
         const defined = title.definedTrophies
 
@@ -158,7 +173,7 @@ export async function processSinglePlayStationGame(title: TitleThin, accountId: 
         console.log(`   ↳ Progresso: ${unlockedCount}/${totalCount} (${title.progress}%) | Platinado: ${isPlat ? 'Sim 🏆' : 'Não'}`);
 
         console.log(`   ↳ 🔍 Verificando e preservando Cache de Imagens do Nexus...`);
-        
+
         const { data: existingGameData } = await supabase.from('games').select('cover_url, banner_url, categories').eq('id', gameId).maybeSingle();
         const finalCover = existingGameData?.cover_url || title.trophyTitleIconUrl;
         const finalBanner = existingGameData?.banner_url || title.trophyTitleIconUrl;
@@ -174,18 +189,18 @@ export async function processSinglePlayStationGame(title: TitleThin, accountId: 
             categories: existingGameData?.categories || []
         }, { onConflict: 'id' })
 
-        const { data: existingRecord } = await supabase.from('user_games').select('unlocked_achievements, is_platinum').eq('user_id', user.id).eq('game_id', gameId).maybeSingle()
-        
+        const { data: existingRecord } = await supabase.from('user_games').select('unlocked_achievements, is_platinum').eq('user_id', userId).eq('game_id', gameId).maybeSingle()
+
         const previousUnlocked = existingRecord?.unlocked_achievements || 0
         const wasPlat = existingRecord?.is_platinum || false
 
         if (existingRecord) {
             await supabase.from('user_games').update({
                 unlocked_achievements: unlockedCount, total_achievements: totalCount, is_platinum: isPlat
-            }).eq('user_id', user.id).eq('game_id', gameId)
+            }).eq('user_id', userId).eq('game_id', gameId)
         } else {
             await supabase.from('user_games').insert({
-                user_id: user.id, game_id: gameId, unlocked_achievements: unlockedCount, total_achievements: totalCount, is_platinum: isPlat
+                user_id: userId, game_id: gameId, unlocked_achievements: unlockedCount, total_achievements: totalCount, is_platinum: isPlat
             })
         }
 
@@ -194,9 +209,9 @@ export async function processSinglePlayStationGame(title: TitleThin, accountId: 
 
         const { data: pastActivities } = await supabase.from('global_activity')
             .select('points_earned, rarity, achievement_name')
-            .eq('user_id', user.id)
+            .eq('user_id', userId)
             .eq('game_id', gameId);
-            
+
         let alreadyRegisteredCoins = 0;
         let individualTrophiesSaved = 0;
         const pastSet = new Set(pastActivities?.map(a => a.achievement_name) || []);
@@ -212,7 +227,7 @@ export async function processSinglePlayStationGame(title: TitleThin, accountId: 
 
         const expectedBaseCoins = (earned.bronze * 5) + (earned.silver * 10) + (earned.gold * 25);
         const coinsToAward = expectedBaseCoins - alreadyRegisteredCoins;
-        
+
         const expectedIndividualTrophies = unlockedCount - (isPlat ? 1 : 0);
         const isMissingVisualTrophies = individualTrophiesSaved < expectedIndividualTrophies;
 
@@ -221,23 +236,23 @@ export async function processSinglePlayStationGame(title: TitleThin, accountId: 
         console.log(`      • Troféus REAIS na timeline: ${individualTrophiesSaved} / Total devido: ${expectedIndividualTrophies}`);
 
         if (coinsToAward > 0 || unlockedCount > previousUnlocked || isMissingVisualTrophies) {
-            
+
             let usedFallback = false;
 
             try {
                 const authorization = { accessToken } as AuthTokens;
                 type AuthParamTitle = Parameters<typeof getTitleTrophies>[0];
-                
+
                 const titleTrophiesData = await getTitleTrophies(authorization as unknown as AuthParamTitle, title.npCommunicationId, 'all', { npServiceName });
                 const availableTrophies = titleTrophiesData?.trophies || [];
                 const defsMap = new Map();
-                
+
                 availableTrophies.forEach((t: PsnTrophyDef) => defsMap.set(t.trophyId, t));
 
                 type AuthParamUser = Parameters<typeof getUserTrophiesEarnedForTitle>[0];
                 const earnedTrophiesData = await getUserTrophiesEarnedForTitle(authorization as unknown as AuthParamUser, accountId, title.npCommunicationId, 'all', { npServiceName });
                 const earnedTrophiesList = earnedTrophiesData?.trophies || [];
-                
+
                 // 🔥 RESOLUÇÃO: array tipado corretamente usando a interface
                 const activitiesToInsert: ActivityInsert[] = [];
 
@@ -247,14 +262,14 @@ export async function processSinglePlayStationGame(title: TitleThin, accountId: 
                         if (!def) continue;
 
                         let pts = 0;
-                        const rarity = def.trophyType; 
+                        const rarity = def.trophyType;
                         if (rarity === 'bronze') pts = 5;
                         else if (rarity === 'silver') pts = 10;
                         else if (rarity === 'gold') pts = 25;
                         else if (rarity === 'platinum') pts = 100;
 
                         activitiesToInsert.push({
-                            user_id: user.id, game_id: gameId, game_name: title.trophyTitleName,
+                            user_id: userId, game_id: gameId, game_name: title.trophyTitleName,
                             achievement_name: def.trophyName || 'Troféu Oculto',
                             achievement_icon: def.trophyIconUrl || title.trophyTitleIconUrl,
                             rarity: rarity, points_earned: pts, platform: 'PlayStation',
@@ -264,13 +279,13 @@ export async function processSinglePlayStationGame(title: TitleThin, accountId: 
                 }
 
                 const newActivities = activitiesToInsert.filter(a => !pastSet.has(a.achievement_name));
-                
+
                 if (newActivities.length > 0) {
                     console.log(`   ↳ 🌐 Gravando metadados das conquistas novas (Nomes e Ícones)...`);
-                    
+
                     if (isMissingVisualTrophies) {
                         await supabase.from('global_activity').delete()
-                            .eq('user_id', user.id).eq('game_id', gameId).like('achievement_name', 'Pacote de Troféus PSN%');
+                            .eq('user_id', userId).eq('game_id', gameId).like('achievement_name', 'Pacote de Troféus PSN%');
                         console.log(`   ↳ 🧹 [CURA] Pacote genérico deletado! Substituindo pelos troféus reais...`);
                     }
 
@@ -281,7 +296,6 @@ export async function processSinglePlayStationGame(title: TitleThin, accountId: 
                 }
 
             } catch (apiError) {
-                // 🔥 RESOLUÇÃO: O erro da API volta a ser logado corretamente e não é ignorado
                 console.warn(`   ↳ ⚠️ A Sony limitou ou falhou na entrega dos troféus individuais:`, apiError instanceof Error ? apiError.message : String(apiError));
                 usedFallback = true;
             }
@@ -289,7 +303,7 @@ export async function processSinglePlayStationGame(title: TitleThin, accountId: 
             if (usedFallback && coinsToAward > 0) {
                 console.log(`   ↳ 🛡️ Ativando Fallback do Nexus: Injetando pacote genérico para não perder as moedas!`);
                 await supabase.from('global_activity').insert({
-                    user_id: user.id, game_id: gameId, game_name: title.trophyTitleName,
+                    user_id: userId, game_id: gameId, game_name: title.trophyTitleName,
                     achievement_name: `Pacote de Troféus PSN (+${unlockedCount - previousUnlocked} Troféus)`,
                     achievement_icon: title.trophyTitleIconUrl, rarity: 'silver', points_earned: coinsToAward, platform: 'PlayStation'
                 });
@@ -304,14 +318,14 @@ export async function processSinglePlayStationGame(title: TitleThin, accountId: 
             console.log(`   ↳ 🏆 NOVA PLATINA REGISTRADA! Conta atualizada.`);
             gamePlatsEarned += 1;
             gameCoinsEarned += 100;
-            
+
             await supabase.from('global_activity').upsert({
-                user_id: user.id, game_id: gameId, game_name: title.trophyTitleName, achievement_name: '🏆 PLATINA CONQUISTADA!',
+                user_id: userId, game_id: gameId, game_name: title.trophyTitleName, achievement_name: '🏆 PLATINA CONQUISTADA!',
                 achievement_icon: 'platinum_ps5', rarity: 'platinum', points_earned: 100, platform: 'PlayStation',
                 created_at: new Date().toISOString()
             }, { onConflict: 'user_id, game_id, achievement_name' })
         }
-        
+
         if (gameCoinsEarned > 0 || gamePlatsEarned > 0) {
             console.log(`✅ [RESULTADO] 💰 Injetando: +${gameCoinsEarned} Nexus Coins | 🏆 Platinas: +${gamePlatsEarned}`);
         } else {
@@ -321,7 +335,6 @@ export async function processSinglePlayStationGame(title: TitleThin, accountId: 
         return { coins: gameCoinsEarned, plats: gamePlatsEarned }
 
     } catch (err) {
-        // 🔥 RESOLUÇÃO: Log do Erro Fatal de volta à ação
         console.error(`❌ [PSN] Erro Fatal no jogo ${title.trophyTitleName}:`, err instanceof Error ? err.message : String(err));
         return { coins: 0, plats: 0 }
     }
