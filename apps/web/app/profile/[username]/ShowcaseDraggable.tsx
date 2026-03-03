@@ -1,21 +1,21 @@
 'use client'
 
 import React, { useState, useEffect } from 'react';
-import { 
-  DndContext, 
-  closestCenter, 
-  KeyboardSensor, 
-  PointerSensor, 
-  useSensor, 
-  useSensors, 
-  DragEndEvent 
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent
 } from '@dnd-kit/core';
-import { 
-  arrayMove, 
-  SortableContext, 
-  sortableKeyboardCoordinates, 
-  rectSortingStrategy, 
-  useSortable 
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  rectSortingStrategy,
+  useSortable
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import FlipGameCard from "@/app/components/FlipGameCard";
@@ -48,27 +48,29 @@ interface ShowcaseDraggableProps {
 
 // 2. COMPONENTE DA CARTA COM FÍSICAS (Sem 'any')
 function SortableGameCard({ game, progress, backUrl, isOwner }: { game: ShowcaseGame, progress: GameProgress | null, backUrl: string, isOwner: boolean }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ 
-    id: game.id, 
-    disabled: !isOwner // Apenas o dono pode arrastar!
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: game.id,
+    disabled: !isOwner
   });
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    zIndex: isDragging ? 50 : 1, // Traz a carta para a frente ao arrastar
+    zIndex: isDragging ? 50 : 1,
   };
 
   return (
-    <div 
-      ref={setNodeRef} 
-      style={style} 
-      {...attributes} 
-      {...listeners} 
-      // Se for dono, o cursor vira uma "mãozinha". No telemóvel, touch-none impede que a tela desça ao arrastar a carta.
-      className={`relative ${isOwner ? 'cursor-grab active:cursor-grabbing touch-none' : ''} ${isDragging ? 'opacity-70 scale-105 shadow-2xl' : ''}`}
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      
+      className={`
+        relative ${isOwner ? 'cursor-grab active:cursor-grabbing touch-none' : ''} 
+        ${isDragging ? 'opacity-70 scale-105 shadow-2xl' : ''}`}
     >
-      {/* A div pointer-events-none quando arrasta impede que o link do Next.js dispare acidentalmente */}
+      
       <div className={isDragging ? 'pointer-events-none' : ''}>
         <FlipGameCard game={game} progress={progress} backUrl={backUrl} />
       </div>
@@ -95,12 +97,12 @@ export default function ShowcaseDraggable({ initialGames, userProgressMap, isOwn
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
-    
+
     // Se soltou num lugar válido e diferente da posição original
     if (over && active.id !== over.id) {
       const oldIndex = games.findIndex((g) => g.id === active.id);
       const newIndex = games.findIndex((g) => g.id === over.id);
-      
+
       // Reordena o Array Visualmente de Imediato (Sensação Instantânea)
       const newGamesOrder = arrayMove(games, oldIndex, newIndex);
       setGames(newGamesOrder);
@@ -118,11 +120,11 @@ export default function ShowcaseDraggable({ initialGames, userProgressMap, isOwn
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 w-full">
         <SortableContext items={games.map(g => g.id)} strategy={rectSortingStrategy}>
           {games.map((game) => (
-            <SortableGameCard 
-              key={game.id} 
-              game={game} 
-              progress={userProgressMap[game.id] || null} 
-              backUrl={backUrl} 
+            <SortableGameCard
+              key={game.id}
+              game={game}
+              progress={userProgressMap[game.id] || null}
+              backUrl={backUrl}
               isOwner={isOwner}
             />
           ))}
