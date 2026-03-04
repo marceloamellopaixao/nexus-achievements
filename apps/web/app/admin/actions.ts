@@ -15,13 +15,6 @@ function getAdminClient() {
     )
 }
 
-// 🔥 HELPER: MATEMÁTICA DE RPG (Injetado aqui para Admin também)
-function calculateLevel(totalCoins: number): number {
-    const baseRequirement = 25; 
-    const calculatedLevel = Math.floor(Math.sqrt(totalCoins / baseRequirement)) + 1;
-    return Math.max(1, calculatedLevel); 
-}
-
 // FUNÇÕES DE VERIFICAÇÃO DE PERMISSÕES
 async function checkAdmin() {
     const supabase = await createClient()
@@ -39,21 +32,19 @@ async function checkModerator() {
     return data?.role === 'moderator'
 }
 
-// 1. DISTRIBUIR MOEDAS PARA USUÁRIO ESPECÍFICO (COM LEVEL UP)
+// 1. DISTRIBUIR MOEDAS PARA USUÁRIO ESPECÍFICO (Apenas Saldo, Sem Level Up)
 export async function distributeCoinsToUser(username: string, amount: number) {
     if (!(await checkAdmin()) || amount <= 0) return { error: 'Não autorizado ou valor inválido.' }
 
     const adminDb = getAdminClient()
     
+    // Busca o ID do usuário e o saldo atual
     const { data: targetUser, error: userError } = await adminDb.from('users').select('id, nexus_coins').eq('username', username).single()
     if (userError || !targetUser) return { error: 'Usuário não encontrado.' }
 
-    const newCoins = (targetUser.nexus_coins || 0) + amount;
-    const newLevel = calculateLevel(newCoins); // 🔥 Calcula o novo nível
-
+    // Atualiza APENAS a carteira. O Nível é protegido por XP vitalício!
     const { error } = await adminDb.from('users').update({ 
-        nexus_coins: newCoins,
-        global_level: newLevel // 🔥 Atualiza o nível
+        nexus_coins: (targetUser.nexus_coins || 0) + amount 
     }).eq('id', targetUser.id)
 
     if (error) return { error: `Erro na distribuição: ${error.message}` }
@@ -62,12 +53,12 @@ export async function distributeCoinsToUser(username: string, amount: number) {
     return { success: `🎉 ${amount} moedas enviadas para ${username}!` }
 }
 
-// 1.1 DISTRIBUIR MOEDAS PARA TODOS (Com o Level Up via RPC no banco)
+// 1.1 DISTRIBUIR MOEDAS PARA TODOS
 export async function distributeCoinsToAll(amount: number) {
     if (!(await checkAdmin()) || amount <= 0) return { error: 'Não autorizado ou valor inválido.' }
 
     const adminDb = getAdminClient()
-    // Nota: Se usar distribute_coins_global, lembre-se de atualizar o código SQL da Função no Supabase para também calcular o Nível!
+    // A função SQL também deve apenas alterar nexus_coins
     const { error } = await adminDb.rpc('distribute_coins_global', { amount_to_add: amount })
 
     if (error) return { error: `Erro na distribuição: ${error.message}` }
@@ -100,13 +91,8 @@ export async function addShopItem(formData: ShopItemFormData) {
 
     const adminDb = getAdminClient()
     const { error } = await adminDb.from('shop_items').insert([{
-        name: formData.name,
-        price: parseInt(formData.price),
-        category: formData.category,
-        rarity_type: formData.rarity,
-        gradient: formData.category === 'Fundos Animados' ? formData.style : null,
-        border_style: formData.category === 'Molduras de Avatar' ? formData.style : null,
-        tag_style: formData.category === 'Títulos Exclusivos' ? formData.style : null,
+        name: formData.name, price: parseInt(formData.price), category: formData.category, rarity_type: formData.rarity,
+        gradient: formData.category === 'Fundos Animados' ? formData.style : null, border_style: formData.category === 'Molduras de Avatar' ? formData.style : null, tag_style: formData.category === 'Títulos Exclusivos' ? formData.style : null,
     }])
 
     if (error) return { error: 'Erro ao criar item.' }
@@ -176,12 +162,14 @@ export async function getTargetSyncDetails(username: string) {
     return { userId: user.id, steamId: user.steam_id, psnId: psn, xboxId: xbox, epicId: epic };
 }
 
-// 8. BANIR USUÁRIO
+// 🔥 8. BANIR USUÁRIO
 export async function banUser(username: string) {
     if (!(await checkAdmin() || await checkModerator())) return { error: 'Acesso negado.' };
     if (!username) return { error: 'Username não fornecido.' };
 
     const adminDb = getAdminClient();
+    
+    // Ano 3000 = Ban Permanente
     const banDate = new Date('3000-01-01T00:00:00Z').toISOString();
     
     const { error } = await adminDb.from('users').update({ banned_until: banDate }).eq('username', username.trim());
@@ -190,7 +178,7 @@ export async function banUser(username: string) {
     return { success: `${username} foi exilado do Nexus permanentemente.` };
 }
 
-// 9. APLICAR MULTA FINANCEIRA (COM LEVEL DOWN)
+// 9. APLICAR MULTA FINANCEIRA (AGORA SEM AFETAR O NÍVEL)
 export async function applyFineToUser(username: string, mode: 'exact' | 'half' | 'zero', exactAmount?: number) {
     if (!(await checkAdmin() || await checkModerator())) return { error: 'Acesso negado.' };
     if (!username) return { error: 'Username não fornecido.' };
@@ -211,16 +199,13 @@ export async function applyFineToUser(username: string, mode: 'exact' | 'half' |
         newBalance = Math.floor(currentCoins / 2);
         penaltyDesc = 'fortuna reduzida pela metade';
     } else if (mode === 'exact' && exactAmount) {
-        newBalance = Math.max(0, currentCoins - exactAmount); 
+        newBalance = Math.max(0, currentCoins - exactAmount); // Nunca deixa ficar negativo
         penaltyDesc = `multa de ${exactAmount} moedas aplicada`;
     }
 
-    const newLevel = calculateLevel(newBalance); // 🔥 Reduz o nível do jogador junto com as moedas
-
-    const { error } = await adminDb.from('users').update({ 
-        nexus_coins: newBalance,
-        global_level: newLevel
-    }).eq('id', user.id);
+    // Atualiza APENAS a carteira financeira (nexus_coins). 
+    // O nível continua intacto porque é baseado na XP (global_activity)
+    const { error } = await adminDb.from('users').update({ nexus_coins: newBalance }).eq('id', user.id);
     
     if (error) return { error: 'Falha ao aplicar multa.' };
     
