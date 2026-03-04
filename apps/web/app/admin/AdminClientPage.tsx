@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from 'react'
 import { addShopItem, distributeCoinsToAll, distributeCoinsToUser, getTargetSyncDetails, performTargetedReset, setGlobalAnnouncement, updateReportStatus, banUser, applyFineToUser } from './actions'
 import { toast } from 'react-toastify'
-import { FaStore, FaShieldAlt, FaBullhorn, FaCheck, FaTimes, FaBan, FaUser, FaCoins, FaSyncAlt, FaTerminal, FaGavel, FaMoneyBillWave } from 'react-icons/fa'
+import { FaStore, FaShieldAlt, FaBullhorn, FaCheck, FaTimes, FaBan, FaUser, FaCoins, FaSyncAlt, FaTerminal, FaGavel, FaMoneyBillWave, FaExclamationTriangle } from 'react-icons/fa'
 import { fetchSteamGamesList, finalizeSync, processSingleGame } from '../integrations/actions'
 import { fetchPlayStationGamesList, processSinglePlayStationGame } from '../integrations/psn'
 import { AiOutlineClear } from 'react-icons/ai'
@@ -28,8 +28,8 @@ export default function AdminClientPage({ initialReports }: { initialReports: Re
     const [formData, setFormData] = useState({ name: '', price: '', category: 'Fundos Animados', rarity: 'comum', style: '' })
 
     const [targetUserReset, setTargetUserReset] = useState('')
-    const [targetUserPunish, setTargetUserPunish] = useState('') // Separado do reset
-    const [fineAmount, setFineAmount] = useState('') // Valor da multa exata
+    const [targetUserPunish, setTargetUserPunish] = useState('') 
+    const [fineAmount, setFineAmount] = useState('') 
 
     const [resetOptions, setResetOptions] = useState({ games: false, social: false, inventory: false, stats: false })
 
@@ -37,6 +37,16 @@ export default function AdminClientPage({ initialReports }: { initialReports: Re
     const [syncPlatform, setSyncPlatform] = useState('Ambos');
     const [syncTerminal, setSyncTerminal] = useState<string[]>([]);
     const terminalRef = useRef<HTMLDivElement>(null);
+
+    // 🔥 ESTADO DO MODAL SUPREMO
+    const [modal, setModal] = useState({
+        isOpen: false,
+        title: '',
+        message: '',
+        confirmLabel: '',
+        isDanger: false,
+        onConfirm: async () => {}
+    });
 
     const pushLog = (msg: string) => setSyncTerminal(prev => [...prev, msg]);
 
@@ -51,48 +61,83 @@ export default function AdminClientPage({ initialReports }: { initialReports: Re
     async function handleDistribute() { if (!coinAmount || Number(coinAmount) <= 0) return; setLoading(true); const res = await distributeCoinsToAll(Number(coinAmount)); if (res.success) toast.success(res.success); else toast.error(res.error); setCoinAmount(''); setLoading(false); }
     async function handleBroadcast(e: React.FormEvent) { e.preventDefault(); setLoading(true); const res = await setGlobalAnnouncement(announcement.message, announcement.type); if (res.success) toast.success(res.success); else toast.error(res.error); setLoading(false); }
 
-    // RESET DE MANUTENÇÃO (NA ABA DE OPERAÇÕES)
-    async function handleTargetedReset() {
+    // RESET DE MANUTENÇÃO COM MODAL
+    function triggerTargetedReset() {
         if (!targetUserReset) return toast.error("O alvo não pode estar vazio.");
         if (!Object.values(resetOptions).some(v => v === true)) return toast.warning("Selecione pelo menos um módulo para resetar.");
-        if (confirm(`Atenção: Você está executando uma manutenção destrutiva nos dados de: ${targetUserReset}. Continuar?`)) {
-            setLoading(true); const res = await performTargetedReset(targetUserReset, resetOptions);
-            if (res.success) { toast.success(res.success); setTargetUserReset(''); setResetOptions({ games: false, social: false, inventory: false, stats: false }); } else toast.error(res.error);
-            setLoading(false);
-        }
-    }
-
-    // BANIMENTO (NA ABA DE MODERAÇÃO)
-    async function handleBanUser() {
-        if (!targetUserPunish) return toast.error("Digite o nome de usuário do alvo.");
-        if (confirm(`🚨 ALERTA DE EXÍLIO 🚨\nTem a certeza que deseja banir [${targetUserPunish}] permanentemente?`)) {
-            setLoading(true); const res = await banUser(targetUserPunish);
-            if (res.success) { toast.success(res.success); setTargetUserPunish(''); } else toast.error(res.error);
-            setLoading(false);
-        }
-    }
-
-    // MULTA FINANCEIRA (NA ABA DE MODERAÇÃO)
-    async function handleFine(mode: 'exact' | 'half' | 'zero') {
-        if (!targetUserPunish) return toast.error("Digite o nome de usuário do alvo.");
-        if (mode === 'exact' && (!fineAmount || Number(fineAmount) <= 0)) return toast.error("Digite um valor válido para a multa.");
         
-        let confirmMsg = '';
-        if (mode === 'exact') confirmMsg = `Deseja retirar ${fineAmount} moedas de ${targetUserPunish}?`;
-        if (mode === 'half') confirmMsg = `Deseja cortar a fortuna de ${targetUserPunish} pela metade?`;
-        if (mode === 'zero') confirmMsg = `Deseja ZERAR completamente a conta bancária de ${targetUserPunish}?`;
+        setModal({
+            isOpen: true,
+            title: 'Protocolo de Limpeza',
+            message: `Atenção: Você está prestes a executar uma manutenção destrutiva nos dados de:\n\n👤 Alvo: ${targetUserReset}\n\nEsta ação apagará os dados selecionados do banco de dados e não pode ser desfeita.`,
+            confirmLabel: 'Executar Limpeza',
+            isDanger: true,
+            onConfirm: async () => {
+                setLoading(true); 
+                const res = await performTargetedReset(targetUserReset, resetOptions);
+                if (res.success) { toast.success(res.success); setTargetUserReset(''); setResetOptions({ games: false, social: false, inventory: false, stats: false }); } else toast.error(res.error);
+                setLoading(false);
+            }
+        });
+    }
 
-        if (confirm(confirmMsg)) {
-            setLoading(true); 
-            const res = await applyFineToUser(targetUserPunish, mode, Number(fineAmount));
-            if (res.success) { toast.success(res.success); setFineAmount(''); } else toast.error(res.error);
-            setLoading(false);
+    // BANIMENTO COM MODAL
+    function triggerBanUser() {
+        if (!targetUserPunish) return toast.error("Digite o nome de usuário do alvo.");
+        
+        setModal({
+            isOpen: true,
+            title: 'Sentença de Exílio',
+            message: `🚨 ALERTA CRÍTICO 🚨\n\nTem a certeza absoluta que deseja banir [${targetUserPunish}] permanentemente do Nexus?\n\nO jogador não poderá mais acessar a conta.`,
+            confirmLabel: 'Exilar Usuário',
+            isDanger: true,
+            onConfirm: async () => {
+                setLoading(true); 
+                const res = await banUser(targetUserPunish);
+                if (res.success) { toast.success(res.success); setTargetUserPunish(''); } else toast.error(res.error);
+                setLoading(false);
+            }
+        });
+    }
+
+    // MULTA FINANCEIRA COM MODAL (Corrigida e Blindada)
+    function triggerFine(mode: 'exact' | 'half' | 'zero') {
+        if (!targetUserPunish) return toast.error("Digite o nome de usuário do alvo.");
+        if (mode === 'exact' && (!fineAmount || Number(fineAmount) <= 0)) return toast.error("Digite um valor numérico válido para a multa exata.");
+
+        let confirmMsg = '';
+        let modalTitle = '';
+        let parsedAmount = 0;
+
+        if (mode === 'exact') {
+            modalTitle = 'Multa Específica';
+            parsedAmount = Number(fineAmount);
+            confirmMsg = `Deseja retirar exatamente ${parsedAmount} moedas da carteira de ${targetUserPunish}?`;
+        } else if (mode === 'half') {
+            modalTitle = 'Corte de Fortuna';
+            confirmMsg = `Atenção: Esta ação cortará a fortuna financeira de ${targetUserPunish} pela metade (-50%). Deseja prosseguir?`;
+        } else if (mode === 'zero') {
+            modalTitle = 'Falência Decretada';
+            confirmMsg = `⚠️ EXTREMO ⚠️\n\nEsta ação irá ZERAR (0) completamente a conta bancária de ${targetUserPunish}.\n\n(O Nível de Prestígio não será afetado).`;
         }
+
+        setModal({
+            isOpen: true,
+            title: modalTitle,
+            message: confirmMsg,
+            confirmLabel: 'Aplicar Sanção',
+            isDanger: mode === 'zero', // Só fica vermelho se for zerar
+            onConfirm: async () => {
+                setLoading(true); 
+                const res = await applyFineToUser(targetUserPunish, mode, parsedAmount);
+                if (res.success) { toast.success(res.success); setFineAmount(''); } else toast.error(res.error);
+                setLoading(false);
+            }
+        });
     }
 
     async function handleResolveReport(id: string, status: 'resolved' | 'dismissed') { setLoading(true); const res = await updateReportStatus(id, status); if (res.success) { toast.success(res.success); setReports(prev => prev.filter(r => r.id !== id)); } else { toast.error(res.error); } setLoading(false); }
-    
-    // ENVIAR NOME PARA O CAMPO DE PUNIÇÃO NA MODERAÇÃO
+
     async function sendToPunishment(username: string) { handleTabChange('moderacao'); setTargetUserPunish(username); setTimeout(() => { window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); }, 100); }
 
     async function handleForceSync() {
@@ -123,8 +168,10 @@ export default function AdminClientPage({ initialReports }: { initialReports: Re
                         const res = await processSingleGame(listResult.games[i]!, listResult.steamId!, userId);
                         coins += res.coins; plats += res.plats;
                     }
-                    await finalizeSync(coins, plats, listResult.games.length, userId);
-                    pushLog(`[STEAM] 🏁 Sincronização concluída: +${coins} Moedas | +${plats} Platinas`);
+
+                    const finalData = await finalizeSync(coins, plats, listResult.games.length, userId);
+                    pushLog(`[STEAM] 🏁 Varredura concluída: +${coins} Moedas | +${plats} Platinas`);
+                    if (finalData) pushLog(`[NEXUS] 📈 Conta Atualizada: Lvl ${finalData.newLevel} | Saldo Total: ${finalData.newTotalCoins} Moedas`);
                 }
             }
         }
@@ -145,8 +192,10 @@ export default function AdminClientPage({ initialReports }: { initialReports: Re
                         const res = await processSinglePlayStationGame(game, listResult.accountId, listResult.accessToken, userId);
                         coins += res.coins; plats += res.plats;
                     }
-                    await finalizeSync(coins, plats, 0, userId);
-                    pushLog(`[PSN] 🏁 Sincronização concluída: +${coins} Moedas | +${plats} Platinas`);
+
+                    const finalData = await finalizeSync(coins, plats, 0, userId);
+                    pushLog(`[PSN] 🏁 Varredura concluída: +${coins} Moedas | +${plats} Platinas`);
+                    if (finalData) pushLog(`[NEXUS] 📈 Conta Atualizada: Lvl ${finalData.newLevel} | Saldo Total: ${finalData.newTotalCoins} Moedas`);
                 }
             }
         }
@@ -156,7 +205,9 @@ export default function AdminClientPage({ initialReports }: { initialReports: Re
     }
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-8 relative">
+            
+            {/* TABS DE NAVEGAÇÃO */}
             <div className="flex flex-wrap gap-3 bg-surface/40 p-2 rounded-2xl border border-white/5 shadow-inner">
                 <button onClick={() => handleTabChange('operacoes')} className={`flex-1 min-w-30 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${activeTab === 'operacoes' ? 'bg-primary text-white shadow-md' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}><FaBullhorn className="text-lg" /> Operações</button>
                 <button onClick={() => handleTabChange('loja')} className={`flex-1 min-w-30 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${activeTab === 'loja' ? 'bg-primary text-white shadow-md' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}><FaStore className="text-lg" /> Vitrine</button>
@@ -223,7 +274,6 @@ export default function AdminClientPage({ initialReports }: { initialReports: Re
                         </div>
                     </div>
 
-                    {/* MANUTENÇÃO (REDUZIDO AQUI, BANIMENTO MOVIDO PARA MODERAÇÃO) */}
                     <div className="lg:col-span-2 bg-yellow-500/5 border border-yellow-500/20 p-8 rounded-[3rem] relative overflow-hidden shadow-xl">
                         <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-yellow-600 to-yellow-400"></div>
                         <h3 className="text-yellow-500 font-black text-lg flex items-center gap-3 mb-2"><span className="text-2xl">🔧</span> Manutenção e Reset de Dados</h3>
@@ -238,7 +288,7 @@ export default function AdminClientPage({ initialReports }: { initialReports: Re
                                     </button>
                                 ))}
                             </div>
-                            <button onClick={handleTargetedReset} disabled={loading || !targetUserReset} className="w-full flex justify-center items-center gap-2 py-4 bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-yellow-500 hover:text-black transition-all active:scale-95 disabled:opacity-50 mt-4">
+                            <button onClick={triggerTargetedReset} disabled={loading || !targetUserReset} className="w-full flex justify-center items-center gap-2 py-4 bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-yellow-500 hover:text-black transition-all active:scale-95 disabled:opacity-50 mt-4">
                                 <AiOutlineClear className='text-2xl' /> Executar Reset
                             </button>
                         </div>
@@ -273,8 +323,7 @@ export default function AdminClientPage({ initialReports }: { initialReports: Re
             {/* ABA 3: MODERAÇÃO E PUNIÇÕES */}
             {!isPending && activeTab === 'moderacao' && (
                 <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
-                    
-                    {/* AVALIAÇÃO DE REPORTES */}
+
                     <div className="bg-surface/40 border border-border p-8 rounded-[3rem] shadow-xl">
                         <h2 className="text-xl font-black text-white flex items-center gap-3 mb-6"><span className="bg-orange-500/20 text-orange-400 p-2.5 rounded-xl">🚨</span> Denúncias Pendentes</h2>
                         {reports.length === 0 ? (
@@ -304,43 +353,67 @@ export default function AdminClientPage({ initialReports }: { initialReports: Re
                         )}
                     </div>
 
-                    {/* 🔥 TRIBUNAL DO NEXUS: MULTAS E BANIMENTOS */}
+                    {/* TRIBUNAL DO NEXUS: MULTAS E BANIMENTOS */}
                     <div className="bg-red-500/5 border border-red-500/20 p-8 rounded-[3rem] relative overflow-hidden shadow-xl">
                         <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-red-600 to-red-400"></div>
                         <h3 className="text-red-500 font-black text-xl flex items-center gap-3 mb-2"><span className="text-3xl">⚖️</span> Tribunal do Nexus</h3>
                         <p className="text-[11px] text-red-400/70 font-medium uppercase tracking-widest mb-8">Aplique sanções financeiras ou exilhe infratores da plataforma.</p>
 
                         <div className="max-w-full space-y-6 relative z-10">
-                            
                             <div className="relative">
                                 <span className="absolute inset-y-0 left-0 pl-5 flex items-center text-red-500 font-bold"><FaUser /></span>
                                 <input type="text" placeholder="Username do infrator..." className="w-full bg-black/60 border border-red-500/30 rounded-2xl pl-12 pr-5 py-4 text-white font-mono focus:border-red-500 focus:ring-1 focus:ring-red-500 outline-none transition-all" value={targetUserPunish} onChange={e => setTargetUserPunish(e.target.value)} />
                             </div>
 
-                            {/* SEÇÃO DE MULTAS */}
                             <div className="p-5 border border-red-500/20 bg-black/30 rounded-2xl space-y-4">
                                 <h4 className="text-red-400 font-bold text-sm flex items-center gap-2 mb-2"><FaMoneyBillWave /> Sanções Financeiras</h4>
-                                
+
                                 <div className="flex flex-col md:flex-row gap-3">
                                     <div className="flex-1 flex bg-black/50 border border-red-500/20 rounded-xl overflow-hidden focus-within:border-red-500 transition-colors">
                                         <input type="number" placeholder="Quantia da multa" className="w-full bg-transparent px-4 py-3 text-white text-sm outline-none font-mono" value={fineAmount} onChange={e => setFineAmount(e.target.value)} />
-                                        <button onClick={() => handleFine('exact')} disabled={loading || !targetUserPunish || !fineAmount} className="px-5 bg-red-900/50 text-red-300 font-bold text-xs hover:bg-red-800 transition-colors disabled:opacity-50 border-l border-red-500/20 shrink-0">Cobrar Exato</button>
+                                        <button onClick={() => triggerFine('exact')} disabled={loading || !targetUserPunish || !fineAmount} className="px-5 bg-red-900/50 text-red-300 font-bold text-xs hover:bg-red-800 transition-colors disabled:opacity-50 border-l border-red-500/20 shrink-0">Cobrar Exato</button>
                                     </div>
-                                    
+
                                     <div className="flex gap-3">
-                                        <button onClick={() => handleFine('half')} disabled={loading || !targetUserPunish} className="px-5 py-3 bg-red-900/30 border border-red-500/30 text-red-400 rounded-xl font-bold text-xs hover:bg-red-800 transition-all disabled:opacity-50">Cortar -50%</button>
-                                        <button onClick={() => handleFine('zero')} disabled={loading || !targetUserPunish} className="px-5 py-3 bg-red-950 border border-red-500/50 text-red-300 rounded-xl font-black text-xs hover:bg-red-800 transition-all disabled:opacity-50">Zerar Cofre</button>
+                                        <button onClick={() => triggerFine('half')} disabled={loading || !targetUserPunish} className="px-5 py-3 bg-red-900/30 border border-red-500/30 text-red-400 rounded-xl font-bold text-xs hover:bg-red-800 transition-all disabled:opacity-50">Cortar -50%</button>
+                                        <button onClick={() => triggerFine('zero')} disabled={loading || !targetUserPunish} className="px-5 py-3 bg-red-950 border border-red-500/50 text-red-300 rounded-xl font-black text-xs hover:bg-red-800 transition-all disabled:opacity-50">Zerar Cofre</button>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* SEÇÃO DE BANIMENTO */}
-                            <button onClick={handleBanUser} disabled={loading || !targetUserPunish} className="flex-1 flex justify-center items-center gap-2 w-full py-4 mt-2 bg-red-500/10 border border-red-500/30 text-red-500 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all active:scale-95 disabled:opacity-50">
+                            <button onClick={triggerBanUser} disabled={loading || !targetUserPunish} className="flex-1 flex justify-center items-center gap-2 w-full py-4 mt-2 bg-red-500/10 border border-red-500/30 text-red-500 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all active:scale-95 disabled:opacity-50">
                                 <FaBan className='text-xl' /> Sentenciar a Exílio Permanente
                             </button>
                         </div>
                     </div>
+                </div>
+            )}
 
+            {/* MODAL SUPREMO DE CONFIRMAÇÃO GLASSMORPHISM */}
+            {modal.isOpen && (
+                <div className="fixed inset-0 z-100 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+                    <div className="bg-[#0a0a0a] border border-white/10 p-8 rounded-[2.5rem] shadow-2xl max-w-md w-full scale-in-95 duration-200 relative overflow-hidden">
+                        
+                        {/* Glow de Fundo no Modal */}
+                        <div className={`absolute -top-20 -right-20 w-48 h-48 rounded-full blur-[80px] pointer-events-none ${modal.isDanger ? 'bg-red-600/20' : 'bg-yellow-500/20'}`}></div>
+
+                        <h3 className={`text-2xl font-black mb-4 flex items-center gap-3 relative z-10 ${modal.isDanger ? 'text-red-500' : 'text-yellow-500'}`}>
+                            {modal.isDanger ? <FaExclamationTriangle /> : <FaMoneyBillWave />} {modal.title}
+                        </h3>
+                        
+                        <div className="text-gray-300 text-sm font-medium mb-8 leading-relaxed whitespace-pre-line relative z-10 bg-white/5 p-5 rounded-2xl border border-white/5">
+                            {modal.message}
+                        </div>
+                        
+                        <div className="flex gap-3 relative z-10">
+                            <button onClick={() => setModal(prev => ({ ...prev, isOpen: false }))} disabled={loading} className="flex-1 py-4 bg-white/5 hover:bg-white/10 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all disabled:opacity-50 border border-transparent hover:border-white/10">
+                                Cancelar
+                            </button>
+                            <button onClick={async () => { await modal.onConfirm(); setModal(prev => ({ ...prev, isOpen: false })); }} disabled={loading} className={`flex-1 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg active:scale-95 disabled:opacity-50 flex justify-center items-center gap-2 ${modal.isDanger ? 'bg-red-600 hover:bg-red-500 text-white shadow-[0_0_20px_rgba(220,38,38,0.3)]' : 'bg-yellow-500 hover:bg-yellow-400 text-black shadow-[0_0_20px_rgba(234,179,8,0.3)]'}`}>
+                                {loading ? <FaSyncAlt className="animate-spin" /> : modal.confirmLabel}
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>
