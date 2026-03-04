@@ -12,22 +12,13 @@ export const metadata: Metadata = {
   description: "Acesse o painel de administração do Nexus Achievements para gerenciar usuários, guias e monitorar o estado do sistema.",
 }
 
-// Tipagem oficial para as denúncias
+// Tipagem oficial e simplificada
 export interface ReportData {
   id: string;
   reported_username: string;
   reason: string;
   created_at: string;
   reporter: { username: string } | null;
-}
-
-// 🔥 TIPAGEM PARA BANIR O 'ANY' DO ESLINT
-interface RawReport {
-  id: string;
-  reported_username: string;
-  reason: string;
-  created_at: string;
-  reporter: { username: string } | { username: string }[] | null;
 }
 
 export default async function AdminPage() {
@@ -39,17 +30,13 @@ export default async function AdminPage() {
   const { data: profile } = await supabase.from("users").select("role").eq("id", user.id).single();
   if (profile?.role !== 'admin' && profile?.role !== 'moderator') redirect("/social");
 
-  // 🔥 Cria o Cliente Admin diretamente aqui para não quebrar as regras de Server Actions
   const adminDb = createSupabaseAdmin(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  // Estatísticas Rápidas
   const { count: totalUsers } = await adminDb.from('users').select('*', { count: 'exact', head: true });
   const { count: totalGuides } = await adminDb.from('game_guides').select('*', { count: 'exact', head: true });
-  
-  // Conta o total de jogos e divide por plataforma!
   const { count: totalGames } = await adminDb.from('games').select('*', { count: 'exact', head: true });
   const { count: totalSteam } = await adminDb.from('games').select('*', { count: 'exact', head: true }).eq('platform', 'Steam');
   const { count: totalPsn } = await adminDb.from('games').select('*', { count: 'exact', head: true }).eq('platform', 'PlayStation');
@@ -63,9 +50,13 @@ export default async function AdminPage() {
       .order('created_at', { ascending: false });
     
     if (reports) {
-      // 🔥 O ANY FOI BANIDO. Usamos o RawReport e formatamos perfeitamente
-      pendingReports = (reports as unknown as RawReport[]).map((r) => ({
-        ...r,
+      // 🔥 O CAST SEGURO QUE CALA O ESLINT
+      pendingReports = reports.map((r) => ({
+        id: r.id,
+        reported_username: r.reported_username,
+        reason: r.reason,
+        created_at: r.created_at,
+        // O Supabase pode retornar um array na relação foreign key, pegamos o índice 0.
         reporter: Array.isArray(r.reporter) ? r.reporter[0] : r.reporter
       })) as ReportData[];
     }
@@ -74,7 +65,6 @@ export default async function AdminPage() {
   return (
     <div className="max-w-7xl mx-auto py-10 px-4 space-y-12 animate-in fade-in duration-700">
 
-      {/* HEADER REDESENHADO COM GLOW */}
       <div className="relative overflow-hidden rounded-[3rem] bg-surface/30 border border-white/5 p-8 md:p-12 shadow-2xl">
         <div className="absolute inset-0 bg-linear-to-r from-red-500/10 via-transparent to-transparent pointer-events-none"></div>
         <div className="absolute -top-24 -right-24 w-64 h-64 bg-red-500/10 blur-[80px] rounded-full pointer-events-none"></div>
@@ -94,7 +84,6 @@ export default async function AdminPage() {
         </div>
       </div>
 
-      {/* ESTATÍSTICAS GAMIFICADAS */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="bg-surface/40 p-8 rounded-4xl border border-white/5 shadow-xl relative overflow-hidden group hover:border-primary/30 transition-colors">
           <div className="absolute top-4 right-4 text-4xl opacity-10 group-hover:scale-110 group-hover:opacity-20 transition-all duration-500"><IoLogoGameControllerB /></div>
@@ -132,9 +121,7 @@ export default async function AdminPage() {
         </div>
       </div>
 
-      {/* CHAMA O COMPONENTE CLIENTE COM OS DADOS */}
       <AdminClientPage initialReports={pendingReports} />
-
     </div>
   );
 }
