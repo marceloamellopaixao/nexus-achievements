@@ -4,19 +4,30 @@ import AdminClientPage from "./AdminClientPage";
 import { Metadata } from "next";
 import { MdAdminPanelSettings } from "react-icons/md";
 import { IoLogoGameControllerB, IoMdBook, IoMdFlash, IoMdPeople } from "react-icons/io";
+import { FaSteam, FaPlaystation } from "react-icons/fa";
+import { createClient as createSupabaseAdmin } from '@supabase/supabase-js';
 
 export const metadata: Metadata = {
   title: "Administração | Nexus Achievements",
   description: "Acesse o painel de administração do Nexus Achievements para gerenciar usuários, guias e monitorar o estado do sistema.",
 }
 
-// 1. Definimos a tipagem para as denúncias
+// Tipagem oficial para as denúncias
 export interface ReportData {
   id: string;
   reported_username: string;
   reason: string;
   created_at: string;
   reporter: { username: string } | null;
+}
+
+// 🔥 TIPAGEM PARA BANIR O 'ANY' DO ESLINT
+interface RawReport {
+  id: string;
+  reported_username: string;
+  reason: string;
+  created_at: string;
+  reporter: { username: string } | { username: string }[] | null;
 }
 
 export default async function AdminPage() {
@@ -26,30 +37,39 @@ export default async function AdminPage() {
   if (!user) redirect("/login");
 
   const { data: profile } = await supabase.from("users").select("role").eq("id", user.id).single();
-  if (profile?.role !== 'admin') redirect("/social");
+  if (profile?.role !== 'admin' && profile?.role !== 'moderator') redirect("/social");
+
+  // 🔥 Cria o Cliente Admin diretamente aqui para não quebrar as regras de Server Actions
+  const adminDb = createSupabaseAdmin(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
 
   // Estatísticas Rápidas
-  const { count: totalUsers } = await supabase.from('users').select('*', { count: 'exact', head: true });
-  const { count: totalGuides } = await supabase.from('game_guides').select('*', { count: 'exact', head: true });
-  const { count: totalGames } = await supabase.from('games').select('*', { count: 'exact', head: true });
+  const { count: totalUsers } = await adminDb.from('users').select('*', { count: 'exact', head: true });
+  const { count: totalGuides } = await adminDb.from('game_guides').select('*', { count: 'exact', head: true });
+  
+  // Conta o total de jogos e divide por plataforma!
+  const { count: totalGames } = await adminDb.from('games').select('*', { count: 'exact', head: true });
+  const { count: totalSteam } = await adminDb.from('games').select('*', { count: 'exact', head: true }).eq('platform', 'Steam');
+  const { count: totalPsn } = await adminDb.from('games').select('*', { count: 'exact', head: true }).eq('platform', 'PlayStation');
 
-  // 2. Removemos o 'any[]' e usamos a nova interface 'ReportData[]'
   let pendingReports: ReportData[] = [];
   try {
-    const { data: reports } = await supabase
+    const { data: reports } = await adminDb
       .from('user_reports')
       .select('id, reported_username, reason, created_at, reporter:users!reporter_id(username)')
       .eq('status', 'pending')
       .order('created_at', { ascending: false });
     
     if (reports) {
-      // Formata os dados para garantir que respeitam a interface
-      pendingReports = reports.map(r => ({
+      // 🔥 O ANY FOI BANIDO. Usamos o RawReport e formatamos perfeitamente
+      pendingReports = (reports as unknown as RawReport[]).map((r) => ({
         ...r,
         reporter: Array.isArray(r.reporter) ? r.reporter[0] : r.reporter
       })) as ReportData[];
     }
-  } catch (e) { console.error("Tabela user_reports não encontrada.", e) }
+  } catch (e) { console.error("Tabela user_reports falhou.", e) }
 
   return (
     <div className="max-w-7xl mx-auto py-10 px-4 space-y-12 animate-in fade-in duration-700">
@@ -80,6 +100,11 @@ export default async function AdminPage() {
           <div className="absolute top-4 right-4 text-4xl opacity-10 group-hover:scale-110 group-hover:opacity-20 transition-all duration-500"><IoLogoGameControllerB /></div>
           <p className="text-gray-500 text-[11px] font-black uppercase tracking-[0.2em] mb-2">Total de Jogos</p>
           <p className="text-4xl font-black text-white">{totalGames || 0} <span className="text-sm font-bold text-gray-500">Jogos</span></p>
+          
+          <div className="mt-4 flex items-center gap-4 border-t border-white/10 pt-3">
+             <div className="flex items-center gap-1.5 text-blue-400 text-xs font-black"><FaSteam /> {totalSteam || 0}</div>
+             <div className="flex items-center gap-1.5 text-blue-500 text-xs font-black"><FaPlaystation /> {totalPsn || 0}</div>
+          </div>
         </div>
 
         <div className="bg-surface/40 p-8 rounded-4xl border border-white/5 shadow-xl relative overflow-hidden group hover:border-primary/30 transition-colors">
