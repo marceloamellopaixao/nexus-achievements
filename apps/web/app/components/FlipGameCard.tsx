@@ -62,9 +62,6 @@ const FlipGameCard = memo(function FlipGameCard({ game, progress, backUrl }: Fli
           
           <div className="absolute inset-x-0 bottom-0 h-1/2 bg-linear-to-t from-background to-transparent z-10 pointer-events-none"></div>
           <div className="absolute inset-x-0 bottom-0 p-3 z-20 flex flex-col justify-end">
-            <h3 className="font-black text-white text-xs md:text-sm line-clamp-2 drop-shadow-md leading-tight group-hover:text-primary transition-colors">
-              {game.title}
-            </h3>
             {unlocked > 0 && !isPlat && (
                <div className="mt-2 w-full h-1.5 bg-black/80 rounded-full overflow-hidden border border-white/5"><div className="h-full bg-primary" style={{ width: `${pct}%` }}></div></div>
             )}
@@ -81,7 +78,7 @@ const FlipGameCard = memo(function FlipGameCard({ game, progress, backUrl }: Fli
         >
           {game.cover_url && (
             <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none bg-background">
-              <Image src={game.cover_url} fill alt="" sizes="(max-width: 768px) 150px, 200px" className="object-cover opacity-20 blur-sm scale-110" unoptimized />
+              <Image src={game.cover_url} fill alt="" sizes="(max-width: 768px) 150px, 200px" className="object-cover opacity-20 blur-sm scale-110" quality={25} />
             </div>
           )}
 
