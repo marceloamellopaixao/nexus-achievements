@@ -46,6 +46,15 @@ async function getDbClient(adminOverrideUserId?: string) {
   return await createClient();
 }
 
+// 🔥 NOVO HELPER: MATEMÁTICA DE RPG PARA CALCULAR NÍVEIS
+function calculateLevel(totalCoins: number): number {
+    // Fórmula: Level = Raiz Quadrada de (Moedas / 25)
+    // Exemplo: 100 moedas = Nível 2 | 2500 moedas = Nível 10
+    const baseRequirement = 25; 
+    const calculatedLevel = Math.floor(Math.sqrt(totalCoins / baseRequirement)) + 1;
+    return Math.max(1, calculatedLevel); // O nível mínimo é sempre 1
+}
+
 // 1. SISTEMA DE BUSCA SGDB COM LOGS
 // ==========================================
 async function getBackupImage(appId: string, type: 'grids' | 'heroes' | 'logos') {
@@ -81,7 +90,6 @@ async function getBackupImage(appId: string, type: 'grids' | 'heroes' | 'logos')
 export async function saveSteamId(steamId: string) {
   console.log(`\n🔗 [STEAM-LINK] Iniciando vinculação para ID: ${steamId}`);
 
-  // 🔥 PROTEÇÃO SÊNIOR: Impede nomes customizados e garante o ID64 numérico de 17 dígitos
   if (!/^\d{17}$/.test(steamId)) {
     console.error(`❌ [STEAM-LINK] Erro: Formato inválido. Não é uma SteamID64.`);
     return { error: 'Use sua SteamID64 (exatamente 17 números, ex: 765611...). Nomes customizados não funcionam.' }
@@ -138,7 +146,7 @@ export async function saveSteamId(steamId: string) {
 // ==========================================
 export async function fetchSteamGamesList(adminOverrideUserId?: string) {
   console.log(`\n📚 [STEAM-SYNC] Iniciando busca da Biblioteca...`);
-  const supabase = await getDbClient()
+  const supabase = await getDbClient(adminOverrideUserId)
   let userId = adminOverrideUserId;
 
   if (!userId) {
@@ -194,7 +202,7 @@ export async function fetchSteamGamesList(adminOverrideUserId?: string) {
 // 4. PROCESSAMENTO INDIVIDUAL (COM COLUNA CONSOLE)
 // ==========================================
 export async function processSingleGame(game: SteamGame, steamId: string, adminOverrideUserId?: string) {
-  const supabase = await getDbClient()
+  const supabase = await getDbClient(adminOverrideUserId)
   let userId = adminOverrideUserId;
 
   if (!userId) {
@@ -216,7 +224,7 @@ export async function processSingleGame(game: SteamGame, steamId: string, adminO
 
   try {
     const res = await fetch(`http://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v0001/?appid=${appId}&key=${STEAM_KEY}&steamid=${steamId}&l=brazilian`)
-    if (!res.ok) return { coins: 0, plats: 0 }; // Proteção anti-HTML
+    if (!res.ok) return { coins: 0, plats: 0 }; 
 
     const data = await res.json()
     if (!data?.playerstats?.success) return { coins: 0, plats: 0 }
@@ -341,13 +349,11 @@ export async function processSingleGame(game: SteamGame, steamId: string, adminO
 }
 
 // ==========================================
-// 5. FINALIZAÇÃO DA SINCRONIZAÇÃO
+// 5. FINALIZAÇÃO E CÁLCULO DE NÍVEIS 🔥
 // ==========================================
 export async function finalizeSync(totalCoinsEarned: number, totalPlatsEarned: number, totalGamesCount: number, adminOverrideUserId?: string) {
   console.log(`\n========================================================`);
   console.log(`🏁 [FINALIZAÇÃO] Salvando Totais Finais do Usuário...`);
-  console.log(`   ↳ 💰 Total Nexus Coins: +${totalCoinsEarned}`);
-  console.log(`   ↳ 🏆 Total Platinas: +${totalPlatsEarned}`);
 
   const supabase = await getDbClient(adminOverrideUserId)
   let userId = adminOverrideUserId;
@@ -355,21 +361,37 @@ export async function finalizeSync(totalCoinsEarned: number, totalPlatsEarned: n
   if (!userId) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-
     userId = user.id;
   }
 
-  const { data: userData } = await supabase.from('users').select('nexus_coins, total_platinums, total_games').eq('id', userId).single()
+  // 1. Buscamos o saldo ATUAL da conta e o Nível Atual
+  const { data: userData } = await supabase.from('users').select('nexus_coins, total_platinums, total_games, global_level').eq('id', userId).single()
+
+  const currentCoins = userData?.nexus_coins || 0;
+  const newTotalCoins = currentCoins + totalCoinsEarned;
+  
+  // 🔥 MÁGICA DE RPG: Calculamos o nível com as novas moedas
+  const currentLevel = userData?.global_level || 1;
+  const newLevel = calculateLevel(newTotalCoins);
+
+  if (newLevel > currentLevel) {
+      console.log(`   🌟 [LEVEL UP!] Usuário subiu do Nível ${currentLevel} para o Nível ${newLevel}!`);
+  }
+
+  console.log(`   ↳ 💰 Novo Saldo: ${newTotalCoins} Moedas (+${totalCoinsEarned})`);
+  console.log(`   ↳ 🏆 Total Platinas: ${(userData?.total_platinums || 0) + totalPlatsEarned} (+${totalPlatsEarned})`);
+  console.log(`   ↳ 📈 Nível de Caçador: Lvl ${newLevel}`);
 
   const { error } = await supabase.from('users').update({
-    nexus_coins: (userData?.nexus_coins || 0) + totalCoinsEarned,
+    nexus_coins: newTotalCoins,
+    global_level: newLevel,
     total_platinums: (userData?.total_platinums || 0) + totalPlatsEarned,
     total_games: totalGamesCount > 0 ? totalGamesCount : (userData?.total_games || 0),
     last_steam_sync: new Date().toISOString()
   }).eq('id', userId)
 
   if (error) console.error(`❌ [FINALIZAÇÃO] Erro ao salvar saldo final no banco:`, error);
-  else console.log(`✅ [FINALIZAÇÃO] Saldo gravado com sucesso! Cofre do Nexus fechado.`);
+  else console.log(`✅ [FINALIZAÇÃO] Saldo e Nível gravados com sucesso!`);
 
   console.log(`========================================================\n`);
 
