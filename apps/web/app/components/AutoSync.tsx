@@ -19,7 +19,7 @@ export default function AutoSync() {
 
         const { data: userData, error } = await supabase
           .from('users')
-          .select('last_steam_sync')
+          .select('last_steam_sync, nexus_coins, global_level')
           .eq('id', user.id)
           .maybeSingle();
 
@@ -28,15 +28,29 @@ export default function AutoSync() {
           return;
         }
 
+        // ==============================================================
+        // 🔥 PROTOCOLO DE AUTO-CURA (SELF-HEALING) DO NÍVEL GLOBAL
+        // Valida se o nível atual condiz matematicamente com as moedas.
+        // Se houver anomalias (dados legados), corrige instantaneamente!
+        // ==============================================================
+        const currentCoins = userData.nexus_coins || 0;
+        const expectedLevel = Math.max(1, Math.floor(Math.sqrt(currentCoins / 25)) + 1);
+
+        if (expectedLevel !== userData.global_level) {
+          console.log(`🔧 [AUTO-CURA] Corrigindo anomalia de Nível: de Lvl ${userData.global_level} para Lvl ${expectedLevel}`);
+          await supabase.from('users').update({ global_level: expectedLevel }).eq('id', user.id);
+        }
+
+        // ==============================================================
+        // 🔄 ROTINA DE SINCRONIZAÇÃO DA STEAM (1 Hora de Cooldown)
+        // ==============================================================
         const lastSync = userData.last_steam_sync ? new Date(userData.last_steam_sync).getTime() : 0;
         const now = new Date().getTime();
 
-        // Checa se a última sync foi há mais de 1 hora (3600000 ms)
         if (now - lastSync > 3600000) {
           console.log('🤖 AutoSync Iniciado nos bastidores...');
 
           try {
-            // 1. Busca a lista de jogos
             const listResult = await fetchSteamGamesList();
 
             if (listResult.error || !listResult.games) {
@@ -46,7 +60,6 @@ export default function AutoSync() {
               return;
             }
 
-            // 2. Limita a sincronização em background apenas aos 10 jogos mais recentes
             const recentGames = listResult.games.slice(0, 10);
             let totalCoins = 0; let totalPlats = 0;
 
@@ -56,24 +69,23 @@ export default function AutoSync() {
               totalPlats += result.plats || 0;
             }));
 
-            // 3. Finaliza a sync para registrar o horário e dar as moedas
             if (recentGames.length > 0) {
               console.log(`🤖 Finalizando AutoSync: ${totalCoins} Nexus Coins e ${totalPlats} Plats encontrados.`);
               console.log('🤖 Atualizando o relógio de sync e concedendo recompensas...');
+
               await finalizeSync(totalCoins, totalPlats, listResult.games.length);
             } else {
-              // Caso a lista de jogos esteja vazia, garante a atualização do relógio
-              console.log('🤖 Nenhum jogo recente encontrado para AutoSync, mas atualizando o relógio de sync.');
+              console.log(`🤖 AutoSync Concluído! +${totalCoins} Nexus Coins encontradas no background.`);
               await supabase.from('users').update({ last_steam_sync: new Date().toISOString() }).eq('id', user.id);
             }
-
             console.log(`🤖 AutoSync Concluído! +${totalCoins} Nexus Coins encontradas no background.`);
           } catch (err) {
             console.error('🤖 Erro fatal no AutoSync:', err);
+
           }
         }
-      }, 5000); // Delay de 5 segundos para não impactar a experiência inicial
-    }
+      }, 5000);
+    };
 
     executeBackgroundSync();
   }, [supabase]);
